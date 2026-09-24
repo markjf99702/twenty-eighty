@@ -48,8 +48,13 @@ export const POSITION_TEMPLATES: Record<FieldPosition | "DH", PositionTemplate> 
 /** Always-right-handed throwers at these spots. */
 const RIGHTY_ONLY: ReadonlySet<string> = new Set(["C", "2B", "3B", "SS"]);
 
+const r1 = (x: number) => Math.round(x * 10) / 10;
+const r2 = (x: number) => Math.round(x * 100) / 100;
+
+/** Grades are kept to one decimal (true talent); scouting reports round them to 5s. */
 function tool(present: number, future: number): ToolGrade {
-  return { present: clampGrade(present), future: clampGrade(Math.max(present, future)) };
+  const p = r1(clampGrade(present));
+  return { present: p, future: r1(clampGrade(Math.max(p, future))) };
 }
 
 /** Expected remaining growth (in grade points) for a player of this age. */
@@ -60,7 +65,7 @@ export function growthRoom(age: number): number {
 /** Organizational fields for a newly generated player; the league generator assigns him. */
 function unassigned(rng: Rng) {
   return {
-    durability: clamp(rng.normal(), -2.5, 2.5),
+    durability: r2(clamp(rng.normal(), -2.5, 2.5)),
     teamId: null,
     level: "A" as const,
     onFortyMan: false,
@@ -161,9 +166,9 @@ export function generateHitter(rng: Rng, opts: HitterOptions): Player {
     positions,
     hitting,
     traits: {
-      launch: clamp(0.35 * powZ + 0.9 * rng.normal(), -2, 2),
-      pull: clamp(0.3 * powZ + 0.95 * rng.normal(), -2, 2),
-      aggression: clamp(0.4 * ((hitting.speed.present - 50) / 10) + 0.9 * rng.normal(), -2.5, 2.5),
+      launch: r2(clamp(0.35 * powZ + 0.9 * rng.normal(), -2, 2)),
+      pull: r2(clamp(0.3 * powZ + 0.95 * rng.normal(), -2, 2)),
+      aggression: r2(clamp(0.4 * ((hitting.speed.present - 50) / 10) + 0.9 * rng.normal(), -2.5, 2.5)),
     },
     ...unassigned(rng),
   };

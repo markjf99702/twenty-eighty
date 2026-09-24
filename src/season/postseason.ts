@@ -114,5 +114,6 @@ export function runPostseason(season: Season): PostseasonResult {
   const [h, l] = season.compare(season.records[a]!, season.records[b]!) <= 0 ? [a, b] : [b, a];
   const ws = playSeries(season, "World Series", null, h, l, 7, lastDay(...series) + 2);
   series.push(ws);
-  return { seeds, series, champion: ws.winner };
+  season.postseason = { seeds, series, champion: ws.winner };
+  return season.postseason;
 }

@@ -39,6 +39,7 @@ import {
   type PitchingLine,
 } from "../stats/lines";
 import { RunTracker } from "../stats/runExpectancy";
+import type { PostseasonResult } from "./postseason";
 import { buildSchedule, type Schedule } from "./schedule";
 import { StaffTracker } from "./staff";
 
@@ -132,7 +133,7 @@ export class LevelSeason {
   readonly fielding = new LineBook<FieldingLine>(emptyFielding, { running: true, add: addFielding });
   records: TeamRecord[];
   games: GameSummary[] = [];
-  readonly env: SimEnv;
+  env: SimEnv;
   parkRuns: { home: number; homeG: number; road: number; roadG: number }[];
 
   constructor(
@@ -283,6 +284,8 @@ export class LevelSeason {
 
 export interface SeasonOptions {
   seed?: string;
+  /** False when restoring a saved season (don't reset per-season player flags). */
+  fresh?: boolean;
   /** Simulate the minor league affiliates too (default true). */
   minors?: boolean;
   /** Let AI front offices make roster moves (default true). */
@@ -292,8 +295,10 @@ export interface SeasonOptions {
 const OPENING_DAY = { month: 2, day: 26 }; // March 26
 
 export class Season {
-  readonly schedule: Schedule;
+  schedule: Schedule;
   staff = new StaffTracker();
+  /** Set once the playoffs have been played. */
+  postseason: PostseasonResult | null = null;
   readonly levels: Record<Level, LevelSeason>;
   readonly simulateMinors: boolean;
   readonly aiRosters: boolean;
@@ -317,9 +322,11 @@ export class Season {
     this.schedule = buildSchedule(league, this.rng.fork("schedule"));
     this.levels = {} as Record<Level, LevelSeason>;
     for (const level of LEVELS) this.levels[level] = new LevelSeason(level, league);
-    for (const p of league.players) {
-      p.options.usedThisYear = false;
-      if (p.injury) this.injured.add(p.id);
+    if (o.fresh ?? true) {
+      for (const p of league.players) {
+        p.options.usedThisYear = false;
+        if (p.injury) this.injured.add(p.id);
+      }
     }
   }
 
@@ -447,8 +454,8 @@ export class Season {
    * BF) on the major-league scale, for the AI's roster decisions.
    */
   performance(): PerformanceLookup {
-    // Production changes slowly; refresh the read once a week.
-    if (this.perfCache && this.day - this.perfCache.day < 7) return this.perfCache.lookup;
+    // Recomputed daily from live totals (cheap), so saved games resume identically.
+    if (this.perfCache && this.perfCache.day === this.day) return this.perfCache.lookup;
     const levelInfo = new Map<Level, { lgWoba: number; lgRa9: number; batShift: number; armShift: number }>();
     for (const level of LEVELS) {
       const ls = this.levels[level];

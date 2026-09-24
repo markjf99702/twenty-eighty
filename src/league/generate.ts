@@ -147,12 +147,12 @@ function rawness(p: Player, level: Level): void {
   if (r === 0) return;
   if (p.pitching) {
     const ctl = 10 * r;
-    p.pitching.control.present = clampGrade(p.pitching.control.present - ctl);
-    for (const pitch of p.pitching.pitches) pitch.grade.present = clampGrade(pitch.grade.present + (ctl * 4) / 22);
+    p.pitching.control.present = r1(clampGrade(p.pitching.control.present - ctl));
+    for (const pitch of p.pitching.pitches) pitch.grade.present = r1(clampGrade(pitch.grade.present + (ctl * 4) / 22));
   } else {
     const eye = 8 * r;
-    p.hitting.eye.present = clampGrade(p.hitting.eye.present - eye);
-    p.hitting.power.present = clampGrade(p.hitting.power.present + (eye * 6) / 19);
+    p.hitting.eye.present = r1(clampGrade(p.hitting.eye.present - eye));
+    p.hitting.power.present = r1(clampGrade(p.hitting.power.present + (eye * 6) / 19));
   }
 }
 
@@ -232,9 +232,11 @@ function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[],
   };
 }
 
+const r1 = (x: number) => Math.round(x * 10) / 10;
+
 function shiftTool(t: ToolGrade, delta: number): void {
-  t.present = clampGrade(t.present + delta);
-  t.future = clampGrade(Math.max(t.present, t.future + delta));
+  t.present = r1(clampGrade(t.present + delta));
+  t.future = r1(clampGrade(Math.max(t.present, t.future + delta)));
 }
 
 /**
