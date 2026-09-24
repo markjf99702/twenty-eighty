@@ -13,10 +13,12 @@ Two things are different from the late-90s version:
   them (wOBA weights, FIP constant, runs per win, park factors) are re-derived every
   season from the simulated league's own run environment.
 
-> Status: **phases 1-4 of the roadmap are done**: the engine, player generation, full
+> Status: **phases 1-5 of the roadmap are done**: the engine, player generation, full
 > organizations with four minor league affiliates, roster rules, injuries, in-game
-> substitutions, AI front offices, postseason, advanced stats, calibration, and a browser
-> UI to play it all in. The offseason (aging, contracts, the draft, trades) is next.
+> substitutions, AI front offices, postseason, advanced stats, calibration, a browser
+> UI, and the offseason: development and aging, contracts and payroll, the draft, free
+> agency, international signings and trades. Seasons roll on indefinitely. Scouting
+> uncertainty, finances and owner goals are next.
 
 ## Quick start
 
@@ -29,6 +31,7 @@ npm run sim:game -- DEN BOS        # one game, with a box score
 npm run scout -- NYE               # an organization's scouting report on the 20-80 scale
 npm run grade-chart                # what each grade means in stats (see below)
 npm run calibrate                  # compare a simulated season to real MLB
+npm run sim:years -- --years 10    # many seasons, offseasons included, watching for drift
 npm test                           # vitest suite
 ```
 
@@ -58,6 +61,15 @@ that any web server can host. Pick a seed and a club, and you're the GM:
   and the season's own run environment (wOBA weights, FIP constant, runs per win).
 - **Scores and box scores**, **standings** with the wild-card race, and the **postseason**
   bracket.
+- **The offseason**, a phase at a time: the season in review (awards, who developed,
+  who retired), the tender deadline for your arbitration cases, the draft (pick when
+  you're on the clock), eight weeks of free agency (make offers; players take the best
+  one that clears their price), international signings against your bonus pool, and
+  spring training. Then the next season starts.
+- **Trades** at any time before the July 31 deadline or in the winter: pick players from
+  both sides and the other club tells you whether it would say yes (and roughly how much
+  more it wants if not). **Payroll** shows every contract, your budget and future
+  commitments; **History** keeps champions and award winners.
 
 The game autosaves to the browser (IndexedDB) after every sim and roster move, and a save
 can be exported to a file and imported again from the League office page. Saves resume
@@ -130,6 +142,41 @@ production, so a slumping veteran can lose his job and a hot prospect can force 
 up. A typical season has about 550 IL placements, 900 call-ups and a steady stream of
 waiver claims, all in a transaction log.
 
+## The offseason
+
+Every winter the whole universe moves forward a year:
+
+- **Development and aging.** Each tool has its own aging curve: speed peaks around 24
+  and fades first, contact and power peak around 27 and hold for a few years, plate
+  discipline and command keep improving into the 30s. Young players close part of the
+  gap to their future grades every year while the projection itself drifts, so some
+  prospects break out and more of them stall. Future Value (FV) is the grade of a
+  player's projected peak under that model.
+- **Contracts.** Players with under three years of service make near the minimum;
+  three to six years go to arbitration each winter (about 22%, 38% and 58% of their
+  market value); six or more can become free agents. A win costs about $8M on the
+  open market, and projected WAR comes from the grades through coefficients measured
+  from the engine. Each club has a payroll budget set by its market, from about $95M
+  to $250M; released players' guaranteed money stays on the books as dead money.
+- **The draft**: ten rounds in reverse order of the standings, high schoolers (18,
+  raw, the most room to grow) and college players (21-22, closer to ready).
+- **Free agency**: every free agent asks for years and salary from his projected
+  WAR over the deal. Clubs with a hole he fills and budget room bid; his price
+  softens week by week. Leftover veterans take minor league deals or retire.
+- **International signings**: 17-year-olds with bonus asks, and bonus pools that are
+  bigger for worse teams.
+- **Trades** are valued by **surplus**: projected WAR over the years a club controls
+  a player, priced at $8M a win and discounted 10% a year, minus salary. A cheap young
+  star is worth a fortune; an aging star on a big deal can be worth less than nothing.
+  AI contenders buy veterans from rebuilding clubs with prospects, too.
+- **Spring training** heals most injuries, trims every 40-man roster, sets an Opening
+  Day 26 and sorts each farm system by ability (with age floors).
+
+A universe has to look the same in year 10 as in year 1, so each winter re-centers the
+grades (50 stays major-league average) and `npm run sim:years` plays many seasons to
+check. Over ten-year runs the run environment stays at 4.3-4.5 runs a game, home runs
+near 3% of plate appearances, home run leaders in the 50s, and payrolls near budget.
+
 ## How a game is simulated
 
 Every pitch is simulated:
@@ -198,15 +245,16 @@ The wOBA weights the sim derives from its own run environment (BB 0.73, 1B 0.85,
 ```
 src/
   core/         seeded RNG, 20-80 grade helpers, math
-  players/      player types, generator (value targets + tool mixes), names, defense, injuries
+  players/      player types, generator (value targets + tool mixes), development and aging, names, defense, injuries
   league/       fictional 30-team universe, parks, organization generation and re-centering
-  org/          roster rules, AI front office, depth charts, player valuation
+  org/          roster rules, AI front office, depth charts, valuation, contracts, trades
   sim/          the engine: pitch model, batted-ball physics, game state machine, substitutions
   season/       schedule, multi-level season runner, standings, pitcher workload, postseason
   stats/        stat lines, run expectancy / linear weights, advanced stats and WAR
   calibration/  MLB targets, league and spread reports, the grade chart
   report/       text renderers for the CLI
-  save/         save games (exact resume)
+  offseason/    the winter: season history, draft, free agency, international signings, spring
+  save/         save games (exact resume) and migrations
 web/            browser UI: Preact pages, a simulation Web Worker, IndexedDB saves
 scripts/        sim:season, sim:game, scout, grade-chart, calibrate, probe
 test/           vitest suite
@@ -221,11 +269,10 @@ contact, running) or at the top of `src/sim/battedBall.ts` (fielding and physics
 2. ~~Player generator with 20-80 grades, full schedule, standings, stats~~
 3. ~~Minor leagues, 40-man roster, call-ups and options, injuries, in-game substitutions,
    AI front offices~~
-4. ~~A browser UI: sortable stat pages, player cards, roster management~~ (league
-   history arrives with multi-season play)
-5. Offseason loop: aging and development toward future grades, contracts (pre-arb,
+4. ~~A browser UI: sortable stat pages, player cards, roster management, league history~~
+5. ~~Offseason loop: aging and development toward future grades, contracts (pre-arb,
    arbitration, free agency), the draft, international signings, AI trades valued by
-   surplus WAR
+   surplus WAR~~
 6. The GM's-eye view: noisy scouting reports whose accuracy depends on your scouting
    staff, an analytics department, finances and owner goals (attendance, ticket prices,
    payroll budget)

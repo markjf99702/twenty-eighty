@@ -9,13 +9,16 @@ import { LEVEL_SLUGS, levelFromSlug } from "./format";
 export type Route =
   | { page: "home" }
   | { page: "standings"; level: Level }
-  | { page: "team"; teamId: number | null; tab: "roster" | "depth" | "farm" }
+  | { page: "team"; teamId: number | null; tab: "roster" | "depth" | "farm" | "payroll" }
   | { page: "player"; playerId: number }
   | { page: "stats"; level: Level; kind: "hitters" | "pitchers" }
   | { page: "scores"; day: number | null }
   | { page: "box"; key: string }
   | { page: "moves"; mine: boolean }
   | { page: "playoffs" }
+  | { page: "winter" }
+  | { page: "trades"; partnerId: number | null }
+  | { page: "history" }
   | { page: "office" };
 
 export function parse(hash: string): Route {
@@ -26,7 +29,7 @@ export function parse(hash: string): Route {
     case "standings":
       return { page: "standings", level: levelFromSlug(a) };
     case "team":
-      return { page: "team", teamId: n(a), tab: b === "depth" || b === "farm" ? b : "roster" };
+      return { page: "team", teamId: n(a), tab: b === "depth" || b === "farm" || b === "payroll" ? b : "roster" };
     case "player":
       return n(a) !== null ? { page: "player", playerId: n(a)! } : { page: "home" };
     case "stats":
@@ -41,6 +44,12 @@ export function parse(hash: string): Route {
       return { page: "playoffs" };
     case "office":
       return { page: "office" };
+    case "winter":
+      return { page: "winter" };
+    case "trades":
+      return { page: "trades", partnerId: n(a) };
+    case "history":
+      return { page: "history" };
     default:
       return { page: "home" };
   }
@@ -68,6 +77,12 @@ export function href(r: Route): string {
       return "#playoffs";
     case "office":
       return "#office";
+    case "winter":
+      return "#winter";
+    case "trades":
+      return r.partnerId === null ? "#trades" : `#trades-${r.partnerId}`;
+    case "history":
+      return "#history";
   }
 }
 

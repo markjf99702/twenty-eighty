@@ -118,7 +118,9 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
   };
   for (const o of state.offers) if (user !== null && asks.has(o.playerId)) bid(o.playerId, { teamId: user, years: o.years, salary: o.salary });
 
-  const clubs = rng.shuffle(league.teams.filter((t) => t.id !== user));
+  // The user's club shops too when the assistant GM is running its roster.
+  const clubs = rng.shuffle(league.teams.filter((t) => t.id !== user || !t.manualRoster));
+  const userOffers = new Set(state.offers.map((o) => o.playerId));
   for (const team of clubs) {
     // Late in the winter, clubs will stretch a little past budget for a bargain.
     const stretch = state.week >= state.weeks / 2 ? 0.05 * team.budget : 0;
@@ -128,6 +130,7 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
     const pay = wealth(team);
     const targets: { p: Player; ask: FreeAgentAsk; upgrade: number }[] = [];
     for (const ask of asks.values()) {
+      if (team.id === user && userOffers.has(ask.playerId)) continue;
       const p = league.players[ask.playerId]!;
       const war = seasonWar(p);
       const upgrade = war - need[roleOf(p)];
@@ -155,7 +158,8 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
       if (offerScore(b) < acceptBar(ask, state.week)) break;
       const team = league.teams[b.teamId]!;
       const stretch = state.week >= state.weeks / 2 ? 0.05 * team.budget : 0;
-      if (b.teamId !== user && (team.budget + stretch - payroll(league, team) < b.salary || !makeRoom(ctx, team, waiverOrder))) continue;
+      const assistant = b.teamId !== user || !userOffers.has(playerId);
+      if (assistant && (team.budget + stretch - payroll(league, team) < b.salary || !makeRoom(ctx, team, waiverOrder))) continue;
       if (signFreeAgent(ctx, team, p, b.years, b.salary).ok) {
         state.signings.push({ playerId, teamId: b.teamId, years: b.years, salary: b.salary, week: state.week });
         break;

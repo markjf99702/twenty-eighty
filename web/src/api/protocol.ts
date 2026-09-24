@@ -3,10 +3,11 @@
  * worker sends back. Everything here is plain, structured-cloneable data.
  */
 import type { DepthChart, TransactionType } from "../../../src/league/types";
-import type { FieldPosition, Level, MinorLevel, PitchType } from "../../../src/players/types";
+import type { OffseasonPhase } from "../../../src/offseason/types";
+import type { CareerLine, ContractType, FieldPosition, Level, MinorLevel, PitchType } from "../../../src/players/types";
 import type { HitterRow, PitcherRow } from "../../../src/season/season";
 
-export type { HitterRow, PitcherRow };
+export type { CareerLine, HitterRow, OffseasonPhase, PitcherRow };
 
 export interface TeamRef {
   id: number;
@@ -25,7 +26,12 @@ export interface Status {
   day?: number;
   totalDays?: number;
   date?: string;
-  phase?: "regular" | "postseason" | "done";
+  phase?: "regular" | "postseason" | "done" | "offseason";
+  /** Where the winter stands, during the offseason. */
+  winter?: { phase: OffseasonPhase; label: string; action: string; week?: number; weeks?: number; userOnClock?: boolean };
+  /** Whether the user can trade right now (no trades after the deadline until the season ends). */
+  canTrade?: boolean;
+  tradeNote?: string;
   userTeamId?: number | null;
   minors?: boolean;
   leagues?: string[];
@@ -79,6 +85,16 @@ export interface PlayerStatus {
   injury: { name: string; daysLeft: number } | null;
 }
 
+export interface ContractView {
+  type: ContractType;
+  salary: number;
+  years: number;
+  /** Last season covered. */
+  through: number;
+  /** "$22.5M through 2029", "Pre-arb $0.84M", "Arbitration $6.1M", "Minor league deal". */
+  label: string;
+}
+
 export interface PlayerSummary {
   id: number;
   name: string;
@@ -96,6 +112,7 @@ export interface PlayerSummary {
   status: PlayerStatus;
   /** One-line stats at his current level this season. */
   line: string;
+  contract: ContractView | null;
   /** Roster moves available to the user's club right now, with the reason when blocked. */
   actions?: RosterActionOption[];
 }
@@ -125,8 +142,19 @@ export interface RosterAction {
   level?: MinorLevel;
 }
 
+export interface PayrollView {
+  payroll: number;
+  budget: number;
+  deadMoney: number;
+  /** Guaranteed money already committed for each of the next five seasons. */
+  commitments: { year: number; amount: number }[];
+  /** Every player with a big-league contract, priciest first. */
+  contracts: (PlayerSummary & { surplus: number })[];
+}
+
 export interface TeamView {
   team: TeamRef & { park: string; altitude: number; market: number; affiliates: Record<MinorLevel, string> };
+  payroll: PayrollView;
   isUser: boolean;
   manualRoster: boolean;
   manualDepth: boolean;
@@ -158,6 +186,13 @@ export interface PlayerView {
   traits: string[];
   stats: StatLine[];
   transactions: { date: string; text: string }[];
+  career: CareerLine[];
+  careerTeams: Record<number, string>;
+  awards: string[];
+  draft: string | null;
+  /** Trade value: surplus over the years of control, $M (null for free agents). */
+  surplus: number | null;
+  retired: number | null;
 }
 
 export interface StatsView {
@@ -172,6 +207,7 @@ export interface StatsView {
 
 export interface TransactionItem {
   date: string;
+  year: number;
   teamId: number;
   abbrev: string;
   playerId: number;
@@ -262,6 +298,92 @@ export interface PostseasonView {
   champion: string | null;
 }
 
+// ---------------------------------------------------------------------------
+// The offseason
+
+export interface DevRow {
+  player: PlayerSummary;
+  team: string;
+  before: number;
+  after: number;
+}
+
+export interface DraftProspect extends PlayerSummary {
+  school: "High school" | "College";
+}
+
+export interface FreeAgentRow {
+  player: PlayerSummary;
+  war: number;
+  askYears: number;
+  askSalary: number;
+  /** The lowest annual salary he'd take this week for his asked-for years. */
+  floor: number;
+}
+
+export interface OffseasonView {
+  phase: OffseasonPhase;
+  year: number;
+  review?: {
+    champion: string | null;
+    awards: { name: string; league: string; playerId: number; player: string; team: string; note: string }[];
+    finish: string | null;
+    record: string | null;
+    risers: DevRow[];
+    fallers: DevRow[];
+    retirements: { playerId: number; name: string; team: string; age: number }[];
+    shift: Record<string, number>;
+  };
+  tenders?: {
+    rows: { player: PlayerSummary; salary: number; war: number; tender: boolean }[];
+    expiring: PlayerSummary[];
+  };
+  draft?: {
+    onClock: { round: number; pick: number; team: string; mine: boolean } | null;
+    myPicks: number[];
+    board: DraftProspect[];
+    picks: { pick: number; round: number; team: string; playerId: number; name: string; pos: string; fv: number; mine: boolean }[];
+  };
+  freeAgency?: {
+    week: number;
+    weeks: number;
+    agents: FreeAgentRow[];
+    offers: { playerId: number; years: number; salary: number }[];
+    signings: { playerId: number; name: string; team: string; years: number; salary: number; week: number }[];
+  };
+  international?: {
+    pool: number;
+    signed: number;
+    maxSignings: number;
+    prospects: (PlayerSummary & { bonus: number })[];
+    signings: { playerId: number; name: string; team: string; bonus: number }[];
+  };
+  payroll: { payroll: number; budget: number; fortyMan: number };
+}
+
+export interface TradeSide {
+  team: TeamRef;
+  players: (PlayerSummary & { surplus: number })[];
+}
+
+export interface TradeCheckView {
+  ok: boolean;
+  reason?: string;
+  give: number;
+  get: number;
+  done?: boolean;
+}
+
+export interface HistoryView {
+  seasons: {
+    year: number;
+    champion: string;
+    runnerUp: string | null;
+    mine: { record: string; finish: string } | null;
+    awards: { name: string; league: string; playerId: number; player: string; team: string; note: string }[];
+  }[];
+}
+
 /** Request -> response map. */
 export interface Api {
   status: { req: void; res: Status };
@@ -287,6 +409,19 @@ export interface Api {
   setDepth: { req: { depth: DepthChart }; res: { ok: boolean; reason?: string } };
   setFlags: { req: { manualRoster?: boolean; manualDepth?: boolean }; res: { ok: boolean } };
   postseason: { req: void; res: PostseasonView | null };
+  beginOffseason: { req: void; res: Status };
+  advance: { req: void; res: Status };
+  winterWeek: { req: void; res: Status };
+  offseason: { req: void; res: OffseasonView | null };
+  setTender: { req: { playerId: number; tender: boolean }; res: { ok: boolean; reason?: string } };
+  draftPick: { req: { playerId: number }; res: { ok: boolean; reason?: string } };
+  draftToMe: { req: void; res: Status };
+  faOffer: { req: { playerId: number; years: number; salary: number }; res: { ok: boolean; reason?: string } };
+  faWithdraw: { req: { playerId: number }; res: { ok: boolean } };
+  intlSign: { req: { playerId: number }; res: { ok: boolean; reason?: string } };
+  tradeSides: { req: { partnerId: number }; res: { mine: TradeSide; theirs: TradeSide } };
+  trade: { req: { partnerId: number; give: number[]; get: number[]; execute: boolean }; res: TradeCheckView };
+  history: { req: void; res: HistoryView };
 }
 
 export type ApiName = keyof Api;

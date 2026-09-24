@@ -18,7 +18,7 @@ export function levelFromSlug(slug: string | undefined): Level {
 
 /** ".312" style rate. */
 export const rate3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3).replace(/^(-?)0\./, "$1.") : "---");
-export const fixed = (x: number, d = 1) => (Number.isFinite(x) ? x.toFixed(d) : "--");
+export const fixed = (x: number, d = 1) => (Number.isFinite(x) ? (Math.abs(x) < 0.5 * 10 ** -d ? 0 : x).toFixed(d) : "--");
 export const pct = (x: number, d = 1) => (Number.isFinite(x) ? `${(100 * x).toFixed(d)}` : "--");
 export const signed = (x: number, d = 0) => (x > 0 ? `+${x.toFixed(d)}` : x.toFixed(d));
 export const whole = (x: number) => (Number.isFinite(x) ? String(Math.round(x)) : "--");

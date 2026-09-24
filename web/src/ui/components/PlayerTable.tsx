@@ -117,6 +117,21 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey 
     ),
     { key: "line", label: "This season", render: (p) => <span class="dim">{p.line || "—"}</span> },
     {
+      key: "pay",
+      label: "Salary",
+      cls: "num",
+      sort: (p) => (p.contract?.type === "minor" ? 0 : (p.contract?.salary ?? 0)),
+      render: (p) =>
+        !p.contract || p.contract.type === "minor" ? (
+          <span class="muted">MiLB</span>
+        ) : (
+          <span title={p.contract.label}>
+            ${p.contract.salary >= 10 ? p.contract.salary.toFixed(1) : p.contract.salary.toFixed(2)}M
+            {p.contract.type === "guaranteed" && p.contract.years > 1 ? <span class="muted"> ×{p.contract.years}</span> : null}
+          </span>
+        ),
+    },
+    {
       key: "forty",
       label: "40",
       title: "On the 40-man roster",

@@ -5,6 +5,7 @@ import { MAX_OPTION_YEARS, MINOR_LEVELS, PITCH_NAMES, playerName, SERVICE_DAYS_P
 import type { FieldPosition, Level, MinorLevel, Player } from "../../../src/players/types";
 import { FIELD_POSITIONS, LEVELS } from "../../../src/players/types";
 import type { League, Team } from "../../../src/league/types";
+import { onTheClock as draftClock } from "../../../src/offseason/draft";
 import { teamName } from "../../../src/league/types";
 import { defenseGrade } from "../../../src/players/defense";
 import {
@@ -17,14 +18,19 @@ import {
   FORTY_MAN_LIMIT,
   pitcherLimit,
   positionLabel,
+  type RosterContext,
   rosterProblems,
 } from "../../../src/org/roster";
+import { committed, payroll } from "../../../src/org/contracts";
+import { surplusValue } from "../../../src/org/trades";
 import { overallGrade } from "../../../src/org/value";
 import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season";
 import type { GameResult } from "../../../src/sim/game";
 import { inningsPitched } from "../../../src/stats/lines";
 import type {
   BoxScoreView,
+  ContractView,
+  PayrollView,
   DashboardView,
   GameItem,
   PlayerSummary,
@@ -55,10 +61,23 @@ export function dateLabel(season: Season, day: number): string {
   return season.dateOf(day).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
-export function phaseOf(season: Season): "regular" | "postseason" | "done" {
+export function phaseOf(season: Season): "regular" | "postseason" | "done" | "offseason" {
+  if (season.league.offseason) return "offseason";
   if (!season.done) return "regular";
   return season.postseason ? "done" : "postseason";
 }
+
+/** Last day for in-season trades: July 31. */
+export const TRADE_DEADLINE_DAY = 127;
+
+const WINTER_LABELS: Record<string, [string, string]> = {
+  review: ["Season in review", "Go to the tender deadline"],
+  tenders: ["Tender deadline", "Tender contracts"],
+  draft: ["Amateur draft", "Finish the draft"],
+  freeAgency: ["Free agency", "Finish free agency"],
+  international: ["International signings", "Close the signing period"],
+  spring: ["Spring training", "Start the season"],
+};
 
 const f3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3).replace(/^(-?)0\./, "$1.") : "---");
 
@@ -113,12 +132,38 @@ export function status(league: League | null, season: Season | null, hasSave: bo
     totalDays: season.totalDays,
     date: dateLabel(season, Math.min(season.day, season.totalDays - 1)),
     phase: phaseOf(season),
+    ...winterStatus(league, season),
     userTeamId: user,
     minors: season.simulateMinors,
     leagues: league.structure.leagues,
     divisions: league.structure.divisions,
     teams: league.teams.map(teamRef),
     record: rec ? { w: rec.w, l: rec.l } : null,
+  };
+}
+
+function winterStatus(league: League, season: Season): Partial<Status> {
+  const phase = phaseOf(season);
+  const w = league.offseason;
+  const canTrade = phase === "offseason" || (phase === "regular" && season.day <= TRADE_DEADLINE_DAY);
+  const tradeNote = canTrade
+    ? undefined
+    : phase === "regular"
+      ? "The trade deadline has passed. Trading reopens in the offseason."
+      : "Trading reopens when the offseason begins.";
+  if (!w) return { canTrade, tradeNote };
+  const [label, action] = WINTER_LABELS[w.phase]!;
+  const fa = w.freeAgency;
+  const clock = w.draft ? draftClock(w.draft) : null;
+  return {
+    canTrade,
+    winter: {
+      phase: w.phase,
+      label: w.phase === "freeAgency" && fa ? `${label}, week ${Math.min(fa.week + 1, fa.weeks)} of ${fa.weeks}` : label,
+      action: w.phase === "spring" ? `Start the ${league.year + 1} season` : action,
+      ...(fa ? { week: fa.week, weeks: fa.weeks } : {}),
+      ...(w.phase === "draft" ? { userOnClock: clock?.teamId === league.userTeamId } : {}),
+    },
   };
 }
 
@@ -147,6 +192,23 @@ function statLine(p: Player, stats: StatsCache): string {
   const s = stats.hitter(p.level, p.id);
   if (!s) return "";
   return `${s.PA} PA, ${f3(s.AVG)}/${f3(s.OBP)}/${f3(s.SLG)}, ${s.line.HR} HR, ${Math.round(s.wRCplus)} wRC+`;
+}
+
+const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
+
+export function contractView(p: Player, year: number): ContractView | null {
+  const c = p.contract;
+  if (!c) return null;
+  const through = year + c.years - 1;
+  const label =
+    c.type === "minor"
+      ? "Minor league deal"
+      : c.type === "pre-arb"
+        ? `Pre-arb ${money(c.salary)}`
+        : c.type === "arb"
+          ? `Arbitration ${money(c.salary)}`
+          : `${money(c.salary)} through ${through}`;
+  return { type: c.type, salary: c.salary, years: c.years, through, label };
 }
 
 export function playerSummary(
@@ -193,14 +255,17 @@ export function playerSummary(
       il: p.il,
       injury: p.injury && p.injury.daysLeft > 0 ? { name: p.injury.name, daysLeft: p.injury.daysLeft } : null,
     },
-    line: statLine(p, stats),
+    line: p.id >= 0 ? statLine(p, stats) : "",
+    contract: contractView(p, contractYear(season)),
     actions,
   };
 }
 
+/** The season a contract's first year refers to (next season, during the winter). */
+export const contractYear = (season: Season) => season.league.year + (season.league.offseason ? 1 : 0);
+
 /** Roster moves the user's club could make with this player right now. */
-export function rosterActions(p: Player, team: Team, season: Season): RosterActionOption[] {
-  const ctx = season.rosterContext();
+export function rosterActions(p: Player, team: Team, ctx: RosterContext): RosterActionOption[] {
   const out: RosterActionOption[] = [];
   const add = (kind: RosterActionOption["kind"], label: string, check: { ok: boolean; reason?: string }, level?: MinorLevel) =>
     out.push({ kind, label, ok: check.ok, ...(check.ok ? {} : { reason: check.reason }), ...(level ? { level } : {}) });
@@ -276,13 +341,29 @@ export function standingsView(season: Season, level: Level): StandingsView {
 // ---------------------------------------------------------------------------
 // Teams
 
-export function teamView(season: Season, stats: StatsCache, teamId: number): TeamView {
+export function payrollView(season: Season, stats: StatsCache, team: Team): PayrollView {
+  const league = season.league;
+  const year = contractYear(season);
+  const everyone = [...LEVELS.flatMap((l) => team.rosters[l]), ...team.injured].map((id) => league.players[id]!);
+  const contracts = everyone
+    .filter((p) => p.contract && p.contract.type !== "minor")
+    .sort((a, b) => b.contract!.salary - a.contract!.salary)
+    .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p) }));
+  return {
+    payroll: payroll(league, team),
+    budget: team.budget,
+    deadMoney: Math.round(team.deadMoney.reduce((s2, d) => s2 + d.amount, 0) * 100) / 100,
+    commitments: [1, 2, 3, 4, 5].map((k) => ({ year: year + k, amount: committed(league, team, k) })),
+    contracts,
+  };
+}
+
+export function teamView(season: Season, stats: StatsCache, teamId: number, ctx: RosterContext): TeamView {
   const league = season.league;
   const team = season.team(teamId);
   const isUser = league.userTeamId === teamId;
-  const ctx = season.rosterContext();
   const P = (id: number) => league.players[id]!;
-  const summarize = (id: number) => playerSummary(P(id), season, stats, isUser ? rosterActions(P(id), team, season) : undefined);
+  const summarize = (id: number) => playerSummary(P(id), season, stats, isUser ? rosterActions(P(id), team, ctx) : undefined);
   const rec = season.records[teamId]!;
   const minors = {} as Record<MinorLevel, PlayerSummary[]>;
   for (const level of MINOR_LEVELS) minors[level] = team.rosters[level].map(summarize);
@@ -294,6 +375,7 @@ export function teamView(season: Season, stats: StatsCache, teamId: number): Tea
       market: team.market,
       affiliates: Object.fromEntries(MINOR_LEVELS.map((l) => [l, team.affiliates[l].name])) as Record<MinorLevel, string>,
     },
+    payroll: payrollView(season, stats, team),
     isUser,
     manualRoster: Boolean(team.manualRoster),
     manualDepth: Boolean(team.manualDepth),
@@ -316,11 +398,17 @@ export function teamView(season: Season, stats: StatsCache, teamId: number): Tea
 // ---------------------------------------------------------------------------
 // Player page
 
-export function playerView(season: Season, stats: StatsCache, playerId: number): PlayerView {
+export function playerView(season: Season, stats: StatsCache, playerId: number, ctx: RosterContext): PlayerView {
   const league = season.league;
   const p = league.players[playerId]!;
   const team = p.teamId !== null ? season.team(p.teamId) : null;
   const isUser = team !== null && league.userTeamId === team.id;
+  const careerTeams: Record<number, string> = {};
+  for (const c of p.career) if (c.teamId !== null) careerTeams[c.teamId] = league.teams[c.teamId]!.abbrev;
+  const d = p.draft;
+  const draft = d
+    ? `${d.year} draft, round ${d.round} (#${d.pick} overall) by ${league.teams[d.teamId]!.city} ${league.teams[d.teamId]!.nickname}`
+    : null;
   const h = p.hitting;
   const tools = p.pitching
     ? [
@@ -351,7 +439,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number):
   }
   traits.push(p.durability > 0.8 ? "Injury-prone" : p.durability < -0.8 ? "Durable" : "Average durability");
   return {
-    summary: playerSummary(p, season, stats, isUser ? rosterActions(p, team!, season) : undefined),
+    summary: playerSummary(p, season, stats, isUser ? rosterActions(p, team!, ctx) : undefined),
     team: team ? teamRef(team) : null,
     born: `${league.year - p.age}`,
     tools,
@@ -372,9 +460,15 @@ export function playerView(season: Season, stats: StatsCache, playerId: number):
     stats: statsRows,
     transactions: league.transactions
       .filter((t) => t.playerId === p.id)
-      .slice(-30)
+      .slice(-40)
       .reverse()
-      .map((t) => ({ date: dateLabel(season, t.day), text: t.text })),
+      .map((t) => ({ date: `${dateLabel(season, t.day)}${t.year !== league.year ? ` ${t.year + (t.day > 280 ? 1 : 0)}` : ""}`, text: t.text })),
+    career: p.career,
+    careerTeams,
+    awards: p.awards,
+    draft,
+    surplus: team ? surplusValue(p) : null,
+    retired: p.retired ?? null,
   };
 }
 
@@ -390,7 +484,7 @@ export function transactions(season: Season, opts: { teamId?: number; majorOnly?
     const t = league.transactions[i]!;
     if (opts.teamId !== undefined && t.teamId !== opts.teamId) continue;
     if (opts.majorOnly && !MAJOR_TYPES.has(t.type)) continue;
-    out.push({ date: dateLabel(season, t.day), teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
+    out.push({ date: dateLabel(season, t.day), year: t.year, teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
   }
   return out;
 }

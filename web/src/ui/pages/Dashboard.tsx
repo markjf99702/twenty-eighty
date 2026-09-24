@@ -99,7 +99,15 @@ export function Dashboard({ status }: { status: Status }) {
         </div>
       </div>
 
-      {status.day === 0 && (
+      {status.phase === "offseason" && status.winter && (
+        <div class="note warn">
+          It's the offseason: <b>{status.winter.label}</b>. <a href={href({ page: "winter" })}>Go to the offseason desk</a>. The numbers below are
+          from the {status.year} season.
+        </div>
+      )}
+      {status.phase === "done" && <div class="note">The {status.year} season is in the books. Start the offseason from the scoreboard.</div>}
+
+      {status.day === 0 && status.phase === "regular" && (
         <div class="note">
           Welcome to the job. The scoreboard's <b>Sim</b> buttons play the schedule a day, a week or a month at a time. Your
           assistant GM handles injuries and call-ups until you take over under <a href={teamHref(d.team.id)}>My club</a>, where

@@ -15,15 +15,22 @@ import {
   placeOnIl,
   refreshDepth,
   releasePlayer,
+  type RosterContext,
   type RosterResult,
 } from "../../../src/org/roster";
+import { evaluateTrade, executeTrade } from "../../../src/org/trades";
 import { overallGrade } from "../../../src/org/value";
+import { makePick, simDraft } from "../../../src/offseason/draft";
+import { validateOffer } from "../../../src/offseason/freeAgency";
+import { signInternational } from "../../../src/offseason/international";
+import { advanceOffseason, beginOffseason, WINTER_DAYS, winterContext, winterWeek } from "../../../src/offseason/offseason";
 import { FIELD_POSITIONS, MINOR_LEVELS, type Level } from "../../../src/players/types";
 import { deserialize, loadGame, saveGame, serialize } from "../../../src/save/save";
 import { runPostseason } from "../../../src/season/postseason";
 import { Season } from "../../../src/season/season";
 import type { Api, ApiName, BoxScoreView, NewGameTeam, RequestMessage, ResponseMessage, ScoresView, StatsView } from "../api/protocol";
 import { clearSave, hasSave, readSave, writeSave } from "./storage";
+import { historyView, offseasonView, tradeSide } from "./winter";
 import {
   boxScoreView,
   dashboardView,
@@ -60,6 +67,19 @@ const stats = new StatsCache(() => requireSeason());
 function requireSeason(): Season {
   if (!season) throw new Error("No game in progress.");
   return season;
+}
+
+/** Roster rules as of today: the season's, or the winter's (no options used, 26-man limit). */
+function ctx(): RosterContext {
+  const s = requireSeason();
+  const w = s.league.offseason;
+  return w ? winterContext(s.league, w.phase) : s.rosterContext();
+}
+
+function winter() {
+  const w = requireSeason().league.offseason;
+  if (!w) throw new Error("It isn't the offseason.");
+  return w;
 }
 
 function userTeam(): Team {
@@ -159,26 +179,26 @@ function applyRosterAction(req: Api["rosterAction"]["req"]): RosterResult {
   const team = userTeam();
   const p = s.league.players[req.playerId];
   if (!p || p.teamId !== team.id) return { ok: false, reason: "He isn't in your organization." };
-  const ctx = s.rosterContext();
+  const c = ctx();
   switch (req.kind) {
     case "callUp":
-      return callUp(ctx, team, p);
+      return callUp(c, team, p);
     case "option":
-      return optionPlayer(ctx, team, p, req.level ?? "AAA");
+      return optionPlayer(c, team, p, req.level ?? "AAA");
     case "dfa":
-      return designateForAssignment(ctx, team, p, waiverOrder(s));
+      return designateForAssignment(c, team, p, waiverOrder(s));
     case "placeIl":
-      return placeOnIl(ctx, team, p);
+      return placeOnIl(c, team, p);
     case "activate":
-      return activateFromIl(ctx, team, p, "MLB");
+      return activateFromIl(c, team, p, "MLB");
     case "activateToMinors":
-      return activateFromIl(ctx, team, p, req.level ?? "AAA");
+      return activateFromIl(c, team, p, req.level ?? "AAA");
     case "assign":
-      return req.level ? assignMinors(ctx, team, p, req.level) : { ok: false, reason: "Pick a level." };
+      return req.level ? assignMinors(c, team, p, req.level) : { ok: false, reason: "Pick a level." };
     case "add40":
-      return addToFortyMan(ctx, team, p);
+      return addToFortyMan(c, team, p);
     case "release":
-      return releasePlayer(ctx, team, p);
+      return releasePlayer(c, team, p);
   }
 }
 
@@ -299,11 +319,11 @@ const handlers: Handlers = {
   },
 
   team({ teamId }) {
-    return teamView(requireSeason(), stats, teamId);
+    return teamView(requireSeason(), stats, teamId, ctx());
   },
 
   player({ playerId }) {
-    return playerView(requireSeason(), stats, playerId);
+    return playerView(requireSeason(), stats, playerId, ctx());
   },
 
   stats({ level, kind }): StatsView {
@@ -383,6 +403,120 @@ const handlers: Handlers = {
 
   postseason() {
     return postseasonView(requireSeason());
+  },
+
+  // --- The offseason -------------------------------------------------------
+
+  async beginOffseason() {
+    const s = requireSeason();
+    if (!s.postseason) throw new Error("Play the postseason first.");
+    beginOffseason(s.league, s);
+    stats.clear();
+    await persist();
+    return currentStatus();
+  },
+
+  async advance() {
+    const s = requireSeason();
+    winter();
+    const next = advanceOffseason(s.league, s);
+    if (next) {
+      season = next;
+      attach(next);
+    }
+    stats.clear();
+    await persist();
+    return currentStatus();
+  },
+
+  async winterWeek() {
+    const s = requireSeason();
+    if (winter().phase !== "freeAgency") throw new Error("Free agency isn't open.");
+    winterWeek(s.league, s);
+    stats.clear();
+    await persist();
+    return currentStatus();
+  },
+
+  offseason() {
+    return offseasonView(requireSeason(), stats);
+  },
+
+  setTender({ playerId, tender }) {
+    const w = winter();
+    const t = w.tenders.find((x) => x.playerId === playerId && x.teamId === userTeam().id);
+    if (!t) return { ok: false, reason: "He isn't one of your arbitration cases." };
+    if (w.phase !== "review" && w.phase !== "tenders") return { ok: false, reason: "The tender deadline has passed." };
+    t.tender = tender;
+    persistSoon();
+    return { ok: true };
+  },
+
+  draftPick({ playerId }) {
+    const w = winter();
+    if (w.phase !== "draft" || !w.draft) return { ok: false, reason: "The draft isn't on." };
+    const p = makePick(requireSeason().league, w.draft, userTeam().id, playerId, WINTER_DAYS.draft);
+    if (!p) return { ok: false, reason: "You're not on the clock." };
+    persistSoon();
+    return { ok: true };
+  },
+
+  async draftToMe() {
+    const w = winter();
+    if (w.phase !== "draft" || !w.draft) throw new Error("The draft isn't on.");
+    simDraft(requireSeason().league, w.draft, WINTER_DAYS.draft, userTeam().id);
+    await persist();
+    return currentStatus();
+  },
+
+  faOffer(offer) {
+    const w = winter();
+    if (w.phase !== "freeAgency" || !w.freeAgency) return { ok: false, reason: "Free agency isn't open." };
+    const salary = Math.round(offer.salary * 20) / 20;
+    const check = validateOffer(requireSeason().league, w.freeAgency, userTeam().id, { ...offer, salary });
+    if (!check.ok) return check;
+    w.freeAgency.offers = [...w.freeAgency.offers.filter((o) => o.playerId !== offer.playerId), { ...offer, salary }];
+    persistSoon();
+    return { ok: true };
+  },
+
+  faWithdraw({ playerId }) {
+    const fa = winter().freeAgency;
+    if (fa) fa.offers = fa.offers.filter((o) => o.playerId !== playerId);
+    persistSoon();
+    return { ok: true };
+  },
+
+  intlSign({ playerId }) {
+    const w = winter();
+    if (w.phase !== "international" || !w.international) return { ok: false, reason: "The signing period isn't open." };
+    const res = signInternational(requireSeason().league, w.international, userTeam().id, playerId, WINTER_DAYS.international);
+    if (res.ok) persistSoon();
+    return res;
+  },
+
+  tradeSides({ partnerId }) {
+    const s = requireSeason();
+    return { mine: tradeSide(s, stats, userTeam()), theirs: tradeSide(s, stats, s.team(partnerId)) };
+  },
+
+  trade({ partnerId, give, get, execute }) {
+    const s = requireSeason();
+    const mine = userTeam();
+    const partner = s.team(partnerId);
+    const st = currentStatus();
+    const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
+    const check = evaluateTrade(s.league, mine, partner, give, get, fraction);
+    if (!st.canTrade) return { ...check, ok: false, reason: st.tradeNote };
+    if (!execute || !check.ok) return check;
+    executeTrade(ctx(), mine, partner, give, get);
+    stats.clear();
+    persistSoon();
+    return { ...check, done: true };
+  },
+
+  history() {
+    return historyView(requireSeason().league);
   },
 };
 

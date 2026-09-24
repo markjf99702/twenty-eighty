@@ -5,10 +5,12 @@ import type { DepthChart } from "../../../../src/league/types";
 import { FIELD_POSITIONS, MINOR_LEVELS } from "../../../../src/players/types";
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
 import { PlayerTable } from "../components/PlayerTable";
+import { Grade } from "../components/Grade";
+import { type Column, Table } from "../components/Table";
 import { LEVEL_NAMES, signed } from "../format";
 import { go, playerHref } from "../router";
 
-type Tab = "roster" | "depth" | "farm";
+type Tab = "roster" | "depth" | "farm" | "payroll";
 
 export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; status: Status }) {
   const view = useApi("team", { teamId }, [teamId]);
@@ -45,6 +47,7 @@ export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; st
               ["roster", "Big-league roster"],
               ["depth", "Depth chart"],
               ["farm", "Farm system"],
+              ["payroll", "Payroll"],
             ]}
             onChange={(t) => go({ page: "team", teamId, tab: t })}
           />
@@ -55,6 +58,7 @@ export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; st
       {d && tab === "roster" && <Roster d={d} />}
       {d && tab === "depth" && <Depth d={d} />}
       {d && tab === "farm" && <Farm d={d} />}
+      {d && tab === "payroll" && <Payroll d={d} />}
     </>
   );
 }
@@ -307,6 +311,77 @@ function Depth({ d }: { d: TeamView }) {
           <div class="small dim">The first reliever closes; the next two set up. Order is how the manager trusts them in close games.</div>
         </Section>
       </div>
+    </>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Payroll
+
+const money = (x: number) => (Math.abs(x) >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
+
+function Payroll({ d }: { d: TeamView }) {
+  const p = d.payroll;
+  const share = Math.min(1.2, p.payroll / p.budget);
+  type Row = TeamView["payroll"]["contracts"][number];
+  const columns: Column<Row>[] = [
+    { key: "name", label: "Name", cls: "name", sort: (r) => r.name, asc: true, render: (r) => <a href={playerHref(r.id)}>{r.name}</a> },
+    { key: "pos", label: "Pos", render: (r) => r.pos },
+    { key: "age", label: "Age", cls: "num", sort: (r) => r.age, asc: true, render: (r) => r.age },
+    { key: "lvl", label: "Lvl", render: (r) => (r.status.il ?? LEVEL_NAMES[r.level]) },
+    { key: "ovr", label: "Now", cls: "ctr", sort: (r) => r.ovr, render: (r) => <Grade g={r.ovr} /> },
+    { key: "svc", label: "Svc", title: "Service time (years.days)", cls: "num", sort: (r) => Number(r.status.service), render: (r) => r.status.service },
+    { key: "type", label: "Status", render: (r) => ({ "pre-arb": "Pre-arb", arb: "Arbitration", guaranteed: "Signed", minor: "Minors" })[r.contract!.type] },
+    { key: "salary", label: "Salary", cls: "num", sort: (r) => r.contract!.salary, render: (r) => money(r.contract!.salary) },
+    { key: "through", label: "Through", cls: "num", sort: (r) => r.contract!.through, render: (r) => (r.contract!.type === "guaranteed" ? r.contract!.through : "—") },
+    {
+      key: "surplus",
+      label: "Value",
+      title: "Surplus value: projected wins over his years of control at $8M a win, minus salary",
+      cls: "num",
+      sort: (r) => r.surplus,
+      render: (r) => <span class={r.surplus < 0 ? "neg" : ""}>{money(r.surplus)}</span>,
+    },
+  ];
+  return (
+    <>
+      <div class="payroll-head">
+        <div>
+          <span class="k">Payroll</span>
+          <span class="v">{money(p.payroll)}</span>
+        </div>
+        <div>
+          <span class="k">Budget</span>
+          <span class="v">{money(p.budget)}</span>
+        </div>
+        <div>
+          <span class="k">Room</span>
+          <span class={`v${p.payroll > p.budget ? " neg" : ""}`}>{money(p.budget - p.payroll)}</span>
+        </div>
+        {p.deadMoney > 0 && (
+          <div>
+            <span class="k">Dead money</span>
+            <span class="v neg">{money(p.deadMoney)}</span>
+          </div>
+        )}
+        <div class="budget-bar" role="img" aria-label={`Payroll is ${Math.round(100 * share)}% of budget`}>
+          <span style={{ width: `${Math.min(100, (100 * share) / 1.2)}%` }} class={share > 1 ? "over" : ""} />
+          <i style={{ left: `${100 / 1.2}%` }} />
+        </div>
+      </div>
+      <Section title="Guaranteed money already committed">
+        <div class="facts">
+          {p.commitments.map((c) => (
+            <div key={c.year}>
+              <span class="k">{c.year}</span>
+              <span class="v">{money(c.amount)}</span>
+            </div>
+          ))}
+        </div>
+      </Section>
+      <Section title="Contracts" aside={`${p.contracts.length} big-league deals`}>
+        <Table columns={columns} rows={p.contracts} rowKey={(r) => r.id} sortKey="salary" />
+      </Section>
     </>
   );
 }
