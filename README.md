@@ -80,9 +80,11 @@ that any web server can host. Pick a seed and a club, and you're the GM:
   spring training. Then the next season starts.
 - **Trades** at any time before the July 31 deadline or in the winter: pick players from
   both sides and the other club tells you whether it would say yes (and roughly how much
-  more it wants if not). Clubs call you, too: a contender asks for one of your veterans,
-  or a seller offers you one of theirs, each valuing players through its own scouts (so
-  an offer can be a steal or a trap). Offers stand for three days (a week in the winter);
+  more it wants if not). Clubs call you, too: a contender asks for one of your veterans
+  who fills a hole on its roster, or a seller shops you one of theirs who fills one on
+  yours, each valuing players through its own scouts (so an offer can be a steal or a
+  trap). Interest spreads around: nobody is asked about twice within three weeks (or
+  twice in a winter), and players who've come up before come up less. Offers stand for three days (a week in the winter);
   accept, decline, or load one into the builder to counter. AI clubs deal with each
   other from late May, busiest in the last three weeks before the deadline, and those
   trades show up on the wire. **Payroll** shows every contract, your budget and future

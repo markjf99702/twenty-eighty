@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, it } from "vitest";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
-import { answerOffer, offerLive, refreshOffers } from "../src/org/offers";
+import { answerOffer, offerLive, RECENTLY_ASKED, refreshOffers } from "../src/org/offers";
 import { rosterProblems } from "../src/org/roster";
 import { TRADE_DEADLINE_DAY } from "../src/org/trades";
 import { warShift } from "../src/scouting/analytics";
@@ -80,6 +80,18 @@ describe("the trade market", () => {
   it("leaves every AI club's roster legal", () => {
     const ctx = season.rosterContext();
     for (const t of league.teams) if (t.id !== USER) expect(rosterProblems(ctx, t)).toEqual([]);
+  });
+
+  it("spreads clubs' interest around the user's roster", () => {
+    const offers = league.tradeOffers;
+    expect(offers.length).toBeGreaterThanOrEqual(2);
+    for (const a of offers) {
+      for (const b of offers) {
+        if (a === b || Math.abs(a.made - b.made) >= RECENTLY_ASKED) continue;
+        const shared = [...a.give, ...a.get].filter((id) => b.give.includes(id) || b.get.includes(id));
+        expect(shared).toEqual([]);
+      }
+    }
   });
 
   it("stops making offers once the deadline passes", () => {

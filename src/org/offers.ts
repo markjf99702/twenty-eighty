@@ -4,6 +4,7 @@ import { playerName, type Player } from "../players/types";
 import { warShift } from "../scouting/analytics";
 import type { Season } from "../season/season";
 import { budgetRoom, orgPlayers, seasonWar } from "./contracts";
+import { canStart } from "./value";
 import type { RosterContext } from "./roster";
 import {
   aiTradeMarket,
@@ -107,44 +108,101 @@ interface Draft {
   kind: "buy" | "sell";
 }
 
-/** A contender wants one of the user's veterans and offers prospects it values a bit below him. */
-function buyOffer(league: League, user: Team, buyers: Team[], rng: Rng, fraction: number, seen: WarShift): Draft | null {
+/**
+ * Whether a player came up in an offer recently (in the last three weeks, or
+ * at all this winter), so he isn't asked about again yet, and how often he's
+ * come up lately.
+ */
+export const RECENTLY_ASKED = 21;
+function interest(league: League, id: number, now: number): { recent: boolean; times: number } {
+  const about = league.tradeOffers.filter((o) => o.give.includes(id) || o.get.includes(id));
+  const recent = about.some((o) => now - o.made < RECENTLY_ASKED || (now >= 1000 && o.made >= 1000));
+  return { recent, times: about.length };
+}
+
+/** Players who've come up before are less likely to come up again. */
+const freshness = (times: number) => 1 / (1 + 2 * times);
+
+/**
+ * What a club would gain, in wins over a season as its own scouts see it, by
+ * putting a player in his spot: a hitter at his position (or at DH), a
+ * starter in place of its weakest starter, a reliever in place of the weakest
+ * of its top eight relievers. This is what makes clubs ask about different
+ * players: each goes after the hole it has.
+ */
+function upgrade(league: League, team: Team, p: Player, seen: WarShift): number {
+  const war = (q: Player) => seasonWar(q) + seen(team.id, q);
+  const d = team.depth;
+  let slots: number[];
+  if (p.pitching) slots = canStart(p) && p.role === "SP" ? d.rotation : d.bullpen.slice(0, 8);
+  else slots = [p.position === "DH" || p.position === "P" ? d.dh : d.starters[p.position], d.dh];
+  const incumbents = slots.filter((id) => id >= 0 && id !== p.id).map((id) => league.players[id]!);
+  if (incumbents.length === 0) return war(p);
+  // The spot where he helps most: in place of the weakest of them.
+  return war(p) - Math.min(...incumbents.map(war));
+}
+
+/** A club's pick of candidates, weighted (never one asked about in the last few weeks). */
+function choose<T extends { p: Player }>(rng: Rng, items: (T & { weight: number })[]): T | null {
+  const ok = items.filter((x) => x.weight > 0);
+  if (ok.length === 0) return null;
+  return ok[rng.weightedIndex(ok.map((x) => x.weight))]!;
+}
+
+/** A club's young players ordered for a package: by value, with some it has offered or been asked for before set back. */
+function packPool(league: League, team: Team, viewer: Team, rng: Rng, now: number, fraction: number, seen: WarShift) {
+  return chips(league, team)
+    .map((p) => {
+      const v = surplusValue(p, fraction, seen(viewer.id, p));
+      return { p, v, order: v * freshness(interest(league, p.id, now).times) * (0.85 + 0.3 * rng.next()) };
+    })
+    .filter((x) => x.v > 0.5)
+    .sort((a, b) => b.order - a.order);
+}
+
+/**
+ * A contender wants one of the user's players who fills a hole on its club,
+ * and offers prospects it values a bit below him.
+ */
+function buyOffer(league: League, user: Team, buyers: Team[], rng: Rng, now: number, fraction: number, seen: WarShift): Draft | null {
   const buyer = rng.pick(buyers);
   const room = budgetRoom(league, buyer) + 0.05 * buyer.budget;
   const targets = orgPlayers(league, user)
     .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 25 && seasonWar(p) >= 1.5 && salaryOf(p) * fraction <= room)
-    .map((p) => ({ p, v: surplusValue(p, fraction, seen(buyer.id, p)) }))
-    .filter((x) => x.v > 3)
-    .sort((a, b) => b.v - a.v)
-    .slice(0, 5);
-  if (targets.length === 0) return null;
-  const t = rng.pick(targets);
-  const pool = chips(league, buyer)
-    .map((p) => ({ p, v: surplusValue(p, fraction, seen(buyer.id, p)) }))
-    .filter((x) => x.v > 0.5)
-    .sort((a, b) => b.v - a.v);
+    .map((p) => {
+      const asked = interest(league, p.id, now);
+      const gain = upgrade(league, buyer, p, seen);
+      const v = surplusValue(p, fraction, seen(buyer.id, p));
+      const weight = asked.recent || gain < 0.5 || v <= 3 ? 0 : gain * freshness(asked.times);
+      return { p, v, weight };
+    });
+  const t = choose(rng, targets);
+  if (!t) return null;
   // They keep an edge in their own eyes (the same one they'd want from a proposal).
-  const got = pack(pool, 0.72 * t.v, Math.min(0.9 * t.v, t.v - 1.1));
+  const got = pack(packPool(league, buyer, buyer, rng, now, fraction, seen), 0.72 * t.v, Math.min(0.9 * t.v, t.v - 1.1));
   return got ? { partner: buyer, give: [t.p], get: got.map((x) => x.p), kind: "buy" } : null;
 }
 
-/** A seller offers one of its veterans for young players it values a bit above him. */
-function sellOffer(league: League, user: Team, sellers: Team[], rng: Rng, fraction: number, seen: WarShift): Draft | null {
+/**
+ * A seller shops one of its veterans where he'd fill a hole on the user's
+ * club, asking for young players it values a bit above him.
+ */
+function sellOffer(league: League, user: Team, sellers: Team[], rng: Rng, now: number, fraction: number, seen: WarShift): Draft | null {
   const seller = rng.pick(sellers);
+  const sellerEyes: WarShift = (_viewer, p) => seen(seller.id, p);
   const vets = orgPlayers(league, seller)
     .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 26 && seasonWar(p) >= 1.5)
-    .map((p) => ({ p, v: surplusValue(p, fraction, seen(seller.id, p)) }))
-    .filter((x) => x.v > 2)
-    .sort((a, b) => b.v - a.v)
-    .slice(0, 5);
-  if (vets.length === 0) return null;
-  const t = rng.pick(vets);
-  const pool = chips(league, user)
-    .map((p) => ({ p, v: surplusValue(p, fraction, seen(seller.id, p)) }))
-    .filter((x) => x.v > 0.5)
-    .sort((a, b) => b.v - a.v);
+    .map((p) => {
+      const asked = interest(league, p.id, now);
+      const gain = upgrade(league, user, p, sellerEyes);
+      const v = surplusValue(p, fraction, seen(seller.id, p));
+      const weight = asked.recent || gain < 0.5 || v <= 2 ? 0 : gain * freshness(asked.times);
+      return { p, v, weight };
+    });
+  const t = choose(rng, vets);
+  if (!t) return null;
   const lo = Math.max(1.12 * t.v + 1, t.v + 2);
-  const got = pack(pool, lo, 1.35 * lo + 2);
+  const got = pack(packPool(league, user, seller, rng, now, fraction, seen), lo, 1.35 * lo + 2);
   return got ? { partner: seller, give: got.map((x) => x.p), get: [t.p], kind: "sell" } : null;
 }
 
@@ -207,7 +265,7 @@ export function proposeToUser(
   for (const kind of tries) {
     const pool = available(kind === "buy" ? sides.buyers : sides.sellers);
     if (pool.length === 0) continue;
-    const d = kind === "buy" ? buyOffer(league, user, pool, rng, fraction, seen) : sellOffer(league, user, pool, rng, fraction, seen);
+    const d = kind === "buy" ? buyOffer(league, user, pool, rng, now, fraction, seen) : sellOffer(league, user, pool, rng, now, fraction, seen);
     if (!d) continue;
     const give = d.give.map((p) => p.id);
     const get = d.get.map((p) => p.id);
