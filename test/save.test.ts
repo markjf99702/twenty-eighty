@@ -24,6 +24,14 @@ describe("save and load", () => {
     expect(a.H).toBe(b.H);
     expect(a.HR).toBe(b.HR);
     expect(restored.league.transactions.length).toBe(original.league.transactions.length);
+    // Recent-form logs come back too, capped at the last 15 games per player.
+    const someone = [...original.levels.MLB.recentBat.rows.keys()][0]!;
+    expect(restored.levels.MLB.recentBat.rows.get(someone)).toEqual(original.levels.MLB.recentBat.rows.get(someone));
+    for (const rows of original.levels.MLB.recentBat.rows.values()) expect(rows.length).toBeLessThanOrEqual(15);
+    const team = original.league.teams[0]!;
+    const cutoff = original.recentCutoff(team.id);
+    const days = new Set(original.schedule.days.slice(cutoff, original.day).flatMap((g, i) => (g.some((x) => x.home === team.id || x.away === team.id) ? [i] : [])));
+    expect(days.size).toBe(15);
   });
 
   it("keeps saves reasonably small", () => {

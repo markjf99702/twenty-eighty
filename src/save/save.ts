@@ -36,6 +36,8 @@ interface LevelState {
   avgDefense: Defense;
   running?: RunningCounters;
   battedBalls?: BattedBallCounters;
+  /** Recent game lines (absent in saves made before recent form existed). */
+  recent?: { bat: [number, number[][]][]; pit: [number, number[][]][] };
 }
 
 export interface SeasonState {
@@ -80,6 +82,18 @@ function unpack<T extends object>(packed: PackedBook, book: LineBook<T>): void {
   book.load(entries);
 }
 
+/** Fifteen club games (off days and the All-Star break included) fit well inside this many days; older rows can't be shown again. */
+const RECENT_HORIZON_DAYS = 30;
+
+function recentWindow(entries: [number, number[][]][], day: number): [number, number[][]][] {
+  const out: [number, number[][]][] = [];
+  for (const [id, rows] of entries) {
+    const kept = rows.filter((r) => r[0]! >= day - RECENT_HORIZON_DAYS);
+    if (kept.length) out.push([id, kept]);
+  }
+  return out;
+}
+
 export function saveGame(league: League, season: Season | null): SaveGame {
   let state: SeasonState | null = null;
   if (season) {
@@ -98,6 +112,7 @@ export function saveGame(league: League, season: Season | null): SaveGame {
         avgDefense: ls.env.avgDefense,
         running: ls.env.running,
         battedBalls: ls.env.battedBalls,
+        recent: { bat: recentWindow(ls.recentBat.toJSON(), season.day), pit: recentWindow(ls.recentPit.toJSON(), season.day) },
       };
     }
     state = {
@@ -149,6 +164,10 @@ export function loadGame(save: SaveGame): { league: League; season: Season | nul
     ls.records = st.records;
     ls.games = st.games;
     ls.parkRuns = st.parkRuns;
+    if (st.recent) {
+      ls.recentBat.load(st.recent.bat);
+      ls.recentPit.load(st.recent.pit);
+    }
   }
   return { league, season };
 }

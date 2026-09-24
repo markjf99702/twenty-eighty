@@ -27,6 +27,7 @@ import { overallGrade } from "../../../src/org/value";
 import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season";
 import type { GameResult } from "../../../src/sim/game";
 import { inningsPitched } from "../../../src/stats/lines";
+import { BAT_ROW, PIT_ROW, sumRows } from "../../../src/stats/recent";
 import type {
   BoxScoreView,
   ContractView,
@@ -250,18 +251,80 @@ function currentSnapshot(p: Player, season: Season, stats: StatsCache): StatSnap
     bat: {
       G: h.line.G,
       PA: h.PA,
-      AVG: h.AVG,
-      OBP: h.OBP,
+      AVG: h.PA > 0 ? h.AVG : null,
+      OBP: h.PA > 0 ? h.OBP : null,
       SLG: h.SLG,
       HR: h.line.HR,
       SB: h.line.SB,
       BBpct: h.BBpct,
       Kpct: h.Kpct,
-      wRCplus: Math.round(h.wRCplus),
+      wRCplus: h.PA > 0 ? Math.round(h.wRCplus) : null,
       // Minor league games skip the expected-stat and fielding bookkeeping.
       xwOBA: mlb ? h.xwOBA : null,
       def: mlb ? h.fieldingRuns : null,
       WAR: h.WAR,
+    },
+  };
+}
+
+/** His line over his club's last 15 games at his current level. */
+function recentSnapshot(p: Player, season: Season, stats: StatsCache): StatSnapshot | null {
+  if (p.id < 0 || p.teamId === null) return null;
+  const level = p.level;
+  const ls = season.levels[level];
+  const cutoff = season.recentCutoff(p.teamId);
+  const base = { year: season.league.year, level, recent: true };
+  const rows = (p.pitching ? ls.recentPit : ls.recentBat).since(p.id, cutoff);
+  if (rows.length === 0) return null;
+  const ctx = stats.get(level).stats.context;
+  if (p.pitching) {
+    const t = sumRows(rows, 14);
+    const R = PIT_ROW;
+    const ip = t[R.outs]! / 3;
+    const era = ip > 0 ? (9 * t[R.ER]!) / ip : 0;
+    return {
+      ...base,
+      pit: {
+        G: rows.length,
+        GS: t[R.GS]!,
+        IP: ip,
+        W: t[R.W]!,
+        L: t[R.L]!,
+        SV: t[R.SV]!,
+        ERA: era,
+        FIP: ip > 0 ? (13 * t[R.HR]! + 3 * (t[R.BB]! + t[R.HBP]!) - 2 * t[R.SO]!) / ip + ctx.fipConstant : 0,
+        // Not park-adjusted over a two-week window.
+        ERAminus: ip > 0 && ctx.lgEra > 0 ? Math.round((100 * era) / ctx.lgEra) : null,
+        Kpct: t[R.BF]! > 0 ? t[R.SO]! / t[R.BF]! : null,
+        BBpct: t[R.BF]! > 0 ? t[R.BB]! / t[R.BF]! : null,
+        WHIP: ip > 0 ? (t[R.H]! + t[R.BB]!) / ip : null,
+        WAR: null,
+      },
+    };
+  }
+  const t = sumRows(rows, 14);
+  const R = BAT_ROW;
+  const [pa, ab, h, d, tr, hr, bb, hbp, so, sf] = [t[R.PA]!, t[R.AB]!, t[R.H]!, t[R.D]!, t[R.T]!, t[R.HR]!, t[R.BB]!, t[R.HBP]!, t[R.SO]!, t[R.SF]!];
+  const w = ctx.weights;
+  const denom = ab + bb + sf + hbp;
+  const wOBA = denom > 0 ? (w.BB * bb + w.HBP * hbp + w["1B"] * (h - d - tr - hr) + w["2B"] * d + w["3B"] * tr + w.HR * hr) / denom : 0;
+  return {
+    ...base,
+    bat: {
+      G: rows.length,
+      PA: pa,
+      AVG: ab > 0 ? h / ab : null,
+      OBP: denom > 0 ? (h + bb + hbp) / denom : null,
+      SLG: ab > 0 ? (h + d + 2 * tr + 3 * hr) / ab : null,
+      HR: hr,
+      SB: t[R.SB]!,
+      BBpct: pa > 0 ? bb / pa : null,
+      Kpct: pa > 0 ? so / pa : null,
+      // wRC+ from this window's wOBA, without the park adjustment.
+      wRCplus: pa > 0 ? Math.round((100 * ((wOBA - ctx.lgWoba) / ctx.wobaScale + ctx.runsPerPA)) / ctx.runsPerPA) : null,
+      xwOBA: null,
+      def: null,
+      WAR: null,
     },
   };
 }
@@ -306,14 +369,14 @@ function careerSnapshot(p: Player, year: number, prefer?: Level): StatSnapshot |
     bat: {
       G: b.G,
       PA: b.PA,
-      AVG: b.AB > 0 ? b.H / b.AB : 0,
+      AVG: b.AB > 0 ? b.H / b.AB : null,
       OBP: b.OBP ?? null,
       SLG: b.SLG ?? (b.AB > 0 ? (b.H + b.D + 2 * b.T + 3 * b.HR) / b.AB : null),
       HR: b.HR,
       SB: b.SB,
       BBpct: b.BBpct ?? (b.PA > 0 ? b.BB / b.PA : null),
       Kpct: b.Kpct ?? (b.PA > 0 ? b.SO / b.PA : null),
-      wRCplus: b.wRCplus,
+      wRCplus: b.PA > 0 ? b.wRCplus : null,
       xwOBA: null,
       def: null,
       WAR: b.WAR,
@@ -368,6 +431,7 @@ export function playerSummary(
     line: p.id >= 0 ? statLine(p, stats) : "",
     stats: currentSnapshot(p, season, stats),
     last: lastSnapshot(p, season),
+    recent: recentSnapshot(p, season, stats),
     contract: contractView(p, contractYear(season)),
     actions,
   };

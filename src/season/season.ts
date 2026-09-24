@@ -38,6 +38,7 @@ import {
   type FieldingLine,
   type PitchingLine,
 } from "../stats/lines";
+import { batRow, pitRow, RECENT_GAMES, RecentLog } from "../stats/recent";
 import { RunTracker } from "../stats/runExpectancy";
 import type { PostseasonResult } from "./postseason";
 import { buildSchedule, type Schedule } from "./schedule";
@@ -135,6 +136,9 @@ export class LevelSeason {
   games: GameSummary[] = [];
   env: SimEnv;
   parkRuns: { home: number; homeG: number; road: number; roadG: number }[];
+  /** Each player's most recent game lines at this level (for recent-form views). */
+  readonly recentBat = new RecentLog();
+  readonly recentPit = new RecentLog();
 
   constructor(
     readonly level: Level,
@@ -158,6 +162,8 @@ export class LevelSeason {
     this.batting.merge(r.batting);
     this.pitching.merge(r.pitching);
     this.fielding.merge(r.fielding);
+    for (const [id, line] of r.batting.lines) this.recentBat.push(id, batRow(day, line));
+    for (const [id, line] of r.pitching.lines) this.recentPit.push(id, pitRow(day, line));
 
     const teams = this.league.teams;
     const [awayRuns, homeRuns] = r.score;
@@ -375,6 +381,21 @@ export class Season {
   compare(a: TeamRecord, b: TeamRecord): number {
     return this.mlb.compare(a, b);
   }
+  /**
+   * The first day of a club's last `games` scheduled games before today (every
+   * level plays the same schedule). Recent-form views count from here.
+   */
+  recentCutoff(teamId: number, games = RECENT_GAMES): number {
+    let found = 0;
+    for (let d = Math.min(this.day, this.schedule.days.length) - 1; d >= 0; d--) {
+      if (this.schedule.days[d]!.some((g) => g.home === teamId || g.away === teamId)) {
+        found++;
+        if (found === games) return d;
+      }
+    }
+    return 0;
+  }
+
   gamesBehind(leader: TeamRecord, r: TeamRecord): number {
     return (leader.w - r.w + (r.l - leader.l)) / 2;
   }

@@ -19,7 +19,7 @@ function useRosterView(): [RosterView, (v: RosterView) => void] {
   const [view, setView] = useState<RosterView>(() => {
     try {
       const v = localStorage.getItem(VIEW_KEY);
-      return v === "stats" || v === "last" || v === "scouting" ? v : "scouting";
+      return v === "stats" || v === "last" || v === "recent" || v === "scouting" ? v : "scouting";
     } catch {
       return "scouting";
     }
@@ -42,6 +42,7 @@ function ViewSwitch({ view, onChange, year }: { view: RosterView; onChange: (v: 
       value={view}
       options={[
         ["scouting", "Scouting report"],
+        ["recent", "Last 15"],
         ["stats", `${year} stats`],
         ["last", `${year - 1} stats`],
       ]}
@@ -157,7 +158,7 @@ function Roster({ d, year }: { d: TeamView; year: number }) {
         <Counts d={d} />
         <ViewSwitch view={view} onChange={setView} year={year} />
       </div>
-      {view !== "scouting" && <StatsKey />}
+      {view !== "scouting" && <StatsKey recent={view === "recent"} />}
       {d.isUser && d.problems.length > 0 && (
         <div class="note alert">
           <b>Roster problems:</b> {d.problems.join(" ")}
@@ -195,7 +196,7 @@ function Farm({ d, year }: { d: TeamView; year: number }) {
         </div>
         <ViewSwitch view={view} onChange={setView} year={year} />
       </div>
-      {view !== "scouting" && <StatsKey minors />}
+      {view !== "scouting" && <StatsKey minors recent={view === "recent"} />}
       <Section title="Position players">
         <PlayerTable key={`h-${view}-${level}`} rows={rows.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} sortKey={sort} view={view} />
       </Section>
@@ -206,9 +207,10 @@ function Farm({ d, year }: { d: TeamView; year: number }) {
   );
 }
 
-function StatsKey({ minors }: { minors?: boolean }) {
+function StatsKey({ minors, recent }: { minors?: boolean; recent?: boolean }) {
   return (
     <div class="small dim stats-key">
+      {recent && <span>Last 15 covers the club's last 15 games at each player's level: about three starts for a starting pitcher. </span>}
       <span>
         <span class="good">Blue</span> and <span class="bad">orange</span> mark wRC+ and ERA well above or below league average (once he has 50
         PA or 15 innings);{" "}

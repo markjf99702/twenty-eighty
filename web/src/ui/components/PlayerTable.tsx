@@ -69,13 +69,13 @@ const TOOL_TITLES: Record<string, string> = {
 };
 
 /** What the roster table shows beside the overall grades: the tools, or a season's stats. */
-export type RosterView = "scouting" | "stats" | "last";
+export type RosterView = "scouting" | "recent" | "stats" | "last";
 
 const SMALL_PA = 30;
 const SMALL_IP = 10;
 
 type Snap = NonNullable<PlayerSummary["stats"]>;
-const snapOf = (p: PlayerSummary, view: RosterView): Snap | null => (view === "last" ? p.last : p.stats);
+const snapOf = (p: PlayerSummary, view: RosterView): Snap | null => (view === "last" ? p.last : view === "recent" ? p.recent : p.stats);
 
 /** Tint a rate against league average once the sample means something. */
 function tone(value: number | null | undefined, goodAbove: number, badBelow: number, enough: boolean, lowerIsBetter = false): string {
@@ -129,6 +129,10 @@ function statColumns(pitchers: boolean, view: RosterView, rows: PlayerSummary[])
 
   if (pitchers) {
     const P = (s: Snap) => s.pit!;
+    const warTracked = rows.some((p) => {
+      const s = snapOf(p, view);
+      return s?.pit && s.pit.WAR !== null;
+    });
     return [
       ...levelCol,
       col("G", "G", (s) => P(s).G, String),
@@ -141,12 +145,15 @@ function statColumns(pitchers: boolean, view: RosterView, rows: PlayerSummary[])
         cls: (s) => tone(P(s).ERAminus, 85, 115, P(s).IP >= 15, true),
         title: "Tinted blue or orange when his park-adjusted ERA is well above or below league average",
       }),
-      col("ERAm", "ERA-", (s) => P(s).ERAminus, whole, { asc: true, title: "Park-adjusted ERA, 100 = league average, lower is better" }),
+      col("ERAm", "ERA-", (s) => P(s).ERAminus, whole, {
+        asc: true,
+        title: view === "recent" ? "ERA against league average, 100 = average, lower is better" : "Park-adjusted ERA, 100 = league average, lower is better",
+      }),
       col("FIP", "FIP", (s) => P(s).FIP, (x) => fixed(x, 2), { asc: true }),
       col("K", "K%", (s) => P(s).Kpct, pct1),
       col("BB", "BB%", (s) => P(s).BBpct, pct1, { asc: true }),
       col("WHIP", "WHIP", (s) => P(s).WHIP, (x) => fixed(x, 2), { asc: true }),
-      col("WAR", "WAR", (s) => P(s).WAR, (x) => fixed(x)),
+      ...(warTracked ? [col("WAR", "WAR", (s) => P(s).WAR, (x) => fixed(x))] : []),
     ].map((c) => (c.key === "W" ? { ...c, render: cell((s) => `${P(s).W}-${P(s).L}`) } : c));
   }
   const B = (s: Snap) => s.bat!;
@@ -171,7 +178,7 @@ function statColumns(pitchers: boolean, view: RosterView, rows: PlayerSummary[])
     }),
     ...(tracked((s) => B(s).xwOBA) ? [col("xwOBA", "xwOBA", (s) => B(s).xwOBA, rate3, { title: "Expected wOBA from exit velocity and launch angle" })] : []),
     ...(tracked((s) => B(s).def) ? [col("Def", "Fld", (s) => B(s).def, (x) => fixed(x), { title: "Fielding runs above average" })] : []),
-    col("WAR", "WAR", (s) => B(s).WAR, (x) => fixed(x)),
+    ...(tracked((s) => B(s).WAR) ? [col("WAR", "WAR", (s) => B(s).WAR, (x) => fixed(x))] : []),
   ];
 }
 
@@ -281,12 +288,21 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
     });
   }
 
+  // Stat views sort by WAR when there is one; recent form (no WAR) by wRC+ or ERA.
+  let initialSort = sortKey;
+  let initialAsc = false;
+  if (sortKey && !columns.some((c) => c.key === sortKey)) {
+    initialSort = pitchers ? "ERA" : "wRC";
+    initialAsc = pitchers;
+  }
+
   return (
     <Table
       columns={columns}
       rows={rows}
       rowKey={(p) => p.id}
-      sortKey={sortKey}
+      sortKey={initialSort}
+      sortAsc={initialAsc}
       empty={empty}
       expanded={manage ? (p) => (open === p.id ? <RosterMoves p={p} onDone={() => setOpen(null)} /> : null) : undefined}
     />

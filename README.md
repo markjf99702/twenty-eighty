@@ -50,7 +50,8 @@ that any web server can host. Pick a seed and a club, and you're the GM:
   prospects, and the transaction wire.
 - **My club**: the active roster, injured list and every affiliate, with each player's
   present grades, overall and future value (FV), 40-man status, options left and service
-  time. Switch the tables between the scouting report, this season's stats (AVG/OBP/SLG,
+  time. Switch the tables between the scouting report, the club's last 15 games, this
+  season's stats (AVG/OBP/SLG,
   wRC+, xwOBA, fielding runs and WAR for hitters; ERA, ERA-, FIP, K%, BB%, WHIP and WAR
   for pitchers) and last season's, sortable, with standout numbers tinted and small
   samples faded. Every legal roster move (call up, select a contract, option, DFA,

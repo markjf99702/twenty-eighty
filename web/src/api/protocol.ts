@@ -99,17 +99,18 @@ export interface ContractView {
 export interface HitterSnapshot {
   G: number;
   PA: number;
-  AVG: number;
+  AVG: number | null;
   OBP: number | null;
   SLG: number | null;
   HR: number;
   SB: number;
   BBpct: number | null;
   Kpct: number | null;
-  wRCplus: number;
+  wRCplus: number | null;
   xwOBA: number | null;
   def: number | null;
-  WAR: number;
+  /** Null for recent-form lines (WAR is a season stat). */
+  WAR: number | null;
 }
 
 export interface PitcherSnapshot {
@@ -126,12 +127,14 @@ export interface PitcherSnapshot {
   Kpct: number | null;
   BBpct: number | null;
   WHIP: number | null;
-  WAR: number;
+  WAR: number | null;
 }
 
 export interface StatSnapshot {
   year: number;
   level: Level;
+  /** For recent form: games he appeared in out of the club's last 15. */
+  recent?: boolean;
   bat?: HitterSnapshot;
   pit?: PitcherSnapshot;
 }
@@ -153,9 +156,10 @@ export interface PlayerSummary {
   status: PlayerStatus;
   /** One-line stats at his current level this season. */
   line: string;
-  /** This season at his current level, and last season (his big-league line if he had one). */
+  /** This season at his current level, last season (his big-league line if he had one), and his club's last 15 games. */
   stats: StatSnapshot | null;
   last: StatSnapshot | null;
+  recent: StatSnapshot | null;
   contract: ContractView | null;
   /** Roster moves available to the user's club right now, with the reason when blocked. */
   actions?: RosterActionOption[];
