@@ -4,6 +4,7 @@ import type { League, Team } from "../league/types";
 import { minorContract } from "../org/contracts";
 import { logTransaction } from "../org/roster";
 import { peakValue } from "../org/value";
+import { carryReport, valueShift } from "../scouting/scouting";
 import { generateHitter, generatePitcher } from "../players/generate";
 import { type FieldPosition, playerName, type Player } from "../players/types";
 import type { Season } from "../season/season";
@@ -73,14 +74,6 @@ export function onTheClock(d: DraftState): { round: number; pick: number; teamId
   return { round: Math.floor(n / d.order.length) + 1, pick: n + 1, teamId: d.order[n % d.order.length]! };
 }
 
-/** A club's scouts don't all agree: a small, stable per-club opinion of each prospect. */
-function opinion(teamId: number, playerId: number): number {
-  let h = Math.imul(teamId + 1, 2654435761) ^ Math.imul(playerId, 1597334677);
-  h = Math.imul(h ^ (h >>> 15), 2246822507);
-  h ^= h >>> 13;
-  return ((h >>> 0) / 4294967296 - 0.5) * 8;
-}
-
 const boardCache = new WeakMap<Player, number>();
 /** The draft board: projected peak value, with a nudge toward players closer to the majors. */
 export function boardValue(p: Player): number {
@@ -92,11 +85,12 @@ export function boardValue(p: Player): number {
   return v;
 }
 
-export function bestAvailable(d: DraftState, teamId: number): Player | undefined {
+/** The best prospect left on a club's board, as its own scouts see the class. */
+export function bestAvailable(league: League, d: DraftState, teamId: number): Player | undefined {
   let best: Player | undefined;
   let bestScore = -Infinity;
   for (const p of d.pool) {
-    const score = boardValue(p) + opinion(teamId, p.id);
+    const score = boardValue(p) + valueShift(league, teamId, p, true);
     if (score > bestScore) {
       best = p;
       bestScore = score;
@@ -107,7 +101,9 @@ export function bestAvailable(d: DraftState, teamId: number): Player | undefined
 
 /** Sign an amateur into an organization: he gets a real id and joins the league. */
 export function signAmateur(league: League, team: Team, p: Player): Player {
+  const poolId = p.id;
   p.id = league.players.length;
+  carryReport(league, p, poolId);
   p.teamId = team.id;
   p.level = p.age >= 21 && boardValue(p) > -10 ? "A+" : "A";
   p.contract = minorContract();
@@ -140,7 +136,7 @@ export function simDraft(league: League, d: DraftState, day: number, stopAt: num
   for (;;) {
     const clock = onTheClock(d);
     if (!clock || clock.teamId === stopAt) return made;
-    const choice = bestAvailable(d, clock.teamId);
+    const choice = bestAvailable(league, d, clock.teamId);
     if (!choice) return made;
     makePick(league, d, clock.teamId, choice.id, day);
     made++;

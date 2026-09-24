@@ -85,6 +85,8 @@ export interface PlayerStatus {
   injury: { name: string; daysLeft: number } | null;
 }
 
+export type Confidence = "high" | "medium" | "low";
+
 export interface ContractView {
   type: ContractType;
   salary: number;
@@ -151,8 +153,13 @@ export interface PlayerSummary {
   ovr: number;
   fv: number;
   pitcher: boolean;
-  /** Key present grades: hitters Hit/Power/Eye/Run/Field/Arm, pitchers Stuff/Control/Command/Stamina. */
+  /** Key present grades as your scouts see them: hitters Hit/Power/Eye/Run/Field/Arm, pitchers Stuff/Control/Command/Stamina. */
   grades: [string, number][];
+  /**
+   * Your front office's read: the scouts' overall grade, the analytics
+   * department's (null without a sample), and how sure the scouts are.
+   */
+  read: { scouts: number; analytics: number | null; confidence: Confidence };
   status: PlayerStatus;
   /** One-line stats at his current level this season. */
   line: string;
@@ -193,6 +200,8 @@ export interface RosterAction {
 export interface PayrollView {
   payroll: number;
   budget: number;
+  /** Scouting and analytics departments, $M a year. */
+  staff: number;
   deadMoney: number;
   /** Guaranteed money already committed for each of the next five seasons. */
   commitments: { year: number; amount: number }[];
@@ -241,6 +250,35 @@ export interface PlayerView {
   /** Trade value: surplus over the years of control, $M (null for free agents). */
   surplus: number | null;
   retired: number | null;
+  /** How your front office sees him. */
+  scouting: {
+    /** Typical error in your scouts' grades, in grade points. */
+    sigma: number;
+    confidence: Confidence;
+    familiarity: string;
+    looks: number;
+    looksLeft: number;
+    canLook: boolean;
+    scoutsGrade: number;
+    analytics: { grade: number; reliability: number; sample: number; basis: string; weight: number } | null;
+    blendGrade: number;
+  };
+}
+
+export interface ScoutingView {
+  editable: boolean;
+  scouting: { tier: number; label: string; cost: number };
+  analytics: { tier: number; label: string; cost: number; basis: string };
+  tiers: {
+    scouting: { tier: number; label: string; cost: number; sigma: number }[];
+    analytics: { tier: number; label: string; cost: number; trust: number; basis: string }[];
+  };
+  /** Typical error of your scouts' grades by kind of player, at your current level. */
+  accuracy: { label: string; sigma: number }[];
+  looksLeft: number;
+  looksPerWindow: number;
+  scouted: { playerId: number; name: string; team: string; pos: string; looks: number }[];
+  budget: { budget: number; payroll: number; staff: number };
 }
 
 export interface StatsView {
@@ -406,7 +444,7 @@ export interface OffseasonView {
     prospects: (PlayerSummary & { bonus: number })[];
     signings: { playerId: number; name: string; team: string; bonus: number }[];
   };
-  payroll: { payroll: number; budget: number; fortyMan: number };
+  payroll: { payroll: number; staff: number; budget: number; fortyMan: number };
 }
 
 export interface TradeSide {
@@ -470,6 +508,9 @@ export interface Api {
   tradeSides: { req: { partnerId: number }; res: { mine: TradeSide; theirs: TradeSide } };
   trade: { req: { partnerId: number; give: number[]; get: number[]; execute: boolean }; res: TradeCheckView };
   history: { req: void; res: HistoryView };
+  scouting: { req: void; res: ScoutingView };
+  setDepartments: { req: { scouting: number; analytics: number }; res: { ok: boolean; reason?: string } };
+  scoutPlayer: { req: { playerId: number }; res: { ok: boolean; reason?: string } };
 }
 
 export type ApiName = keyof Api;

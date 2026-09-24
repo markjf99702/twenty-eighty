@@ -18,7 +18,7 @@ import { migrateLeague } from "./migrate";
  */
 
 export const SAVE_FORMAT = "twenty-eighty-save";
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 
 interface PackedBook {
   keys: string[];
@@ -61,14 +61,14 @@ export interface SaveGame {
   season: SeasonState | null;
 }
 
-const round = (x: number) => (Number.isInteger(x) ? x : Math.round(x * 1000) / 1000);
 
 function pack<T extends object>(book: LineBook<T>, empty: () => T): PackedBook {
   const keys = Object.keys(empty());
   const rows: number[][] = [];
   for (const [id, line] of book.lines) {
     const rec = line as unknown as Record<string, number>;
-    rows.push([id, ...keys.map((k) => round(rec[k] ?? 0))]);
+    // Full precision: expected-stat sums feed analytics, and resumes must be exact.
+    rows.push([id, ...keys.map((k) => rec[k] ?? 0)]);
   }
   return { keys, rows };
 }

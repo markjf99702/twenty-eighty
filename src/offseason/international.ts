@@ -6,6 +6,7 @@ import { rawness } from "../league/generate";
 import { generateHitter, generatePitcher } from "../players/generate";
 import { type FieldPosition, playerName, type Player } from "../players/types";
 import type { Season } from "../season/season";
+import { valueShift } from "../scouting/scouting";
 import { boardValue, signAmateur } from "./draft";
 import type { InternationalState } from "./types";
 
@@ -79,7 +80,8 @@ export function finishInternational(league: League, s: InternationalState, day: 
     for (const team of clubs) {
       const affordable = s.pool.filter((p) => s.asks.find((a) => a.playerId === p.id)!.bonus <= s.pools[team.id]!);
       if (affordable.length === 0) continue;
-      const best = affordable.reduce((a, b) => (boardValue(b) > boardValue(a) ? b : a));
+      const seen = (p: Player) => boardValue(p) + valueShift(league, team.id, p, true);
+      const best = affordable.reduce((a, b) => (seen(b) > seen(a) ? b : a));
       signInternational(league, s, team.id, best.id, day);
     }
   }

@@ -13,12 +13,13 @@ Two things are different from the late-90s version:
   them (wOBA weights, FIP constant, runs per win, park factors) are re-derived every
   season from the simulated league's own run environment.
 
-> Status: **phases 1-5 of the roadmap are done**: the engine, player generation, full
-> organizations with four minor league affiliates, roster rules, injuries, in-game
-> substitutions, AI front offices, postseason, advanced stats, calibration, a browser
-> UI, and the offseason: development and aging, contracts and payroll, the draft, free
-> agency, international signings and trades. Seasons roll on indefinitely. Scouting
-> uncertainty, finances and owner goals are next.
+> Status: **phases 1-5 and the first half of phase 6 are done**: the engine, player
+> generation, full organizations with four minor league affiliates, roster rules,
+> injuries, in-game substitutions, AI front offices, postseason, advanced stats,
+> calibration, a browser UI, the offseason (development and aging, contracts and payroll,
+> the draft, free agency, international signings and trades), and scouting uncertainty
+> with scouting and analytics departments. Seasons roll on indefinitely. Finances and
+> owner goals are next.
 
 ## Quick start
 
@@ -181,6 +182,40 @@ grades (50 stays major-league average) and `npm run sim:years` plays many season
 check. Over ten-year runs the run environment stays at 4.3-4.5 runs a game, home runs
 near 3% of plate appearances, home run leaders in the 50s, and payrolls near budget.
 
+## Scouting and analytics
+
+No club, including yours, sees a player's true grades. Every club sees each player
+through its own scouts: the true grade plus an error. That error depends on:
+
+- **the scouting department**, five levels from "bare bones" ($2M a year, a typical
+  miss of ±7 grade points on a tool) to "elite" ($13M, ±2.9);
+- **familiarity**: your own organization is read best (less than half the miss), then
+  other clubs' big leaguers, their upper and lower minors, college draft prospects,
+  and, hardest of all, high schoolers and 17-year-old international amateurs;
+- **the tool**: speed and arm strength are easy to clock, the hit tool and command are
+  the hardest reads, and projecting the future is harder than grading the present;
+- **looks**: send a scout from a player's page, the draft board or the international
+  list. Each look narrows the report (one by about a fifth, five by about half), and
+  two turn up his medical history. Looks refill weekly, and each winter phase.
+
+The errors come from a stable hash of club, player and tool, so a report doesn't
+flicker from day to day; part of each error is redrawn every year.
+
+The **analytics department** reads players from what they've done, translated to the
+major-league scale. Better departments trust better metrics: SIERA and xwOBA, which
+settle faster and say more about skill, instead of runs allowed and wOBA. Your "Now"
+grade blends the two, leaning on analytics as the sample grows, up to 90% for the best
+department. A ▲ or ▼ on a roster table means the numbers have pulled your read
+noticeably away from the scouts'. The scouts alone project the future.
+
+AI clubs decide the same way, each through its own departments: draft boards,
+international signings, free-agent bids and trade evaluations all run on beliefs, so
+clubs disagree and misjudge players, and a player your rivals overrate is one to sell.
+The simulation itself always runs on the true grades.
+
+Department costs come out of the same budget as payroll, and budgets are set in the
+winter (or before your first Opening Day).
+
 ## How a game is simulated
 
 Every pitch is simulated:
@@ -252,6 +287,7 @@ src/
   players/      player types, generator (value targets + tool mixes), development and aging, names, defense, injuries
   league/       fictional 30-team universe, parks, organization generation and re-centering
   org/          roster rules, AI front office, depth charts, valuation, contracts, trades
+  scouting/     each club's view of players: scouting error, analytics reads, beliefs
   sim/          the engine: pitch model, batted-ball physics, game state machine, substitutions
   season/       schedule, multi-level season runner, standings, pitcher workload, postseason
   stats/        stat lines, run expectancy / linear weights, advanced stats and WAR
@@ -277,9 +313,9 @@ contact, running) or at the top of `src/sim/battedBall.ts` (fielding and physics
 5. ~~Offseason loop: aging and development toward future grades, contracts (pre-arb,
    arbitration, free agency), the draft, international signings, AI trades valued by
    surplus WAR~~
-6. The GM's-eye view: noisy scouting reports whose accuracy depends on your scouting
-   staff, an analytics department, finances and owner goals (attendance, ticket prices,
-   payroll budget)
+6. The GM's-eye view: ~~noisy scouting reports whose accuracy depends on your scouting
+   staff, an analytics department~~, finances and owner goals (attendance, ticket
+   prices, revenue-driven budgets)
 
 ## A note on the universe
 

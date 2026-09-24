@@ -16,6 +16,8 @@ import {
 } from "../org/contracts";
 import { logTransaction, refreshDepth, releasePlayer, type RosterContext } from "../org/roster";
 import { aiTradeMarket } from "../org/trades";
+import { believedWar, warShift } from "../scouting/analytics";
+import { clearAmateurLooks, staffCost } from "../scouting/scouting";
 import { peakValue, playerValue } from "../org/value";
 import { developPlayer } from "../players/development";
 import { LEVELS, playerName, type Player } from "../players/types";
@@ -170,6 +172,7 @@ function budgetTenders(league: League, team: Team, tenders: Tender[], expiring: 
     if (p.contract && p.contract.type !== "minor") total += p.contract.salary;
   }
   for (const d of team.deadMoney) total += d.amount;
+  total += staffCost(league, team);
   for (const t of tenders) if (t.tender) total += t.salary;
   const byValue = tenders
     .filter((t) => t.tender)
@@ -185,6 +188,7 @@ function budgetTenders(league: League, team: Team, tenders: Tender[], expiring: 
 export function beginOffseason(league: League, season: Season): OffseasonState {
   if (league.offseason) return league.offseason;
   const day = WINTER_DAYS.review;
+  clearAmateurLooks(league);
   recordCareers(league, season);
   recordHistory(league, season, seasonAwards(league, season));
   reinstateInjured(league);
@@ -317,8 +321,16 @@ export function winterWeek(league: League, season: Season): void {
   if (!s || s.phase !== "freeAgency" || !fa || fa.week >= fa.weeks) return;
   const ctx = winterContext(league, "freeAgency", 7 * fa.week);
   const rng = winterRng(league, `fa${fa.week}`);
-  freeAgencyWeek(ctx, fa, rng, waiverOrder(league, season));
-  aiTradeMarket(ctx, rng.fork("trades"), 2);
+  // Clubs bid and trade on what their own scouts and analysts believe.
+  const beliefs = new Map<number, number>();
+  const judge = (team: Team, p: Player) => {
+    const key = team.id * 1_000_000 + p.id;
+    let war = beliefs.get(key);
+    if (war === undefined) beliefs.set(key, (war = believedWar(season, team.id, p)));
+    return war;
+  };
+  freeAgencyWeek(ctx, fa, rng, waiverOrder(league, season), judge);
+  aiTradeMarket(ctx, rng.fork("trades"), 2, 1, (viewer, p) => warShift(season, viewer, p));
 }
 
 /** Play an entire offseason with the AI deciding everything (CLI and tests). */

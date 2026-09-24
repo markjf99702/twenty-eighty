@@ -1,6 +1,7 @@
-import { useApi } from "../../api/client";
-import type { CareerLine, StatLine, Status } from "../../api/protocol";
-import { ErrorNote, Loading, Section } from "../components/Common";
+import { useState } from "preact/hooks";
+import { bump, call, useApi } from "../../api/client";
+import type { CareerLine, PlayerView, StatLine, Status } from "../../api/protocol";
+import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeBar, PresentFuture } from "../components/Grade";
 import { RosterMoves, StatusBadges } from "../components/PlayerTable";
 import { LEVEL_NAMES, fixed, gradeWord, ip, pct, rate3, scout, whole } from "../format";
@@ -57,7 +58,14 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
       )}
 
       <div class="grid-2">
-        <Section title="Scouting report" aside="present / future, 20–80">
+        <Section
+          title="Scouting report"
+          aside={
+            <span class={`confidence ${v.scouting.confidence}`} title={v.scouting.familiarity}>
+              Your scouts · ±{v.scouting.sigma.toFixed(1)} · {v.scouting.confidence} confidence
+            </span>
+          }
+        >
           <div class="report">
             {v.pitches.map((x) => (
               <div class="tool-row" key={x.type}>
@@ -92,6 +100,8 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
         </Section>
 
         <div class="section" style={{ gap: "22px" }}>
+          <YourRead v={v} />
+
           <Section title="Contract">
             <div class="facts">
               <div>
@@ -479,5 +489,54 @@ function Career({ lines, teams, pitcher }: { lines: CareerLine[]; teams: Record<
         </tbody>
       </table>
     </div>
+  );
+}
+
+/** Scouts vs. analytics, the blend you act on, and the button that sends a scout. */
+function YourRead({ v }: { v: PlayerView }) {
+  const sc = v.scouting;
+  const [busy, setBusy] = useState(false);
+  const look = async () => {
+    setBusy(true);
+    const res = await call("scoutPlayer", { playerId: v.summary.id });
+    if (res.ok) notify(`Your scouts took another look at ${v.summary.name}.`);
+    else notify(res.reason ?? "No scouts available.", true);
+    setBusy(false);
+    bump();
+  };
+  const a = sc.analytics;
+  return (
+    <Section title="Your read" aside={sc.familiarity}>
+      <div class="read-row">
+        <div>
+          <span class="k">Scouts</span>
+          <Grade g={sc.scoutsGrade} large />
+        </div>
+        <div>
+          <span class="k">Analytics</span>
+          {a ? <Grade g={a.grade} large /> : <span class="gc lg g50" title="No sample yet">—</span>}
+        </div>
+        <div>
+          <span class="k">Your read</span>
+          <Grade g={sc.blendGrade} large />
+        </div>
+      </div>
+      <div class="small dim">
+        {a
+          ? `Analytics works from ${a.basis}: ${a.sample} ${v.summary.pitcher ? "batters faced" : "plate appearances"} this season and last, ${Math.round(100 * a.reliability)}% reliable, so your read leans ${Math.round(100 * a.weight)}% on it.`
+          : "No performance sample yet, so your read is the scouts' alone."}
+      </div>
+      {sc.canLook && (
+        <div class="actions" style={{ alignItems: "center" }}>
+          <button type="button" class="btn small" disabled={busy || sc.looksLeft <= 0} onClick={look}>
+            Send a scout
+          </button>
+          <span class="small dim">
+            {sc.looks > 0 ? `${sc.looks} look${sc.looks === 1 ? "" : "s"} so far. ` : ""}
+            {sc.looksLeft} left {v.summary.teamId === null ? "" : "this week"}.
+          </span>
+        </div>
+      )}
+    </Section>
   );
 }

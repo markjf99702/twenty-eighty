@@ -3,6 +3,7 @@ import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
 import { assignInitialContracts, budgetFor } from "../org/contracts";
 import { autoDepthChart } from "../org/depth";
+import { defaultScouting } from "../scouting/scouting";
 import { playerValue } from "../org/value";
 import { generateHitter, generatePitcher } from "../players/generate";
 import type { FieldPosition, Level, MinorLevel, Player, ToolGrade } from "../players/types";
@@ -333,9 +334,11 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     history: [],
     freeAgents: [],
     offseason: null,
+    scouting: { scouting: [], analytics: [], looks: {}, looksLeft: 0, looksWindow: "" },
   };
   recenterGrades(league);
   for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));
+  league.scouting = defaultScouting(league, rng.fork("scouting"));
   assignInitialContracts(league, rng.fork("contracts"));
   return league;
 }

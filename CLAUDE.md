@@ -33,6 +33,15 @@ training, and returns the next `Season`. `runOffseason` does the whole winter wi
 deciding everything. The winter state lives in `league.offseason`, so it saves and
 resumes like everything else; each step draws randomness from `winterRng(league, label)`.
 
+Grades on a `Player` are the truth, and the simulation only ever uses the truth.
+Decisions use beliefs (src/scouting/): `perceive(league, viewer, p)` is a player as a
+club's scouts see him, `belief`/`believedWar` blend in the analytics read, and
+`valueShift`/`warShift` are fast versions for AI loops over hundreds of players. The
+AI's draft, international, free-agent and trade decisions take a club's beliefs; its
+day-to-day roster moves and depth charts still use true grades (a club knows its own
+players well). The UI always shows the user's view. Errors are deterministic hashes, so
+nothing about beliefs is saved except department levels and the user's looks.
+
 The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
 owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with
 plain view models built in `web/src/worker/views.ts`. Pages call it through `useApi`
@@ -60,7 +69,10 @@ screen means: a request/response pair in protocol.ts, a handler in the worker, a
 - Money is in millions of dollars. Anything that puts a player on the 40-man goes
   through `ensureMajorContract`; releases go through `releasePlayer` (dead money, free
   agency or retirement). Bump `SAVE_VERSION` and add a step to src/save/migrate.ts
-  when the saved shape changes.
+  when the saved shape changes. Anything an AI decision reads must round-trip through a
+  save exactly (the winter-resume test catches it); caches must key on state that changes
+  when the answer would (the day stands still all winter; `levelShift` keys on the
+  transaction count too).
 
 ## Calibration workflow
 

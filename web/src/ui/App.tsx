@@ -14,6 +14,7 @@ import { Standings } from "./pages/Standings";
 import { StatsPage } from "./pages/Stats";
 import { TeamPage } from "./pages/Team";
 import { History } from "./pages/History";
+import { Scouting } from "./pages/Scouting";
 import { Trades } from "./pages/Trades";
 import { Transactions } from "./pages/Transactions";
 import { Winter } from "./pages/Winter";
@@ -178,6 +179,8 @@ function Page({
       return <Trades partnerId={route.partnerId} status={status} />;
     case "history":
       return <History status={status} />;
+    case "scouting":
+      return <Scouting status={status} />;
   }
 }
 
@@ -316,7 +319,12 @@ function Rail({ status, route }: { status: Status; route: Route }) {
     { to: { page: "stats", level: "MLB", kind: "hitters" }, label: "Stats", on: route.page === "stats" },
     { to: { page: "scores", day: null }, label: "Scores", on: route.page === "scores" || route.page === "box" },
     { to: { page: "moves", mine: false }, label: "Transactions", on: route.page === "moves" },
-    ...(userTeam ? [{ to: { page: "trades", partnerId: null } as Route, label: "Trades", on: route.page === "trades" }] : []),
+    ...(userTeam
+      ? [
+          { to: { page: "trades", partnerId: null } as Route, label: "Trades", on: route.page === "trades" },
+          { to: { page: "scouting" } as Route, label: "Scouting", on: route.page === "scouting" },
+        ]
+      : []),
     { to: { page: "history" }, label: "History", on: route.page === "history" },
     ...(status.phase === "done" || status.phase === "postseason" || status.phase === "offseason"
       ? [{ to: { page: "playoffs" } as Route, label: "Postseason", on: route.page === "playoffs" }]

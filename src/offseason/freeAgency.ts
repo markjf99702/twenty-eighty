@@ -1,6 +1,6 @@
 import type { Rng } from "../core/rng";
 import type { League, Team } from "../league/types";
-import { DOLLARS_PER_WAR, MIN_SALARY, marketSalary, payroll, projectedWar, seasonWar } from "../org/contracts";
+import { budgetRoom, DOLLARS_PER_WAR, MIN_SALARY, marketSalary, projectedWar, seasonWar } from "../org/contracts";
 import { designateForAssignment, FORTY_MAN_LIMIT, logTransaction, type RosterContext, type RosterResult } from "../org/roster";
 import { canStart, peakValue, playerValue } from "../org/value";
 import { playerName, type Player } from "../players/types";
@@ -106,7 +106,10 @@ export function validateOffer(league: League, state: FreeAgencyState, teamId: nu
  * One week: AI clubs make offers, then every free agent with an offer that
  * clears his bar signs with the best bidder.
  */
-export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: Rng, waiverOrder: Team[]): void {
+/** A club's belief about a free agent's WAR (defaults to the truth). */
+export type Judge = (team: Team, p: Player) => number;
+
+export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: Rng, waiverOrder: Team[], judge: Judge = (_t, p) => seasonWar(p)): void {
   const league = ctx.league;
   const user = league.userTeamId;
   const asks = new Map(state.asks.filter((a) => league.freeAgents.includes(a.playerId)).map((a) => [a.playerId, a]));
@@ -124,7 +127,7 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
   for (const team of clubs) {
     // Late in the winter, clubs will stretch a little past budget for a bargain.
     const stretch = state.week >= state.weeks / 2 ? 0.05 * team.budget : 0;
-    const room = team.budget + stretch - payroll(league, team) - 3;
+    const room = budgetRoom(league, team) + stretch - 3;
     if (room < MIN_SALARY) continue;
     const need = incumbents(league, team);
     const pay = wealth(team);
@@ -132,7 +135,7 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
     for (const ask of asks.values()) {
       if (team.id === user && userOffers.has(ask.playerId)) continue;
       const p = league.players[ask.playerId]!;
-      const war = seasonWar(p);
+      const war = judge(team, p);
       const upgrade = war - need[roleOf(p)];
       if (upgrade < 0.4) continue;
       const bar = acceptBar(ask, state.week) / (1 + 0.1 * (ask.years - 1));
@@ -159,7 +162,7 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
       const team = league.teams[b.teamId]!;
       const stretch = state.week >= state.weeks / 2 ? 0.05 * team.budget : 0;
       const assistant = b.teamId !== user || !userOffers.has(playerId);
-      if (assistant && (team.budget + stretch - payroll(league, team) < b.salary || !makeRoom(ctx, team, waiverOrder))) continue;
+      if (assistant && (budgetRoom(league, team) + stretch < b.salary || !makeRoom(ctx, team, waiverOrder))) continue;
       if (signFreeAgent(ctx, team, p, b.years, b.salary).ok) {
         state.signings.push({ playerId, teamId: b.teamId, years: b.years, salary: b.salary, week: state.week });
         break;

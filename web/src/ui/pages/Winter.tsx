@@ -47,8 +47,8 @@ export function Winter({ status, onWinter }: { status: Status; onWinter: (kind: 
           <h1>{status.winter?.label}</h1>
         </div>
         <div class="counts">
-          <span class={v.payroll.payroll > v.payroll.budget ? "over" : ""}>
-            Payroll <b>{$(v.payroll.payroll)}</b> of {$(v.payroll.budget)}
+          <span class={v.payroll.payroll + v.payroll.staff > v.payroll.budget ? "over" : ""}>
+            Payroll <b>{$(v.payroll.payroll)}</b> + staff {$(v.payroll.staff)} of {$(v.payroll.budget)}
           </span>
           <span class={v.payroll.fortyMan > 40 ? "over" : ""}>
             40-man <b>{v.payroll.fortyMan}</b>/40
@@ -290,6 +290,8 @@ function Draft({ v }: { v: OffseasonView }) {
   const mine = d.onClock?.mine ?? false;
   const columns = prospectColumns([
     { key: "school", label: "From", render: (p) => p.school },
+    { key: "conf", label: "Read", title: "How sure your scouts are", render: (p) => <span class={`confidence ${p.read.confidence}`}>{p.read.confidence}</span> },
+    { key: "scout", label: "", render: (p) => <ScoutButton id={p.id} /> },
     {
       key: "go",
       label: "",
@@ -452,6 +454,8 @@ function International({ v }: { v: OffseasonView }) {
   };
   const columns = prospectColumns([
     { key: "bonus", label: "Bonus", cls: "num", sort: (p) => p.bonus ?? 0, render: (p) => $(p.bonus ?? 0) },
+    { key: "conf", label: "Read", title: "How sure your scouts are", render: (p) => <span class={`confidence ${p.read.confidence}`}>{p.read.confidence}</span> },
+    { key: "scout", label: "", render: (p) => <ScoutButton id={p.id} /> },
     {
       key: "go",
       label: "",
@@ -507,5 +511,20 @@ function Spring({ status }: { status: Status }) {
         </>
       )}
     </div>
+  );
+}
+
+/** Send a scout to see an amateur (uses one of your looks). */
+function ScoutButton({ id }: { id: number }) {
+  const look = async () => {
+    const res = await call("scoutPlayer", { playerId: id });
+    if (!res.ok) notify(res.reason ?? "No scouts available.", true);
+    else notify("Your scouts took another look.");
+    bump();
+  };
+  return (
+    <button type="button" class="btn small" onClick={look} title="Send a scout: narrows your report on him">
+      Scout
+    </button>
   );
 }

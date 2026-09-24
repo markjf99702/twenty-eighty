@@ -1,4 +1,5 @@
 import type { OffseasonState } from "../offseason/types";
+import type { ScoutingState } from "../scouting/types";
 import type { FieldPosition, Level, MinorLevel, Player } from "../players/types";
 
 export interface Park {
@@ -113,6 +114,8 @@ export interface League {
   freeAgents: number[];
   /** Winter state between the postseason and the next Opening Day. */
   offseason: OffseasonState | null;
+  /** Front-office departments: how well each club sees players. */
+  scouting: ScoutingState;
 }
 
 export interface Award {

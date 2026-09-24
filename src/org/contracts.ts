@@ -2,6 +2,7 @@ import type { Rng } from "../core/rng";
 import type { League, Team } from "../league/types";
 import { projectPlayer } from "../players/development";
 import { type Contract, type Player, SERVICE_DAYS_PER_YEAR } from "../players/types";
+import { staffCost } from "../scouting/scouting";
 import { canStart, pitchingValue, playerValue } from "./value";
 
 /**
@@ -33,6 +34,16 @@ export function seasonWar(p: Player): number {
     return canStart(p) ? 0.9 * (2.67 + 0.0606 * v) : 0.23 + 0.0263 * v;
   }
   return 1.38 + 0.0657 * playerValue(p);
+}
+
+/** WAR for a full season in his role from a value on the `playerValue` scale (for beliefs about a player). */
+export function warFromValue(p: Player, value: number): number {
+  if (p.pitching) {
+    const start = canStart(p);
+    const pv = value / (start ? 1.25 : 0.45);
+    return start ? 0.9 * (2.67 + 0.0606 * pv) : 0.23 + 0.0263 * pv;
+  }
+  return 1.38 + 0.0657 * value;
 }
 
 /** Projected WAR `yearsAhead` seasons from now, with expected development and aging. */
@@ -89,9 +100,18 @@ export function outrightContract(p: Player): void {
   if (!p.contract || p.contract.type !== "guaranteed") p.contract = minorContract();
 }
 
-/** Payroll budget from the size of the market: about $95M in the smallest metro, $250M in the biggest. */
+/**
+ * Baseball-operations budget from the size of the market: about $105M in the
+ * smallest metro, $260M in the biggest. It covers player payroll plus the
+ * scouting and analytics departments.
+ */
 export function budgetFor(market: number): number {
-  return Math.round(Math.max(85, 95 + 48 * Math.log2(market / 2)));
+  return Math.round(Math.max(95, 105 + 48 * Math.log2(market / 2)));
+}
+
+/** What's left of the budget after payroll and the front-office departments. */
+export function budgetRoom(league: League, team: Team): number {
+  return team.budget - staffCost(league, team) - payroll(league, team);
 }
 
 /** This season's payroll: every non-minor-league contract in the organization plus dead money. */
@@ -144,7 +164,7 @@ export function assignInitialContracts(league: League, rng: Rng): void {
   }
   // Big markets carry big payrolls: scale each club's veteran deals toward its budget.
   for (const team of league.teams) {
-    const target = team.budget * (0.82 + 0.18 * rng.next());
+    const target = (team.budget - staffCost(league, team)) * (0.82 + 0.18 * rng.next());
     const deals = orgPlayers(league, team).filter((p) => p.contract?.type === "guaranteed");
     const guaranteed = deals.reduce((s, p) => s + p.contract!.salary, 0);
     if (guaranteed === 0) continue;

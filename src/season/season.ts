@@ -476,6 +476,31 @@ export class Season {
    * What each player has actually done this season, in runs per 600 PA (or
    * BF) on the major-league scale, for the AI's roster decisions.
    */
+  private shiftCache: { key: string; shifts: Map<Level, { bat: number; arm: number }> } | null = null;
+
+  /**
+   * A level's average talent on the major-league scale (runs per 600 PA or
+   * BF): what a league-average line there translates to in the majors.
+   */
+  levelShift(level: Level): { bat: number; arm: number } {
+    // Rosters change with every logged move (the day stands still all winter).
+    const key = `${this.day}:${this.league.transactions.length}`;
+    if (!this.shiftCache || this.shiftCache.key !== key) {
+      const shifts = new Map<Level, { bat: number; arm: number }>();
+      for (const lv of LEVELS) {
+        const roster = this.league.teams.flatMap((t) => t.rosters[lv]).map((id) => this.league.players[id]!);
+        const hitters = roster.filter((x) => !x.pitching);
+        const arms = roster.filter((x) => x.pitching);
+        shifts.set(lv, {
+          bat: hitters.reduce((s, x) => s + offenseValue(x), 0) / Math.max(1, hitters.length),
+          arm: arms.reduce((s, x) => s + pitchingValue(x), 0) / Math.max(1, arms.length),
+        });
+      }
+      this.shiftCache = { key, shifts };
+    }
+    return this.shiftCache.shifts.get(level)!;
+  }
+
   performance(): PerformanceLookup {
     // Recomputed daily from live totals (cheap), so saved games resume identically.
     if (this.perfCache && this.perfCache.day === this.day) return this.perfCache.lookup;
@@ -486,13 +511,8 @@ export class Season {
       const p = ls.pitching.total();
       const lgWoba = b.PA > 0 ? fixedWoba(b) : 0.315;
       const lgRa9 = p.outs > 0 ? (27 * p.R) / p.outs : 4.4;
-      // The level's average talent, on the MLB grade scale.
-      const roster = this.league.teams.flatMap((t) => t.rosters[level]).map((id) => this.league.players[id]!);
-      const hitters = roster.filter((x) => !x.pitching);
-      const arms = roster.filter((x) => x.pitching);
-      const batShift = hitters.reduce((s, x) => s + offenseValue(x), 0) / Math.max(1, hitters.length);
-      const armShift = arms.reduce((s, x) => s + pitchingValue(x), 0) / Math.max(1, arms.length);
-      levelInfo.set(level, { lgWoba, lgRa9, batShift, armShift });
+      const shift = this.levelShift(level);
+      levelInfo.set(level, { lgWoba, lgRa9, batShift: shift.bat, armShift: shift.arm });
     }
     const lookup: PerformanceLookup = (player) => {
       const info = levelInfo.get(player.level)!;

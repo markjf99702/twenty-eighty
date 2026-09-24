@@ -19,6 +19,7 @@ export type Route =
   | { page: "winter" }
   | { page: "trades"; partnerId: number | null }
   | { page: "history" }
+  | { page: "scouting" }
   | { page: "office" };
 
 export function parse(hash: string): Route {
@@ -50,6 +51,8 @@ export function parse(hash: string): Route {
       return { page: "trades", partnerId: n(a) };
     case "history":
       return { page: "history" };
+    case "scouting":
+      return { page: "scouting" };
     default:
       return { page: "home" };
   }
@@ -83,6 +86,8 @@ export function href(r: Route): string {
       return r.partnerId === null ? "#trades" : `#trades-${r.partnerId}`;
     case "history":
       return "#history";
+    case "scouting":
+      return "#scouting";
   }
 }
 

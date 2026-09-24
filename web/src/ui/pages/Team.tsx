@@ -387,7 +387,7 @@ const money = (x: number) => (Math.abs(x) >= 10 ? `$${x.toFixed(1)}M` : `$${x.to
 
 function Payroll({ d }: { d: TeamView }) {
   const p = d.payroll;
-  const share = Math.min(1.2, p.payroll / p.budget);
+  const share = Math.min(1.2, (p.payroll + p.staff) / p.budget);
   type Row = TeamView["payroll"]["contracts"][number];
   const columns: Column<Row>[] = [
     { key: "name", label: "Name", cls: "name", sort: (r) => r.name, asc: true, render: (r) => <a href={playerHref(r.id)}>{r.name}</a> },
@@ -420,8 +420,12 @@ function Payroll({ d }: { d: TeamView }) {
           <span class="v">{money(p.budget)}</span>
         </div>
         <div>
+          <span class="k" title="Scouting and analytics departments">Staff</span>
+          <span class="v">{money(p.staff)}</span>
+        </div>
+        <div>
           <span class="k">Room</span>
-          <span class={`v${p.payroll > p.budget ? " neg" : ""}`}>{money(p.budget - p.payroll)}</span>
+          <span class={`v${p.payroll + p.staff > p.budget ? " neg" : ""}`}>{money(p.budget - p.payroll - p.staff)}</span>
         </div>
         {p.deadMoney > 0 && (
           <div>

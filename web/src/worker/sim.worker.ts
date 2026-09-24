@@ -18,7 +18,18 @@ import {
   type RosterContext,
   type RosterResult,
 } from "../../../src/org/roster";
+import { payroll } from "../../../src/org/contracts";
 import { evaluateTrade, executeTrade } from "../../../src/org/trades";
+import { warShift } from "../../../src/scouting/analytics";
+import {
+  ANALYTICS_TIERS,
+  FAMILIARITY,
+  looksAllowance,
+  looksLeft,
+  SCOUTING_TIERS,
+  staffCost,
+  takeLook,
+} from "../../../src/scouting/scouting";
 import { overallGrade } from "../../../src/org/value";
 import { makePick, simDraft } from "../../../src/offseason/draft";
 import { validateOffer } from "../../../src/offseason/freeAgency";
@@ -28,7 +39,17 @@ import { FIELD_POSITIONS, MINOR_LEVELS, type Level } from "../../../src/players/
 import { deserialize, loadGame, saveGame, serialize } from "../../../src/save/save";
 import { runPostseason } from "../../../src/season/postseason";
 import { Season } from "../../../src/season/season";
-import type { Api, ApiName, BoxScoreView, NewGameTeam, RequestMessage, ResponseMessage, ScoresView, StatsView } from "../api/protocol";
+import type {
+  Api,
+  ApiName,
+  BoxScoreView,
+  NewGameTeam,
+  RequestMessage,
+  ResponseMessage,
+  ScoresView,
+  ScoutingView,
+  StatsView,
+} from "../api/protocol";
 import { clearSave, hasSave, readSave, writeSave } from "./storage";
 import { historyView, offseasonView, tradeSide } from "./winter";
 import {
@@ -506,7 +527,7 @@ const handlers: Handlers = {
     const partner = s.team(partnerId);
     const st = currentStatus();
     const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
-    const check = evaluateTrade(s.league, mine, partner, give, get, fraction);
+    const check = evaluateTrade(s.league, mine, partner, give, get, fraction, (viewer, p) => warShift(s, viewer, p));
     if (!st.canTrade) return { ...check, ok: false, reason: st.tradeNote };
     if (!execute || !check.ok) return check;
     executeTrade(ctx(), mine, partner, give, get);
@@ -518,7 +539,85 @@ const handlers: Handlers = {
   history() {
     return historyView(requireSeason().league);
   },
+
+  // --- Scouting --------------------------------------------------------------
+
+  scouting() {
+    return scoutingView(requireSeason());
+  },
+
+  setDepartments({ scouting, analytics }) {
+    const s = requireSeason();
+    const team = userTeam();
+    if (!s.league.offseason && s.day > 0) return { ok: false, reason: "Department budgets are set in the offseason (or before Opening Day)." };
+    if (![scouting, analytics].every((t) => Number.isInteger(t) && t >= 1 && t <= 5)) return { ok: false, reason: "Pick a level from 1 to 5." };
+    s.league.scouting.scouting[team.id] = scouting;
+    s.league.scouting.analytics[team.id] = analytics;
+    stats.clear();
+    persistSoon();
+    return { ok: true };
+  },
+
+  scoutPlayer({ playerId }) {
+    const s = requireSeason();
+    const w = s.league.offseason;
+    const pool = [...(w?.draft?.pool ?? []), ...(w?.international?.pool ?? [])];
+    const p = playerId >= 0 ? s.league.players[playerId] : pool.find((x) => x.id === playerId);
+    if (!p) return { ok: false, reason: "No such player." };
+    const res = takeLook(s.league, s.day, p);
+    if (res.ok) persistSoon();
+    return res;
+  },
 };
+
+function scoutingView(season: Season): ScoutingView {
+  const league = season.league;
+  const team = userTeam();
+  const st = league.scouting;
+  const tier = st.scouting[team.id]!;
+  const aTier = st.analytics[team.id]!;
+  const sc = SCOUTING_TIERS[tier - 1]!;
+  const an = ANALYTICS_TIERS[aTier - 1]!;
+  const w = league.offseason;
+  const pool = [...(w?.draft?.pool ?? []), ...(w?.international?.pool ?? [])];
+  const scouted = Object.entries(st.looks)
+    .map(([key, looks]) => {
+      const id = Number(key);
+      const p = id >= 0 ? league.players[id] : pool.find((x) => x.id === id);
+      if (!p) return null;
+      return {
+        playerId: id,
+        name: `${p.firstName} ${p.lastName}`,
+        team: p.teamId === null ? (id < 0 ? "Amateur" : "FA") : league.teams[p.teamId]!.abbrev,
+        pos: p.pitching ? (p.role === "SP" ? "SP" : "RP") : p.position,
+        looks,
+      };
+    })
+    .filter((x): x is NonNullable<typeof x> => x !== null)
+    .sort((a, b) => b.looks - a.looks);
+  const r1 = (x: number) => Math.round(x * 10) / 10;
+  return {
+    editable: w !== null || season.day === 0,
+    scouting: { tier, label: sc.label, cost: sc.cost },
+    analytics: { tier: aTier, label: an.label, cost: an.cost, basis: an.basis },
+    tiers: {
+      scouting: SCOUTING_TIERS.map((t) => ({ tier: t.tier, label: t.label, cost: t.cost, sigma: t.sigma })),
+      analytics: ANALYTICS_TIERS.map((t) => ({ tier: t.tier, label: t.label, cost: t.cost, trust: t.trust, basis: t.basis })),
+    },
+    accuracy: [
+      { label: "Your own organization", sigma: r1(sc.sigma * FAMILIARITY.own) },
+      { label: "Other clubs' big leaguers", sigma: r1(sc.sigma * FAMILIARITY.bigLeaguer) },
+      { label: "Other clubs' upper minors (AAA, AA)", sigma: r1(sc.sigma * FAMILIARITY.upperMinors) },
+      { label: "Other clubs' lower minors (High-A, Single-A)", sigma: r1(sc.sigma * FAMILIARITY.lowerMinors) },
+      { label: "College draft prospects", sigma: r1(sc.sigma * FAMILIARITY.college) },
+      { label: "High schoolers and international amateurs", sigma: r1(sc.sigma * FAMILIARITY.amateur) },
+    ],
+    looksLeft: looksLeft(league, season.day),
+    looksPerWindow: looksAllowance(tier, w !== null),
+    scouted,
+    budget: { budget: team.budget, payroll: payroll(league, team), staff: staffCost(league, team) },
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Message loop

@@ -1,11 +1,12 @@
 import { Rng } from "../core/rng";
 import type { League } from "../league/types";
 import { assignInitialContracts, budgetFor } from "../org/contracts";
+import { defaultScouting } from "../scouting/scouting";
 
 /**
  * Bring an older save up to date. Version 1 predates contracts, careers and
  * league history: those start fresh, with contracts assigned the way a new
- * universe's are.
+ * universe's are. Version 2 predates scouting departments.
  */
 export function migrateLeague(league: League, fromVersion: number): void {
   if (fromVersion < 2) {
@@ -24,5 +25,10 @@ export function migrateLeague(league: League, fromVersion: number): void {
     }
     for (const tx of league.transactions) tx.year ??= league.year;
     assignInitialContracts(league, new Rng(`${league.seed}:contracts`));
+  }
+  if (fromVersion < 3) {
+    // Scouting and analytics departments arrive, and budgets grow to pay for them.
+    for (const t of league.teams) t.budget += 10;
+    (league as Partial<League> & League).scouting ??= defaultScouting(league, new Rng(`${league.seed}:scouting`));
   }
 }

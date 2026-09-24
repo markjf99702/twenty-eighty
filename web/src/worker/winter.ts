@@ -2,14 +2,16 @@
  * View models for the offseason, trades and league history.
  */
 import type { League, Team } from "../../../src/league/types";
-import { payroll, seasonWar } from "../../../src/org/contracts";
+import { payroll } from "../../../src/org/contracts";
 import { orgPlayers } from "../../../src/org/contracts";
 import { surplusValue } from "../../../src/org/trades";
 import { overallGrade } from "../../../src/org/value";
 import { boardValue, onTheClock } from "../../../src/offseason/draft";
 import { acceptBar, offerScore } from "../../../src/offseason/freeAgency";
 import { MAX_INTERNATIONAL_SIGNINGS } from "../../../src/offseason/international";
-import { playerName } from "../../../src/players/types";
+import { playerName, type Player } from "../../../src/players/types";
+import { believedWar, warShift } from "../../../src/scouting/analytics";
+import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
 import type { DevRow, HistoryView, OffseasonView, TradeSide } from "../api/protocol";
 import { playerSummary, type StatsCache, teamRef } from "./views";
@@ -37,7 +39,9 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
   const view: OffseasonView = {
     phase: w.phase,
     year: w.year,
-    payroll: team ? { payroll: payroll(league, team), budget: team.budget, fortyMan: team.fortyMan.length } : { payroll: 0, budget: 0, fortyMan: 0 },
+    payroll: team
+      ? { payroll: payroll(league, team), staff: staffCost(league, team), budget: team.budget, fortyMan: team.fortyMan.length }
+      : { payroll: 0, staff: 0, budget: 0, fortyMan: 0 },
   };
 
   if (w.phase === "review") {
@@ -68,7 +72,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
     view.tenders = {
       rows: w.tenders
         .filter((t) => t.teamId === user)
-        .map((t) => ({ player: summary(t.playerId), salary: t.salary, war: Math.round(seasonWar(league.players[t.playerId]!) * 10) / 10, tender: t.tender })),
+        .map((t) => ({ player: summary(t.playerId), salary: t.salary, war: Math.round(believedWar(season, user, league.players[t.playerId]!) * 10) / 10, tender: t.tender })),
       expiring: w.expiring.filter((id) => league.players[id]!.teamId === user).map(summary),
     };
   }
@@ -79,8 +83,10 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
     const total = d.order.length * d.rounds;
     const myPicks: number[] = [];
     for (let n = d.picks.length; n < total; n++) if (d.order[n % d.order.length] === user) myPicks.push(n + 1);
+    // Your board: the class as your scouts see it.
+    const seen = (p: Player) => boardValue(p) + valueShift(league, user, p, true);
     const board = [...d.pool]
-      .sort((a, b) => boardValue(b) - boardValue(a))
+      .sort((a, b) => seen(b) - seen(a))
       .slice(0, 60)
       .map((p) => ({ ...playerSummary(p, season, stats), school: p.age >= 21 ? ("College" as const) : ("High school" as const) }));
     view.draft = {
@@ -119,7 +125,8 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
           const floor = acceptBar(a, fa.week) / (offerScore({ years: a.years, salary: 1 }));
           return {
             player: summary(a.playerId),
-            war: Math.round(seasonWar(p) * 10) / 10,
+            // What your front office believes he'll be worth.
+            war: Math.round(believedWar(season, user, p) * 10) / 10,
             askYears: a.years,
             askSalary: a.salary,
             floor: Math.round(floor * 20) / 20,
@@ -142,7 +149,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
       signed: s.signings.filter((x) => x.teamId === user).length,
       maxSignings: MAX_INTERNATIONAL_SIGNINGS,
       prospects: [...s.pool]
-        .sort((a, b) => boardValue(b) - boardValue(a))
+        .sort((a, b) => boardValue(b) + valueShift(league, user, b, true) - (boardValue(a) + valueShift(league, user, a, true)))
         .map((p) => ({ ...playerSummary(p, season, stats), bonus: asks.get(p.id) ?? 0 })),
       signings: s.signings
         .slice()
@@ -156,7 +163,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
 export function tradeSide(season: Season, stats: StatsCache, team: Team): TradeSide {
   const league = season.league;
   const players = orgPlayers(league, team)
-    .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p) }))
+    .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p, 1, warShift(season, league.userTeamId, p)) }))
     .sort((a, b) => b.surplus - a.surplus);
   return { team: teamRef(team), players };
 }

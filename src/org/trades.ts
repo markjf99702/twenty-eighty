@@ -9,8 +9,8 @@ import {
   FREE_AGENT_YEARS,
   MIN_SALARY,
   marketSalary,
+  budgetRoom,
   orgPlayers,
-  payroll,
   seasonWar,
   serviceYears,
 } from "./contracts";
@@ -41,14 +41,14 @@ export interface ControlYear {
  * The seasons a club controls a player, with projected WAR and salary.
  * `fraction` is how much of the current season is left (1 in the offseason).
  */
-export function controlYears(p: Player, fraction = 1): ControlYear[] {
+export function controlYears(p: Player, fraction = 1, warShift = 0): ControlYear[] {
   const c = p.contract;
   if (!c || p.teamId === null) return [];
   const out: ControlYear[] = [];
   let q = p;
   if (c.type === "guaranteed") {
     for (let y = 0; y < c.years; y++) {
-      out.push({ offset: y, war: seasonWar(q), salary: c.salary, guaranteed: true });
+      out.push({ offset: y, war: seasonWar(q) + warShift, salary: c.salary, guaranteed: true });
       q = projectPlayer(q, 1);
     }
     return out;
@@ -66,7 +66,7 @@ export function controlYears(p: Player, fraction = 1): ControlYear[] {
   }
   const years = Math.max(0, FREE_AGENT_YEARS - service) + eta;
   for (let y = 0; y < Math.min(12, years); y++) {
-    const war = seasonWar(q);
+    const war = seasonWar(q) + warShift;
     if (y < eta) {
       out.push({ offset: y, war: 0, salary: 0, guaranteed: false });
     } else {
@@ -88,10 +88,14 @@ export function controlYears(p: Player, fraction = 1): ControlYear[] {
   return out;
 }
 
-/** Surplus value in millions: discounted projected value minus salary over the years of control. */
-export function surplusValue(p: Player, fraction = 1): number {
+/**
+ * Surplus value in millions: discounted projected value minus salary over the
+ * years of control. `warShift` is a club's belief about him relative to the
+ * truth (see scouting/analytics), applied to every projected season.
+ */
+export function surplusValue(p: Player, fraction = 1, warShift = 0): number {
   let total = 0;
-  for (const y of controlYears(p, fraction)) {
+  for (const y of controlYears(p, fraction, warShift)) {
     let surplus = Math.max(0, y.war) * DOLLARS_PER_WAR - y.salary;
     // A club can always walk away from a player it doesn't guarantee.
     if (!y.guaranteed) surplus = Math.max(surplus, -0.5);
@@ -113,11 +117,27 @@ function fortyManAfter(league: League, team: Team, out: number[], incoming: numb
   return team.fortyMan.length - out.filter(on).length + incoming.filter(on).length;
 }
 
-/** Would the AI club accept? The user's club sends `give` and receives `get`. */
-export function evaluateTrade(league: League, userTeam: Team, partner: Team, give: number[], get: number[], fraction = 1): TradeCheck {
+/** A club's belief about a player's WAR relative to the truth (0 = sees him exactly). */
+export type WarShift = (viewer: number, p: Player) => number;
+
+/**
+ * Would the AI club accept? The user's club sends `give` and receives `get`.
+ * Each side values the players through its own scouts (`seen`); the values
+ * returned are the user's view.
+ */
+export function evaluateTrade(
+  league: League,
+  userTeam: Team,
+  partner: Team,
+  give: number[],
+  get: number[],
+  fraction = 1,
+  seen: WarShift = () => 0,
+): TradeCheck {
   const P = (id: number) => league.players[id]!;
-  const giveValue = give.reduce((s, id) => s + surplusValue(P(id), fraction), 0);
-  const getValue = get.reduce((s, id) => s + surplusValue(P(id), fraction), 0);
+  const value = (viewer: number, ids: number[]) => ids.reduce((s, id) => s + surplusValue(P(id), fraction, seen(viewer, P(id))), 0);
+  const giveValue = value(userTeam.id, give);
+  const getValue = value(userTeam.id, get);
   const base = { give: Math.round(giveValue * 10) / 10, get: Math.round(getValue * 10) / 10 };
   if (give.length === 0 && get.length === 0) return { ...base, ok: false, reason: "Put players on both sides." };
   if (give.some((id) => P(id).teamId !== userTeam.id) || get.some((id) => P(id).teamId !== partner.id)) {
@@ -131,12 +151,15 @@ export function evaluateTrade(league: League, userTeam: Team, partner: Team, giv
   }
   const salaryIn = give.reduce((s, id) => s + (P(id).contract?.type === "guaranteed" ? P(id).contract!.salary : 0), 0);
   const salaryOut = get.reduce((s, id) => s + (P(id).contract?.type === "guaranteed" ? P(id).contract!.salary : 0), 0);
-  if (salaryIn - salaryOut > 0 && payroll(league, partner) + salaryIn - salaryOut > partner.budget * 1.05) {
+  if (salaryIn - salaryOut > 0 && salaryIn - salaryOut > budgetRoom(league, partner) + 0.05 * partner.budget) {
     return { ...base, ok: false, reason: `${partner.nickname} can't take on that much salary.` };
   }
-  const want = getValue + Math.max(1, AI_MARGIN * Math.abs(getValue));
-  if (giveValue < want) {
-    const short = Math.round((want - giveValue) * 10) / 10;
+  // The other club judges with its own scouts.
+  const theirIn = value(partner.id, give);
+  const theirOut = value(partner.id, get);
+  const want = theirOut + Math.max(1, AI_MARGIN * Math.abs(theirOut));
+  if (theirIn < want) {
+    const short = Math.round((want - theirIn) * 10) / 10;
     return { ...base, ok: false, reason: `${partner.nickname} want more: about $${short}M more in surplus value.` };
   }
   return { ...base, ok: true };
@@ -185,7 +208,7 @@ export function teamStrength(league: League, team: Team): number {
  * The AI trade market: contenders buy established players from rebuilding
  * clubs with prospects of similar surplus value. Returns trades made.
  */
-export function aiTradeMarket(ctx: RosterContext, rng: Rng, attempts: number, fraction = 1): number {
+export function aiTradeMarket(ctx: RosterContext, rng: Rng, attempts: number, fraction = 1, seen: WarShift = () => 0): number {
   const league = ctx.league;
   const clubs = league.teams.filter((t) => t.id !== league.userTeamId);
   const ranked = [...clubs].sort((a, b) => teamStrength(league, b) - teamStrength(league, a));
@@ -195,12 +218,12 @@ export function aiTradeMarket(ctx: RosterContext, rng: Rng, attempts: number, fr
   for (let i = 0; i < attempts; i++) {
     const buyer = rng.pick(buyers);
     const seller = rng.pick(sellers);
-    const room = buyer.budget - payroll(league, buyer);
+    const room = budgetRoom(league, buyer);
     const target = orgPlayers(league, seller)
       .filter((p) => p.level === "MLB" && !p.il && p.age >= 27 && seasonWar(p) >= 2 && (p.contract?.salary ?? 0) <= room)
       .sort((a, b) => seasonWar(b) - seasonWar(a))[0];
     if (!target) continue;
-    const price = surplusValue(target, fraction);
+    const price = surplusValue(target, fraction, seen(seller.id, target));
     if (price <= 2) continue;
     const top = new Set(
       orgPlayers(league, buyer)
@@ -209,9 +232,10 @@ export function aiTradeMarket(ctx: RosterContext, rng: Rng, attempts: number, fr
         .slice(0, 20)
         .map((p) => p.id),
     );
+    // The seller prices the prospects it's offered with its own scouts.
     const chips = orgPlayers(league, buyer)
       .filter((p) => !top.has(p.id) && !p.il && p.age <= 26)
-      .map((p) => ({ p, v: surplusValue(p, fraction) }))
+      .map((p) => ({ p, v: surplusValue(p, fraction, seen(seller.id, p)) }))
       .filter((x) => x.v > 1 && x.v < price * 1.3)
       .sort((a, b) => b.v - a.v);
     const pkg: typeof chips = [];

@@ -8,6 +8,20 @@ import { notify } from "./Common";
 import { Grade } from "./Grade";
 import { type Column, Table } from "./Table";
 
+/** The Now grade, with a mark when analytics sees him noticeably differently than the scouts. */
+export function NowGrade({ p }: { p: PlayerSummary }) {
+  const a = p.read.analytics;
+  // Only when analytics actually moves your read (a big gap on a small sample doesn't).
+  const gap = p.ovr - p.read.scouts;
+  const title = `Your read ${p.ovr}: scouts ${p.read.scouts}${a === null ? "" : `, analytics ${a}`} (${p.read.confidence} confidence)`;
+  return (
+    <span class="now-grade" title={title}>
+      <Grade g={p.ovr} title={title} />
+      {gap >= 3 ? <span class="ana-up">▲</span> : gap <= -3 ? <span class="ana-down">▼</span> : null}
+    </span>
+  );
+}
+
 export function StatusBadges({ p }: { p: PlayerSummary }) {
   const s = p.status;
   return (
@@ -217,7 +231,7 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
     ...(showLevel ? [{ key: "lvl", label: "Lvl", render: (p: PlayerSummary) => LEVEL_NAMES[p.level], sort: (p: PlayerSummary) => p.level }] : []),
     { key: "age", label: "Age", cls: "num", sort: (p) => p.age, asc: true, render: (p) => p.age },
     ...(scouting ? [{ key: "bt", label: "B/T", cls: "ctr", render: (p: PlayerSummary) => `${p.bats}/${p.throws}` }] : []),
-    { key: "ovr", label: "Now", title: "Overall grade today", cls: "ctr", sort: (p) => p.ovr, render: (p) => <Grade g={p.ovr} /> },
+    { key: "ovr", label: "Now", title: "Your read of his overall grade today (scouts blended with analytics)", cls: "ctr", sort: (p) => p.ovr, render: (p) => <NowGrade p={p} /> },
     { key: "fv", label: "FV", title: "Future value", cls: "ctr", sort: (p) => p.fv, render: (p) => <Grade g={p.fv} /> },
     ...(scouting ? scoutingColumns() : statColumns(pitchers, view, rows)),
   ];

@@ -28,8 +28,11 @@ import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season
 import type { GameResult } from "../../../src/sim/game";
 import { inningsPitched } from "../../../src/stats/lines";
 import { BAT_ROW, PIT_ROW, sumRows } from "../../../src/stats/recent";
+import { belief, warShift } from "../../../src/scouting/analytics";
+import { looksLeft, perceive, staffCost, uncertainty } from "../../../src/scouting/scouting";
 import type {
   BoxScoreView,
+  Confidence,
   ContractView,
   PayrollView,
   DashboardView,
@@ -384,19 +387,38 @@ function careerSnapshot(p: Player, year: number, prefer?: Level): StatSnapshot |
   };
 }
 
+const toGrade = (v: number) => Math.round(Math.max(20, Math.min(80, 50 + v / 2)));
+
+/** Scouting confidence from the typical error (grade points). */
+export function confidenceOf(sigma: number): Confidence {
+  return sigma <= 2.5 ? "high" : sigma <= 4.5 ? "medium" : "low";
+}
+
+/** How the user's front office sees a player: perceived grades and the scouts/analytics blend. */
+export function readOf(season: Season, p: Player) {
+  const league = season.league;
+  const viewer = league.userTeamId;
+  const seen = perceive(league, viewer, p);
+  const b = belief(season, viewer, p);
+  const sigma = uncertainty(league, viewer, p);
+  return { seen, belief: b, sigma, now: toGrade(b.value), fv: Math.max(toGrade(b.value), overallGrade(seen, true)) };
+}
+
 export function playerSummary(
   p: Player,
   season: Season,
   stats: StatsCache,
   actions?: RosterActionOption[],
 ): PlayerSummary {
-  const h = p.hitting;
-  const grades: [string, number][] = p.pitching
+  const read = readOf(season, p);
+  const q = read.seen;
+  const h = q.hitting;
+  const grades: [string, number][] = q.pitching
     ? [
-        ["Stuff", stuffGrade(p)],
-        ["Ctl", p.pitching.control.present],
-        ["Cmd", p.pitching.command.present],
-        ["Stam", p.pitching.stamina.present],
+        ["Stuff", stuffGrade(q)],
+        ["Ctl", q.pitching.control.present],
+        ["Cmd", q.pitching.command.present],
+        ["Stam", q.pitching.stamina.present],
       ]
     : [
         ["Hit", h.hit.present],
@@ -415,10 +437,15 @@ export function playerSummary(
     throws: p.throws,
     level: p.level,
     teamId: p.teamId,
-    ovr: overallGrade(p),
-    fv: overallGrade(p, true),
+    ovr: read.now,
+    fv: read.fv,
     pitcher: Boolean(p.pitching),
     grades,
+    read: {
+      scouts: toGrade(read.belief.scouts),
+      analytics: read.belief.analytics ? toGrade(read.belief.analytics.value) : null,
+      confidence: confidenceOf(read.sigma),
+    },
     status: {
       fortyMan: p.onFortyMan || p.il === "IL60",
       optionsLeft: MAX_OPTION_YEARS - p.options.used,
@@ -524,10 +551,11 @@ export function payrollView(season: Season, stats: StatsCache, team: Team): Payr
   const contracts = everyone
     .filter((p) => p.contract && p.contract.type !== "minor")
     .sort((a, b) => b.contract!.salary - a.contract!.salary)
-    .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p) }));
+    .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p, 1, warShift(season, league.userTeamId, p)) }));
   return {
     payroll: payroll(league, team),
     budget: team.budget,
+    staff: staffCost(league, team),
     deadMoney: Math.round(team.deadMoney.reduce((s2, d) => s2 + d.amount, 0) * 100) / 100,
     commitments: [1, 2, 3, 4, 5].map((k) => ({ year: year + k, amount: committed(league, team, k) })),
     contracts,
@@ -585,12 +613,15 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
   const draft = d
     ? `${d.year} draft, round ${d.round} (#${d.pick} overall) by ${league.teams[d.teamId]!.city} ${league.teams[d.teamId]!.nickname}`
     : null;
-  const h = p.hitting;
-  const tools = p.pitching
+  // Everything graded here is the user's scouts' report, not the truth.
+  const read = readOf(season, p);
+  const q = read.seen;
+  const h = q.hitting;
+  const tools = q.pitching
     ? [
-        { label: "Control", present: p.pitching.control.present, future: p.pitching.control.future, note: "throwing strikes" },
-        { label: "Command", present: p.pitching.command.present, future: p.pitching.command.future, note: "hitting spots" },
-        { label: "Stamina", present: p.pitching.stamina.present, future: p.pitching.stamina.future, note: "how deep he goes" },
+        { label: "Control", present: q.pitching.control.present, future: q.pitching.control.future, note: "throwing strikes" },
+        { label: "Command", present: q.pitching.command.present, future: q.pitching.command.future, note: "hitting spots" },
+        { label: "Stamina", present: q.pitching.stamina.present, future: q.pitching.stamina.future, note: "how deep he goes" },
       ]
     : [
         { label: "Hit", present: h.hit.present, future: h.hit.future, note: "bat-to-ball" },
@@ -613,13 +644,15 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
     traits.push(t.pull > 0.5 ? "Pull hitter" : t.pull < -0.5 ? "Uses the whole field" : "Neutral spray");
     if (t.aggression > 0.8) traits.push("Aggressive baserunner");
   }
-  traits.push(p.durability > 0.8 ? "Injury-prone" : p.durability < -0.8 ? "Durable" : "Average durability");
+  // Medical history is private: you know your own players, and what your scouts dig up on others.
+  const looks = league.scouting.looks[p.id] ?? 0;
+  if (isUser || looks >= 2) traits.push(p.durability > 0.8 ? "Injury-prone" : p.durability < -0.8 ? "Durable" : "Average durability");
   return {
     summary: playerSummary(p, season, stats, isUser ? rosterActions(p, team!, ctx) : undefined),
     team: team ? teamRef(team) : null,
     born: `${league.year - p.age}`,
     tools,
-    pitches: (p.pitching?.pitches ?? []).map((x) => ({
+    pitches: (q.pitching?.pitches ?? []).map((x) => ({
       type: x.type,
       name: PITCH_NAMES[x.type],
       present: x.grade.present,
@@ -629,7 +662,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
     velocity: p.pitching?.velocity ?? null,
     defense: p.pitching
       ? []
-      : FIELD_POSITIONS.map((pos: FieldPosition) => ({ pos, grade: defenseGrade(p, pos), natural: p.positions.includes(pos) }))
+      : FIELD_POSITIONS.map((pos: FieldPosition) => ({ pos, grade: defenseGrade(q, pos), natural: p.positions.includes(pos) }))
           .filter((d) => d.natural || d.grade >= 40)
           .sort((a, b) => b.grade - a.grade),
     traits,
@@ -643,9 +676,36 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
     careerTeams,
     awards: p.awards,
     draft,
-    surplus: team ? surplusValue(p) : null,
+    surplus: team ? surplusValue(p, 1, warShift(season, league.userTeamId, p)) : null,
     retired: p.retired ?? null,
+    scouting: {
+      sigma: Math.round(read.sigma * 10) / 10,
+      confidence: confidenceOf(read.sigma),
+      familiarity: familiarityLabel(league, p),
+      looks,
+      looksLeft: looksLeft(league, season.day),
+      canLook: league.userTeamId !== null && p.teamId !== league.userTeamId && p.retired === undefined,
+      scoutsGrade: toGrade(read.belief.scouts),
+      analytics: read.belief.analytics
+        ? {
+            grade: toGrade(read.belief.analytics.value),
+            reliability: Math.round(100 * read.belief.analytics.reliability) / 100,
+            sample: read.belief.analytics.sample,
+            basis: read.belief.analytics.basis,
+            weight: Math.round(100 * read.belief.weight) / 100,
+          }
+        : null,
+      blendGrade: read.now,
+    },
   };
+}
+
+function familiarityLabel(league: League, p: Player): string {
+  if (p.teamId !== null && p.teamId === league.userTeamId) return "Your organization: your scouts see him every day";
+  if (p.teamId === null) return p.service > 0 ? "Free agent with big-league time" : "Free agent";
+  if (p.level === "MLB") return "Big leaguer: plenty of video and data";
+  if (p.level === "AAA" || p.level === "AA") return "Another club's upper minors";
+  return "Another club's lower minors: few looks";
 }
 
 // ---------------------------------------------------------------------------

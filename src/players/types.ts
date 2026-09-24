@@ -221,6 +221,8 @@ export interface Player {
   draft?: DraftInfo;
   /** Year he retired. */
   retired?: number;
+  /** Identity his scouting reports hang on, when it isn't his id (signed amateurs). */
+  scoutKey?: number;
 }
 
 export const playerName = (p: Player): string => `${p.firstName} ${p.lastName}`;
