@@ -95,6 +95,47 @@ export interface ContractView {
   label: string;
 }
 
+/** A compact season line for roster tables. Rates are fractions; null means not tracked at that level. */
+export interface HitterSnapshot {
+  G: number;
+  PA: number;
+  AVG: number;
+  OBP: number | null;
+  SLG: number | null;
+  HR: number;
+  SB: number;
+  BBpct: number | null;
+  Kpct: number | null;
+  wRCplus: number;
+  xwOBA: number | null;
+  def: number | null;
+  WAR: number;
+}
+
+export interface PitcherSnapshot {
+  G: number;
+  GS: number;
+  IP: number;
+  W: number;
+  L: number;
+  SV: number;
+  ERA: number;
+  FIP: number;
+  /** Park-adjusted ERA, 100 = league average. */
+  ERAminus: number | null;
+  Kpct: number | null;
+  BBpct: number | null;
+  WHIP: number | null;
+  WAR: number;
+}
+
+export interface StatSnapshot {
+  year: number;
+  level: Level;
+  bat?: HitterSnapshot;
+  pit?: PitcherSnapshot;
+}
+
 export interface PlayerSummary {
   id: number;
   name: string;
@@ -112,6 +153,9 @@ export interface PlayerSummary {
   status: PlayerStatus;
   /** One-line stats at his current level this season. */
   line: string;
+  /** This season at his current level, and last season (his big-league line if he had one). */
+  stats: StatSnapshot | null;
+  last: StatSnapshot | null;
   contract: ContractView | null;
   /** Roster moves available to the user's club right now, with the reason when blocked. */
   actions?: RosterActionOption[];

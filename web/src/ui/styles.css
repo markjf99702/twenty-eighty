@@ -27,6 +27,8 @@
   --board-dim: #a5c2b3;
   --bulb: #f4d35e;
   --focus: #2f7fd1;
+  --good: #2c6aa8;
+  --bad: #b04f00;
 
   /* 20-80 grade scale: background / text pairs */
   --g20: #a84f05;  --g20-ink: #ffffff;
@@ -73,6 +75,8 @@
     --board-dim: #8fae9f;
     --bulb: #f2d36b;
     --focus: #6aa9ec;
+    --good: #7ab4ec;
+    --bad: #f0995a;
     --g20: #b85c12;  --g20-ink: #ffffff;
     --g30: #c9771f;  --g30-ink: #140b01;
     --g40: #b98746;  --g40-ink: #140c02;
@@ -110,6 +114,8 @@
   --board-dim: #8fae9f;
   --bulb: #f2d36b;
   --focus: #6aa9ec;
+  --good: #7ab4ec;
+  --bad: #f0995a;
   --g20: #b85c12;  --g20-ink: #ffffff;
   --g30: #c9771f;  --g30-ink: #140b01;
   --g40: #b98746;  --g40-ink: #140c02;
@@ -1017,3 +1023,10 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .budget-bar span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--accent); border-radius: 3px; }
 .budget-bar span.over { background: var(--alert); }
 .budget-bar i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+
+/* ------------------------------------------------------------------ roster stats */
+
+.good { color: var(--good); font-weight: 700; }
+.bad { color: var(--bad); font-weight: 700; }
+.small-sample { opacity: 0.5; }
+.stats-key { display: block; }

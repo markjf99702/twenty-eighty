@@ -4,13 +4,51 @@ import type { PlayerSummary, Status, TeamView } from "../../api/protocol";
 import type { DepthChart } from "../../../../src/league/types";
 import { FIELD_POSITIONS, MINOR_LEVELS } from "../../../../src/players/types";
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
-import { PlayerTable } from "../components/PlayerTable";
+import { PlayerTable, type RosterView } from "../components/PlayerTable";
 import { Grade } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
 import { LEVEL_NAMES, signed } from "../format";
 import { go, playerHref } from "../router";
 
 type Tab = "roster" | "depth" | "farm" | "payroll";
+
+const VIEW_KEY = "twenty-eighty.rosterView";
+
+/** Scouting report or stats, remembered in this browser (storage can be unavailable; that's fine). */
+function useRosterView(): [RosterView, (v: RosterView) => void] {
+  const [view, setView] = useState<RosterView>(() => {
+    try {
+      const v = localStorage.getItem(VIEW_KEY);
+      return v === "stats" || v === "last" || v === "scouting" ? v : "scouting";
+    } catch {
+      return "scouting";
+    }
+  });
+  const set = (v: RosterView) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      // Private window or blocked storage: the choice lasts until the page closes.
+    }
+  };
+  return [view, set];
+}
+
+function ViewSwitch({ view, onChange, year }: { view: RosterView; onChange: (v: RosterView) => void; year: number }) {
+  return (
+    <Seg<RosterView>
+      label="Show"
+      value={view}
+      options={[
+        ["scouting", "Scouting report"],
+        ["stats", `${year} stats`],
+        ["last", `${year - 1} stats`],
+      ]}
+      onChange={onChange}
+    />
+  );
+}
 
 export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; status: Status }) {
   const view = useApi("team", { teamId }, [teamId]);
@@ -55,9 +93,9 @@ export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; st
       </div>
       {view.error && <ErrorNote error={view.error} />}
       {!d && !view.error && <Loading />}
-      {d && tab === "roster" && <Roster d={d} />}
+      {d && tab === "roster" && <Roster d={d} year={status.year ?? 0} />}
       {d && tab === "depth" && <Depth d={d} />}
-      {d && tab === "farm" && <Farm d={d} />}
+      {d && tab === "farm" && <Farm d={d} year={status.year ?? 0} />}
       {d && tab === "payroll" && <Payroll d={d} />}
     </>
   );
@@ -108,12 +146,18 @@ function Flags({ d }: { d: TeamView }) {
   );
 }
 
-function Roster({ d }: { d: TeamView }) {
+function Roster({ d, year }: { d: TeamView; year: number }) {
   const hitters = d.active.filter((p) => !p.pitcher);
   const pitchers = d.active.filter((p) => p.pitcher);
+  const [view, setView] = useRosterView();
+  const statSort = view === "scouting" ? undefined : "WAR";
   return (
     <>
-      <Counts d={d} />
+      <div class="toolbar" style={{ justifyContent: "space-between" }}>
+        <Counts d={d} />
+        <ViewSwitch view={view} onChange={setView} year={year} />
+      </div>
+      {view !== "scouting" && <StatsKey />}
       {d.isUser && d.problems.length > 0 && (
         <div class="note alert">
           <b>Roster problems:</b> {d.problems.join(" ")}
@@ -121,38 +165,57 @@ function Roster({ d }: { d: TeamView }) {
       )}
       {d.isUser && <Flags d={d} />}
       <Section title="Position players" aside={`${hitters.length}`}>
-        <PlayerTable rows={hitters} pitchers={false} manage={d.isUser} />
+        <PlayerTable key={`h-${view}`} rows={hitters} pitchers={false} manage={d.isUser} view={view} sortKey={statSort} />
       </Section>
       <Section title="Pitchers" aside={`${pitchers.length}`}>
-        <PlayerTable rows={pitchers} pitchers manage={d.isUser} />
+        <PlayerTable key={`p-${view}`} rows={pitchers} pitchers manage={d.isUser} view={view} sortKey={statSort} />
       </Section>
       <Section title="Injured list" aside={`${d.injured.length}`}>
-        {d.injured.some((p) => !p.pitcher) && <PlayerTable rows={d.injured.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} />}
-        {d.injured.some((p) => p.pitcher) && <PlayerTable rows={d.injured.filter((p) => p.pitcher)} pitchers manage={d.isUser} />}
+        {d.injured.some((p) => !p.pitcher) && <PlayerTable rows={d.injured.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} view={view} />}
+        {d.injured.some((p) => p.pitcher) && <PlayerTable rows={d.injured.filter((p) => p.pitcher)} pitchers manage={d.isUser} view={view} />}
         {d.injured.length === 0 && <div class="empty">Nobody on the injured list.</div>}
       </Section>
     </>
   );
 }
 
-function Farm({ d }: { d: TeamView }) {
+function Farm({ d, year }: { d: TeamView; year: number }) {
   const [level, setLevel] = useState<(typeof MINOR_LEVELS)[number]>("AAA");
+  const [view, setView] = useRosterView();
   const rows = d.minors[level];
+  const sort = view === "scouting" ? "fv" : "WAR";
   return (
     <>
-      <div class="toolbar">
-        <Seg label="Affiliate" value={level} options={MINOR_LEVELS.map((l) => [l, LEVEL_NAMES[l]])} onChange={setLevel} />
-        <span class="dim">
-          {d.team.affiliates[level]} · {rows.length} players
-        </span>
+      <div class="toolbar" style={{ justifyContent: "space-between" }}>
+        <div class="toolbar">
+          <Seg label="Affiliate" value={level} options={MINOR_LEVELS.map((l) => [l, LEVEL_NAMES[l]])} onChange={setLevel} />
+          <span class="dim">
+            {d.team.affiliates[level]} · {rows.length} players
+          </span>
+        </div>
+        <ViewSwitch view={view} onChange={setView} year={year} />
       </div>
+      {view !== "scouting" && <StatsKey minors />}
       <Section title="Position players">
-        <PlayerTable rows={rows.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} sortKey="fv" />
+        <PlayerTable key={`h-${view}-${level}`} rows={rows.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} sortKey={sort} view={view} />
       </Section>
       <Section title="Pitchers">
-        <PlayerTable rows={rows.filter((p) => p.pitcher)} pitchers manage={d.isUser} sortKey="fv" />
+        <PlayerTable key={`p-${view}-${level}`} rows={rows.filter((p) => p.pitcher)} pitchers manage={d.isUser} sortKey={sort} view={view} />
       </Section>
     </>
+  );
+}
+
+function StatsKey({ minors }: { minors?: boolean }) {
+  return (
+    <div class="small dim stats-key">
+      <span>
+        <span class="good">Blue</span> and <span class="bad">orange</span> mark wRC+ and ERA well above or below league average (once he has 50
+        PA or 15 innings);{" "}
+      </span>
+      <span class="small-sample">faded</span> numbers are small samples.{" "}
+      {minors ? "Expected stats and fielding runs are tracked in the majors only." : ""}
+    </div>
   );
 }
 

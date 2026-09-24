@@ -9,6 +9,7 @@ import type { Season } from "../season/season";
 
 const round1 = (x: number) => Math.round(x * 10) / 10;
 const round2 = (x: number) => Math.round(x * 100) / 100;
+const round3 = (x: number) => (Number.isFinite(x) ? Math.round(x * 1000) / 1000 : 0);
 
 /** Add this season's lines to every player's career record. */
 export function recordCareers(league: League, season: Season): void {
@@ -37,6 +38,10 @@ export function recordCareers(league: League, season: Season): void {
           SB: b.SB,
           wRCplus: Math.round(h.wRCplus),
           WAR: round1(h.WAR),
+          OBP: round3(h.OBP),
+          SLG: round3(h.SLG),
+          Kpct: round3(h.Kpct),
+          BBpct: round3(h.BBpct),
         },
       });
     }
@@ -62,6 +67,10 @@ export function recordCareers(league: League, season: Season): void {
           ERA: round2(x.ERA),
           FIP: round2(x.FIP),
           WAR: round1(x.WAR),
+          Kpct: round3(x.Kpct),
+          BBpct: round3(x.BBpct),
+          WHIP: round2(x.WHIP),
+          ERAminus: Math.round(x.ERAminus),
         },
       });
     }

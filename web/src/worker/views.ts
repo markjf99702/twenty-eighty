@@ -38,6 +38,7 @@ import type {
   PostseasonView,
   RosterActionOption,
   StandingRow,
+  StatSnapshot,
   StandingsView,
   Status,
   TeamRef,
@@ -211,6 +212,115 @@ export function contractView(p: Player, year: number): ContractView | null {
   return { type: c.type, salary: c.salary, years: c.years, through, label };
 }
 
+/** This season's line at his current level (in the winter, from his career record, since levels change at spring training). */
+function currentSnapshot(p: Player, season: Season, stats: StatsCache): StatSnapshot | null {
+  if (p.id < 0) return null;
+  if (season.league.offseason) return careerSnapshot(p, season.league.year, p.level);
+  const year = season.league.year;
+  const level = p.level;
+  const mlb = level === "MLB";
+  if (p.pitching) {
+    const x = stats.pitcher(level, p.id);
+    if (!x) return null;
+    return {
+      year,
+      level,
+      pit: {
+        G: x.line.G,
+        GS: x.line.GS,
+        IP: x.IP,
+        W: x.line.W,
+        L: x.line.L,
+        SV: x.line.SV,
+        ERA: x.ERA,
+        FIP: x.FIP,
+        ERAminus: Number.isFinite(x.ERAminus) ? Math.round(x.ERAminus) : null,
+        Kpct: x.Kpct,
+        BBpct: x.BBpct,
+        WHIP: x.WHIP,
+        WAR: x.WAR,
+      },
+    };
+  }
+  const h = stats.hitter(level, p.id);
+  if (!h) return null;
+  return {
+    year,
+    level,
+    bat: {
+      G: h.line.G,
+      PA: h.PA,
+      AVG: h.AVG,
+      OBP: h.OBP,
+      SLG: h.SLG,
+      HR: h.line.HR,
+      SB: h.line.SB,
+      BBpct: h.BBpct,
+      Kpct: h.Kpct,
+      wRCplus: Math.round(h.wRCplus),
+      // Minor league games skip the expected-stat and fielding bookkeeping.
+      xwOBA: mlb ? h.xwOBA : null,
+      def: mlb ? h.fieldingRuns : null,
+      WAR: h.WAR,
+    },
+  };
+}
+
+/** Last season from his career record. */
+function lastSnapshot(p: Player, season: Season): StatSnapshot | null {
+  return careerSnapshot(p, season.league.year - 1);
+}
+
+/** A season from his career record: the line at `prefer` if he has one, else his highest level. */
+function careerSnapshot(p: Player, year: number, prefer?: Level): StatSnapshot | null {
+  const lines = p.career.filter((c) => c.year === year && (p.pitching ? c.pit : c.bat));
+  if (lines.length === 0) return null;
+  const line = lines.find((c) => c.level === prefer) ?? lines.sort((a, b) => LEVELS.indexOf(a.level) - LEVELS.indexOf(b.level))[0]!;
+  if (line.pit) {
+    const x = line.pit;
+    const ip = x.outs / 3;
+    return {
+      year,
+      level: line.level,
+      pit: {
+        G: x.G,
+        GS: x.GS,
+        IP: ip,
+        W: x.W,
+        L: x.L,
+        SV: x.SV,
+        ERA: x.ERA,
+        FIP: x.FIP,
+        ERAminus: x.ERAminus ?? null,
+        Kpct: x.Kpct ?? null,
+        BBpct: x.BBpct ?? null,
+        WHIP: x.WHIP ?? (ip > 0 ? (x.H + x.BB) / ip : null),
+        WAR: x.WAR,
+      },
+    };
+  }
+  const b = line.bat!;
+  return {
+    year,
+    level: line.level,
+    bat: {
+      G: b.G,
+      PA: b.PA,
+      AVG: b.AB > 0 ? b.H / b.AB : 0,
+      OBP: b.OBP ?? null,
+      SLG: b.SLG ?? (b.AB > 0 ? (b.H + b.D + 2 * b.T + 3 * b.HR) / b.AB : null),
+      HR: b.HR,
+      SB: b.SB,
+      BBpct: b.BBpct ?? (b.PA > 0 ? b.BB / b.PA : null),
+      Kpct: b.Kpct ?? (b.PA > 0 ? b.SO / b.PA : null),
+      wRCplus: b.wRCplus,
+      xwOBA: null,
+      def: null,
+      WAR: b.WAR,
+    },
+  };
+}
+
 export function playerSummary(
   p: Player,
   season: Season,
@@ -256,6 +366,8 @@ export function playerSummary(
       injury: p.injury && p.injury.daysLeft > 0 ? { name: p.injury.name, daysLeft: p.injury.daysLeft } : null,
     },
     line: p.id >= 0 ? statLine(p, stats) : "",
+    stats: currentSnapshot(p, season, stats),
+    last: lastSnapshot(p, season),
     contract: contractView(p, contractYear(season)),
     actions,
   };

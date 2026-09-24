@@ -131,6 +131,11 @@ export interface CareerBatting {
   SB: number;
   wRCplus: number;
   WAR: number;
+  /** Rates kept for quick reading (absent in lines recorded before they were added). */
+  OBP?: number;
+  SLG?: number;
+  Kpct?: number;
+  BBpct?: number;
 }
 
 export interface CareerPitching {
@@ -148,6 +153,10 @@ export interface CareerPitching {
   ERA: number;
   FIP: number;
   WAR: number;
+  Kpct?: number;
+  BBpct?: number;
+  WHIP?: number;
+  ERAminus?: number;
 }
 
 export interface CareerLine {
