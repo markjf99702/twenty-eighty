@@ -1,0 +1,25 @@
+{
+  "name": "twenty-eighty",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A baseball GM / front-office simulation with modern 20-80 scouting grades and modern stats.",
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "calibrate": "tsx scripts/calibrate.ts",
+    "sim:season": "tsx scripts/sim-season.ts",
+    "sim:game": "tsx scripts/sim-game.ts",
+    "check": "npm run typecheck && npm test"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^26.6.2",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.1"
+  }
+}

@@ -1,0 +1,43 @@
+import { Rng } from "../src/core/rng";
+import { generateLeague } from "../src/league/generate";
+import { NEUTRAL_PARK } from "../src/league/parks";
+import { simulateGame, emptyRunningCounters, emptyBattedBallCounters, type SimEnv } from "../src/sim/game";
+import { averageDefense, buildLineup } from "../src/sim/manager";
+import { StaffTracker } from "../src/season/staff";
+import { LineBook, emptyBatting, emptyPitching, type BattingLine, type PitchingLine } from "../src/stats/lines";
+import { RunTracker } from "../src/stats/runExpectancy";
+
+const league = generateLeague({ seed: "smoke" });
+const env: SimEnv = { league, avgDefense: averageDefense(league), neutralPark: NEUTRAL_PARK, tracker: new RunTracker(), running: emptyRunningCounters(), battedBalls: emptyBattedBallCounters() };
+const rng = new Rng("games");
+const staff = new StaffTracker();
+const bat = new LineBook<BattingLine>(emptyBatting);
+const pit = new LineBook<PitchingLine>(emptyPitching);
+const N = Number(process.argv[2] ?? 300);
+let runs = 0, innings = 0;
+const t0 = Date.now();
+let order = [...league.teams];
+for (let g = 0; g < N; g++) {
+  const day = Math.floor(g / 15);
+  if (g % 15 === 0) order = rng.shuffle([...league.teams]);
+  const a = order[(2 * g) % 30]!, h = order[(2 * g + 1) % 30]!;
+  const setup = (t: typeof a) => ({ team: t, lineup: buildLineup(league, t, rng), starter: staff.nextStarter(t, day), bullpen: t.depth.bullpen, unavailable: staff.unavailableRelievers(t, day), fatigue: staff.fatigueMap(t, day) });
+  const r = simulateGame(env, setup(a), setup(h), rng);
+  staff.record(r.pitchCounts, day);
+  bat.merge(r.batting); pit.merge(r.pitching);
+  runs += r.score[0] + r.score[1];
+  innings += r.innings;
+  if (g === 0) console.log("first game", r.score, r.lineScore.map(l => l.join(" ")), "W", r.winningPitcher, "L", r.losingPitcher, "S", r.savePitcher);
+}
+const b = bat.total(); const p = pit.total();
+const pa = b.PA;
+const f = (x: number, d = 3) => x.toFixed(d);
+console.log(`games ${N} in ${Date.now() - t0}ms; R/G per team ${f(runs / (2 * N), 2)}`);
+console.log(`AVG ${f(b.H / b.AB)} OBP ${f((b.H + b.BB + b.HBP) / (b.AB + b.BB + b.HBP + b.SF))} SLG ${f((b["1B"] + 2 * b["2B"] + 3 * b["3B"] + 4 * b.HR) / b.AB)}`);
+console.log(`K% ${f(100 * b.SO / pa, 1)} BB% ${f(100 * b.BB / pa, 1)} HBP% ${f(100 * b.HBP / pa, 2)} HR% ${f(100 * b.HR / pa, 2)} 2B% ${f(100 * b["2B"] / pa, 2)} 3B% ${f(100 * b["3B"] / pa, 2)}`);
+console.log(`BABIP ${f((b.H - b.HR) / (b.AB - b.SO - b.HR + b.SF))} P/PA ${f(b.pitches / pa, 2)} swing% ${f(100 * p.swings / p.pitches, 1)} whiff/swing ${f(100 * p.whiffs / p.swings, 1)} CSW ${f(100 * (p.whiffs + p.calledStrikes) / p.pitches, 1)}`);
+console.log(`GB% ${f(100 * b.GB / b.BBE, 1)} LD% ${f(100 * b.LD / b.BBE, 1)} FB% ${f(100 * b.FB / b.BBE, 1)} PU% ${f(100 * b.PU / b.BBE, 1)} EV ${f(b.evSum / b.BBE, 1)} hard% ${f(100 * b.hardHit / b.BBE, 1)} barrel% ${f(100 * b.barrels / b.BBE, 1)}`);
+console.log(`SB/G ${f(b.SB / (2 * N), 2)} CS/G ${f(b.CS / (2 * N), 2)} GIDP/G ${f(b.GIDP / (2 * N), 2)} ROE/G ${f(b.ROE / (2*N), 2)} innings/G ${f(innings / N, 2)}`);
+console.log(`IP/GS ${f(0, 0)} pitches ${p.pitches} outs ${p.outs}`);
+console.log(env.running);
+for (const [k, v] of Object.entries(env.battedBalls!)) console.log(k.padEnd(6), "share", f(v.n / b.BBE), "BA", f((v["1B"] + v["2B"] + v["3B"] + v.HR) / v.n), "SLG", f((v["1B"] + 2 * v["2B"] + 3 * v["3B"] + 4 * v.HR) / v.n), "1B", f(v["1B"] / v.n), "2B", f(v["2B"] / v.n), "3B", f(v["3B"] / v.n), "HR", f(v.HR / v.n));
