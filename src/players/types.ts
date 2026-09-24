@@ -120,8 +120,9 @@ export interface Player {
   /** Assigned level; MLB players on the injured list keep "MLB". */
   level: Level;
   onFortyMan: boolean;
-  /** MLB injured-list placement, if any. */
+  /** MLB injured-list placement, if any, and the day it began. */
   il: IlType | null;
+  ilDay: number | null;
   /** Current injury (day-to-day or longer), if any. */
   injury: Injury | null;
   /** Option years used (max 3) and whether this season already burned one. */

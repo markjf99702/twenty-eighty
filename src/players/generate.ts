@@ -65,6 +65,7 @@ function unassigned(rng: Rng) {
     level: "A" as const,
     onFortyMan: false,
     il: null,
+    ilDay: null,
     injury: null,
     options: { used: 0, usedThisYear: false },
     service: 0,

@@ -46,6 +46,8 @@ export interface Team {
   injured: number[];
   /** MLB depth chart, rebuilt by the manager AI after roster moves (unless the user sets it). */
   depth: DepthChart;
+  /** The user has set this club's depth chart by hand; the AI only patches holes. */
+  manualDepth?: boolean;
   affiliates: Record<MinorLevel, Affiliate>;
 }
 
