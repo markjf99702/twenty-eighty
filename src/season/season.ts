@@ -1,8 +1,12 @@
 import { Rng } from "../core/rng";
 import { NEUTRAL_PARK } from "../league/parks";
-import type { League, Team } from "../league/types";
-import type { Player } from "../players/types";
-import { playerName } from "../players/types";
+import type { DepthChart, League, Team } from "../league/types";
+import { manageOrganization, type PerformanceLookup } from "../org/ai";
+import { autoDepthChart } from "../org/depth";
+import { logTransaction, positionLabel, type RosterContext } from "../org/roster";
+import { offenseValue, pitchingValue } from "../org/value";
+import { injuryPhrase } from "../players/injuries";
+import { LEVELS, type Level, type Player, playerName, SERVICE_DAYS_PER_YEAR } from "../players/types";
 import {
   emptyBattedBallCounters,
   emptyRunningCounters,
@@ -23,6 +27,9 @@ import {
   type PitcherAdvanced,
 } from "../stats/advanced";
 import {
+  addBatting,
+  addFielding,
+  addPitching,
   emptyBatting,
   emptyFielding,
   emptyPitching,
@@ -82,6 +89,7 @@ export interface PitcherRow extends PitcherAdvanced {
 }
 
 export interface SeasonStats {
+  level: Level;
   context: LeagueContext;
   hitters: HitterRow[];
   pitchers: PitcherRow[];
@@ -100,124 +108,62 @@ const summarize = (day: number, r: GameResult): GameSummary => ({
   savePitcher: r.savePitcher,
 });
 
-export class Season {
-  readonly schedule: Schedule;
+export const emptyRecord = (teamId: number): TeamRecord => ({
+  teamId,
+  w: 0,
+  l: 0,
+  rs: 0,
+  ra: 0,
+  homeW: 0,
+  homeL: 0,
+  awayW: 0,
+  awayL: 0,
+  divW: 0,
+  divL: 0,
+  streak: 0,
+  last10: [],
+});
+
+/** One level's season: its games, standings and stat books. */
+export class LevelSeason {
+  tracker = new RunTracker();
+  readonly batting = new LineBook<BattingLine>(emptyBatting, { running: true, add: addBatting });
+  readonly pitching = new LineBook<PitchingLine>(emptyPitching, { running: true, add: addPitching });
+  readonly fielding = new LineBook<FieldingLine>(emptyFielding, { running: true, add: addFielding });
+  records: TeamRecord[];
+  games: GameSummary[] = [];
   readonly env: SimEnv;
-  readonly staff = new StaffTracker();
-  readonly tracker = new RunTracker();
-  readonly batting = new LineBook<BattingLine>(emptyBatting);
-  readonly pitching = new LineBook<PitchingLine>(emptyPitching);
-  readonly fielding = new LineBook<FieldingLine>(emptyFielding);
-  readonly records: TeamRecord[];
-  readonly games: GameSummary[] = [];
-  readonly teamOf = new Map<number, number>();
-  private readonly parkRuns: { home: number; homeG: number; road: number; roadG: number }[];
-  private readonly rng: Rng;
-  day = 0;
+  parkRuns: { home: number; homeG: number; road: number; roadG: number }[];
 
   constructor(
+    readonly level: Level,
     readonly league: League,
-    seed = `${league.seed}:${league.year}`,
   ) {
-    this.rng = new Rng(seed);
-    this.schedule = buildSchedule(league, this.rng.fork("schedule"));
+    const mlb = level === "MLB";
     this.env = {
       league,
-      avgDefense: averageDefense(league),
+      avgDefense: averageDefense(league, level),
       neutralPark: NEUTRAL_PARK,
       tracker: this.tracker,
-      running: emptyRunningCounters(),
-      battedBalls: emptyBattedBallCounters(),
+      running: mlb ? emptyRunningCounters() : undefined,
+      battedBalls: mlb ? emptyBattedBallCounters() : undefined,
+      detailed: mlb,
     };
-    this.records = league.teams.map((t) => ({
-      teamId: t.id,
-      w: 0,
-      l: 0,
-      rs: 0,
-      ra: 0,
-      homeW: 0,
-      homeL: 0,
-      awayW: 0,
-      awayL: 0,
-      divW: 0,
-      divL: 0,
-      streak: 0,
-      last10: [],
-    }));
+    this.records = league.teams.map((t) => emptyRecord(t.id));
     this.parkRuns = league.teams.map(() => ({ home: 0, homeG: 0, road: 0, roadG: 0 }));
-    for (const p of league.players) if (p.teamId !== null) this.teamOf.set(p.id, p.teamId);
   }
 
-  get totalDays(): number {
-    return this.schedule.days.length;
-  }
-
-  get done(): boolean {
-    return this.day >= this.schedule.days.length;
-  }
-
-  team(id: number): Team {
-    return this.league.teams[id]!;
-  }
-
-  player(id: number): Player {
-    return this.league.players[id]!;
-  }
-
-  /** Lineup, starter and bullpen state for one club today. */
-  gameSetup(team: Team, rng: Rng, day = this.day): TeamGameSetup {
-    return {
-      team,
-      lineup: buildLineup(this.league, team.depth, rng),
-      starter: this.staff.nextStarter(team, day),
-      bullpen: team.depth.bullpen,
-      unavailable: this.staff.unavailableRelievers(team, day),
-      fatigue: this.staff.fatigueMap(team, day),
-    };
-  }
-
-  simDay(): GameSummary[] {
-    if (this.done) return [];
-    const day = this.day;
-    const out: GameSummary[] = [];
-    for (const g of this.schedule.days[day]!) {
-      const rng = this.rng.fork(`g${day}:${g.home}`);
-      const away = this.team(g.away);
-      const home = this.team(g.home);
-      const result = simulateGame(this.env, this.gameSetup(away, rng, day), this.gameSetup(home, rng, day), rng);
-      this.absorb(result, day);
-      const summary = summarize(day, result);
-      this.games.push(summary);
-      out.push(summary);
-    }
-    this.day++;
-    return out;
-  }
-
-  simDays(n: number): void {
-    for (let i = 0; i < n && !this.done; i++) this.simDay();
-  }
-
-  simToEnd(onDay?: (day: number, total: number) => void): void {
-    while (!this.done) {
-      this.simDay();
-      onDay?.(this.day, this.totalDays);
-    }
-  }
-
-  private absorb(r: GameResult, day: number): void {
-    this.staff.record(r.pitchCounts, day);
+  absorb(r: GameResult, day: number): GameSummary {
     this.batting.merge(r.batting);
     this.pitching.merge(r.pitching);
     this.fielding.merge(r.fielding);
 
+    const teams = this.league.teams;
     const [awayRuns, homeRuns] = r.score;
     const away = this.records[r.awayId]!;
     const home = this.records[r.homeId]!;
     const homeWon = homeRuns > awayRuns;
-    const sameDiv =
-      this.team(r.awayId).league === this.team(r.homeId).league &&
-      this.team(r.awayId).division === this.team(r.homeId).division;
+    const sameDiv = teams[r.awayId]!.league === teams[r.homeId]!.league && teams[r.awayId]!.division === teams[r.homeId]!.division;
     const apply = (rec: TeamRecord, won: boolean, rs: number, ra: number, isHome: boolean) => {
       rec.rs += rs;
       rec.ra += ra;
@@ -245,6 +191,10 @@ export class Season {
     this.parkRuns[r.homeId]!.homeG++;
     this.parkRuns[r.awayId]!.road += total;
     this.parkRuns[r.awayId]!.roadG++;
+
+    const summary = summarize(day, r);
+    this.games.push(summary);
+    return summary;
   }
 
   /**
@@ -266,64 +216,46 @@ export class Season {
   }
 
   context(): LeagueContext {
-    const lw = this.tracker.linearWeights();
-    const counts = this.batting.total();
-    const outValue = this.tracker.outValue();
-    const runs = this.records.reduce((s, r) => s + r.rs, 0);
     return buildLeagueContext({
-      batting: counts,
+      batting: this.batting.total(),
       pitching: this.pitching.total(),
       games: this.games.length,
-      runs,
-      linearWeights: lw,
-      outValue,
+      runs: this.records.reduce((s, r) => s + r.rs, 0),
+      linearWeights: this.tracker.linearWeights(),
+      outValue: this.tracker.outValue(),
       parkFactors: this.parkFactors(),
     });
   }
 
   stats(): SeasonStats {
     const ctx = this.context();
-    const pf = (id: number) => ctx.parkFactors.get(this.teamOf.get(id) ?? -1) ?? 1;
-    const teamAbbrev = (id: number) => this.league.teams[this.teamOf.get(id) ?? -1]?.abbrev ?? "FA";
+    const players = this.league.players;
+    const teams = this.league.teams;
+    const pf = (id: number) => ctx.parkFactors.get(players[id]?.teamId ?? -1) ?? 1;
+    const abbrev = (id: number) => teams[players[id]?.teamId ?? -1]?.abbrev ?? "FA";
 
     const hitters: HitterRow[] = [];
     for (const [id, line] of this.batting.lines) {
       if (line.PA === 0) continue;
-      const p = this.player(id);
+      const p = players[id]!;
       const adv = hitterAdvanced(line, this.fielding.lines.get(id), pf(id), ctx);
-      hitters.push({ ...adv, id, name: playerName(p), team: teamAbbrev(id), pos: p.position, line });
+      hitters.push({ ...adv, id, name: playerName(p), team: abbrev(id), pos: p.position, line });
     }
     finishHitterWar(hitters, ctx);
 
     const pitchers: PitcherRow[] = [];
     for (const [id, line] of this.pitching.lines) {
       if (line.outs === 0 && line.BF === 0) continue;
-      const p = this.player(id);
+      const p = players[id]!;
       const adv = pitcherAdvanced(line, pf(id), ctx);
-      pitchers.push({ ...adv, id, name: playerName(p), team: teamAbbrev(id), role: p.role ?? "P", line });
+      pitchers.push({ ...adv, id, name: playerName(p), team: abbrev(id), role: p.role ?? "P", line });
     }
     finishPitcherWar(pitchers, ctx);
-    return { context: ctx, hitters, pitchers };
+    return { level: this.level, context: ctx, hitters, pitchers };
   }
-
-  // -------------------------------------------------------------------------
-  // Standings
 
   winPct(r: TeamRecord): number {
     return r.w + r.l > 0 ? r.w / (r.w + r.l) : 0;
-  }
-
-  /** Division standings: [league][division] -> records, best first. */
-  standings(): TeamRecord[][][] {
-    const out: TeamRecord[][][] = this.league.structure.leagues.map(() =>
-      this.league.structure.divisions.map(() => [] as TeamRecord[]),
-    );
-    for (const r of this.records) {
-      const t = this.team(r.teamId);
-      out[t.league]![t.division]!.push(r);
-    }
-    for (const lg of out) for (const div of lg) div.sort((a, b) => this.compare(a, b));
-    return out;
   }
 
   /** Sort comparator: win pct, then run differential, then a stable coin flip. */
@@ -335,7 +267,331 @@ export class Season {
     );
   }
 
+  /** Division standings: [league][division] -> records, best first. */
+  standings(): TeamRecord[][][] {
+    const out: TeamRecord[][][] = this.league.structure.leagues.map(() =>
+      this.league.structure.divisions.map(() => [] as TeamRecord[]),
+    );
+    for (const r of this.records) {
+      const t = this.league.teams[r.teamId]!;
+      out[t.league]![t.division]!.push(r);
+    }
+    for (const lg of out) for (const div of lg) div.sort((a, b) => this.compare(a, b));
+    return out;
+  }
+}
+
+export interface SeasonOptions {
+  seed?: string;
+  /** Simulate the minor league affiliates too (default true). */
+  minors?: boolean;
+  /** Let AI front offices make roster moves (default true). */
+  aiRosters?: boolean;
+}
+
+const OPENING_DAY = { month: 2, day: 26 }; // March 26
+
+export class Season {
+  readonly schedule: Schedule;
+  staff = new StaffTracker();
+  readonly levels: Record<Level, LevelSeason>;
+  readonly simulateMinors: boolean;
+  readonly aiRosters: boolean;
+  /** Players currently hurt (healing daily). */
+  readonly injured = new Set<number>();
+  /** Service days accrued this season (capped at one year). */
+  readonly seasonService = new Map<number, number>();
+  rng: Rng;
+  private perfCache: { day: number; lookup: PerformanceLookup } | null = null;
+  private depthCache = new Map<string, { key: string; depth: DepthChart }>();
+  day = 0;
+
+  constructor(
+    readonly league: League,
+    opts: SeasonOptions | string = {},
+  ) {
+    const o = typeof opts === "string" ? { seed: opts } : opts;
+    this.rng = new Rng(o.seed ?? `${league.seed}:${league.year}`);
+    this.simulateMinors = o.minors ?? true;
+    this.aiRosters = o.aiRosters ?? true;
+    this.schedule = buildSchedule(league, this.rng.fork("schedule"));
+    this.levels = {} as Record<Level, LevelSeason>;
+    for (const level of LEVELS) this.levels[level] = new LevelSeason(level, league);
+    for (const p of league.players) {
+      p.options.usedThisYear = false;
+      if (p.injury) this.injured.add(p.id);
+    }
+  }
+
+  // --- MLB shortcuts (most of the game looks at the big leagues) -------------
+  get mlb(): LevelSeason {
+    return this.levels.MLB;
+  }
+  get env(): SimEnv {
+    return this.mlb.env;
+  }
+  get tracker(): RunTracker {
+    return this.mlb.tracker;
+  }
+  get batting(): LineBook<BattingLine> {
+    return this.mlb.batting;
+  }
+  get pitching(): LineBook<PitchingLine> {
+    return this.mlb.pitching;
+  }
+  get fielding(): LineBook<FieldingLine> {
+    return this.mlb.fielding;
+  }
+  get records(): TeamRecord[] {
+    return this.mlb.records;
+  }
+  get games(): GameSummary[] {
+    return this.mlb.games;
+  }
+  stats(level: Level = "MLB"): SeasonStats {
+    return this.levels[level].stats();
+  }
+  context(level: Level = "MLB"): LeagueContext {
+    return this.levels[level].context();
+  }
+  parkFactors(): Map<number, number> {
+    return this.mlb.parkFactors();
+  }
+  standings(level: Level = "MLB"): TeamRecord[][][] {
+    return this.levels[level].standings();
+  }
+  winPct(r: TeamRecord): number {
+    return this.mlb.winPct(r);
+  }
+  compare(a: TeamRecord, b: TeamRecord): number {
+    return this.mlb.compare(a, b);
+  }
   gamesBehind(leader: TeamRecord, r: TeamRecord): number {
     return (leader.w - r.w + (r.l - leader.l)) / 2;
   }
+
+  get totalDays(): number {
+    return this.schedule.days.length;
+  }
+
+  get done(): boolean {
+    return this.day >= this.schedule.days.length;
+  }
+
+  team(id: number): Team {
+    return this.league.teams[id]!;
+  }
+
+  player(id: number): Player {
+    return this.league.players[id]!;
+  }
+
+  /** Calendar date of a season day. */
+  dateOf(day: number): Date {
+    return new Date(Date.UTC(this.league.year, OPENING_DAY.month, OPENING_DAY.day + day));
+  }
+
+  /** September 1 and later: expanded rosters. */
+  expanded(day = this.day): boolean {
+    return this.dateOf(day).getUTCMonth() >= 8;
+  }
+
+  rosterContext(day = this.day): RosterContext {
+    return { league: this.league, day, expanded: this.expanded(day) };
+  }
+
+  isOut = (id: number): boolean => {
+    const inj = this.league.players[id]!.injury;
+    return inj !== null && inj.daysLeft > 0;
+  };
+
+  /** Lineup, starter, bench and bullpen state for one club at one level today. */
+  gameSetup(team: Team, rng: Rng, day = this.day, level: Level = "MLB"): TeamGameSetup {
+    const league = this.league;
+    const depth = level === "MLB" ? team.depth : this.minorDepth(team, level);
+    const lineup = buildLineup(league, depth, rng, { unavailable: this.isOut });
+    const inLineup = new Set(lineup.map((s) => s.id));
+    const position = [...Object.values(depth.starters), depth.dh, ...depth.bench];
+    const bench = position.filter((id) => id >= 0 && !inLineup.has(id) && !this.isOut(id));
+    const starter = this.staff.nextStarter(`${team.id}:${level}`, depth.rotation, day, (id) => !this.isOut(id));
+    // Relievers first; the other starters are emergency arms only.
+    const relievers = depth.bullpen.filter((id) => !this.isOut(id));
+    const bullpen = [...relievers, ...depth.rotation.filter((id) => id !== starter && !this.isOut(id))];
+    const unavailable = new Set(bullpen.filter((id) => !relievers.includes(id) || !this.staff.isRested(id, day)));
+    return {
+      team,
+      lineup,
+      bench,
+      starter,
+      bullpen,
+      unavailable,
+      fatigue: this.staff.fatigueMap(bullpen, day),
+      park: level === "MLB" ? team.park : team.affiliates[level].park,
+    };
+  }
+
+  /** A minor league affiliate's depth chart, rebuilt only when its healthy roster changes. */
+  private minorDepth(team: Team, level: Level): DepthChart {
+    const healthy = team.rosters[level].filter((id) => !this.isOut(id));
+    const key = healthy.join(",");
+    const cacheKey = `${team.id}:${level}`;
+    const hit = this.depthCache.get(cacheKey);
+    if (hit && hit.key === key) return hit.depth;
+    const depth = autoDepthChart(healthy.map((id) => this.league.players[id]!));
+    this.depthCache.set(cacheKey, { key, depth });
+    return depth;
+  }
+
+  /**
+   * What each player has actually done this season, in runs per 600 PA (or
+   * BF) on the major-league scale, for the AI's roster decisions.
+   */
+  performance(): PerformanceLookup {
+    // Production changes slowly; refresh the read once a week.
+    if (this.perfCache && this.day - this.perfCache.day < 7) return this.perfCache.lookup;
+    const levelInfo = new Map<Level, { lgWoba: number; lgRa9: number; batShift: number; armShift: number }>();
+    for (const level of LEVELS) {
+      const ls = this.levels[level];
+      const b = ls.batting.total();
+      const p = ls.pitching.total();
+      const lgWoba = b.PA > 0 ? fixedWoba(b) : 0.315;
+      const lgRa9 = p.outs > 0 ? (27 * p.R) / p.outs : 4.4;
+      // The level's average talent, on the MLB grade scale.
+      const roster = this.league.teams.flatMap((t) => t.rosters[level]).map((id) => this.league.players[id]!);
+      const hitters = roster.filter((x) => !x.pitching);
+      const arms = roster.filter((x) => x.pitching);
+      const batShift = hitters.reduce((s, x) => s + offenseValue(x), 0) / Math.max(1, hitters.length);
+      const armShift = arms.reduce((s, x) => s + pitchingValue(x), 0) / Math.max(1, arms.length);
+      levelInfo.set(level, { lgWoba, lgRa9, batShift, armShift });
+    }
+    const lookup: PerformanceLookup = (player) => {
+      const info = levelInfo.get(player.level)!;
+      const ls = this.levels[player.level];
+      if (player.pitching) {
+        const line = ls.pitching.lines.get(player.id);
+        if (!line || line.BF < 20) return null;
+        const ra9 = (27 * line.R) / Math.max(1, line.outs);
+        // Runs saved per 600 batters faced (about 142 innings) vs. the level, on the MLB scale.
+        return { runs: ((info.lgRa9 - ra9) * 142) / 9 + info.armShift, sample: line.BF };
+      }
+      const line = ls.batting.lines.get(player.id);
+      if (!line || line.PA < 20) return null;
+      return { runs: ((fixedWoba(line) - info.lgWoba) / 1.2) * 600 + info.batShift, sample: line.PA };
+    };
+    this.perfCache = { day: this.day, lookup };
+    return lookup;
+  }
+
+  /** Waiver priority: worst MLB record first. */
+  private waiverOrder(): Team[] {
+    return [...this.records].sort((a, b) => this.compare(b, a)).map((r) => this.team(r.teamId));
+  }
+
+  private heal(): void {
+    for (const id of [...this.injured]) {
+      const inj = this.league.players[id]!.injury;
+      if (!inj) {
+        this.injured.delete(id);
+        continue;
+      }
+      if (inj.startDay >= this.day) continue;
+      inj.daysLeft = Math.max(0, inj.daysLeft - 1);
+      if (inj.daysLeft === 0) {
+        this.league.players[id]!.injury = null;
+        this.injured.delete(id);
+      }
+    }
+  }
+
+  private manageRosters(): void {
+    if (!this.aiRosters) return;
+    const ctx = this.rosterContext();
+    const opts = {
+      performance: this.performance(),
+      weekly: this.day > 0 && this.day % 7 === 0,
+      farmCheck: this.day > 0 && this.day % 14 === 0,
+      waiverOrder: this.waiverOrder(),
+      rng: this.rng.fork(`ai${this.day}`),
+    };
+    for (const team of this.league.teams) {
+      if (this.league.userTeamId === team.id && team.manualRoster) continue;
+      manageOrganization(ctx, team, opts);
+    }
+  }
+
+  private applyInjuries(r: GameResult, level: Level): void {
+    for (const { playerId, injury } of r.injuries) {
+      const p = this.league.players[playerId]!;
+      if (p.injury) continue;
+      p.injury = injury;
+      this.injured.add(p.id);
+      if (level === "MLB" && p.teamId !== null) {
+        const days = `${injury.days} day${injury.days === 1 ? "" : "s"}`;
+        logTransaction(
+          this.league,
+          this.day,
+          this.team(p.teamId),
+          p,
+          "injury",
+          `${positionLabel(p)} ${playerName(p)} left the game with ${injuryPhrase(injury.name)} (out about ${days})`,
+        );
+      }
+    }
+  }
+
+  private accrueService(): void {
+    for (const team of this.league.teams) {
+      for (const id of [...team.rosters.MLB, ...team.injured]) {
+        const used = this.seasonService.get(id) ?? 0;
+        if (used >= SERVICE_DAYS_PER_YEAR) continue;
+        this.seasonService.set(id, used + 1);
+        this.league.players[id]!.service++;
+      }
+    }
+  }
+
+  /** Simulate one day at every level. Returns the day's MLB games. */
+  simDay(): GameSummary[] {
+    if (this.done) return [];
+    const day = this.day;
+    this.heal();
+    this.manageRosters();
+
+    const out: GameSummary[] = [];
+    const levels: Level[] = this.simulateMinors ? [...LEVELS] : ["MLB"];
+    for (const level of levels) {
+      const ls = this.levels[level];
+      for (const g of this.schedule.days[day]!) {
+        const rng = this.rng.fork(`g${day}:${level}:${g.home}`);
+        const away = this.team(g.away);
+        const home = this.team(g.home);
+        const result = simulateGame(ls.env, this.gameSetup(away, rng, day, level), this.gameSetup(home, rng, day, level), rng, day);
+        this.staff.record(result.pitchCounts, day);
+        this.applyInjuries(result, level);
+        const summary = ls.absorb(result, day);
+        if (level === "MLB") out.push(summary);
+      }
+    }
+    this.accrueService();
+    this.day++;
+    return out;
+  }
+
+  simDays(n: number): void {
+    for (let i = 0; i < n && !this.done; i++) this.simDay();
+  }
+
+  simToEnd(onDay?: (day: number, total: number) => void): void {
+    while (!this.done) {
+      this.simDay();
+      onDay?.(this.day, this.totalDays);
+    }
+  }
+}
+
+/** wOBA with fixed (typical MLB) weights, for quick performance reads. */
+function fixedWoba(b: BattingLine): number {
+  const denom = b.AB + b.BB - b.IBB + b.SF + b.HBP;
+  if (denom <= 0) return 0;
+  return (0.69 * (b.BB - b.IBB) + 0.72 * b.HBP + 0.88 * b["1B"] + 1.25 * b["2B"] + 1.6 * b["3B"] + 2.05 * b.HR) / denom;
 }

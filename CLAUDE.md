@@ -10,7 +10,17 @@ README.md for the design.
   plus player/team spread. Aim for "0 metric(s) outside 2x tolerance".
 - `npm run grade-chart [-- --pa 30000]`: what each 20-80 grade produces, per tool.
 - `npm run probe`: batted-ball BA/SLG grid by exit velocity x launch angle.
-- `npm run sim:season`, `npm run sim:game -- AWAY HOME`, `npm run scout -- ABBR`.
+- `npm run sim:season [-- --team ABBR] [-- --no-minors]`, `npm run sim:game -- AWAY HOME`,
+  `npm run scout -- ABBR`.
+
+## Architecture in one breath
+
+`League` (plain JSON: teams, players, transactions) is mutated by `Season`, which each
+day heals injuries, runs `manageOrganization` (src/org/ai.ts) for every club, then plays
+every level's games through `simulateGame` (src/sim/game.ts). Roster changes go through
+the rule-checked functions in src/org/roster.ts, never by editing arrays directly, so
+the transaction log and 40-man/IL bookkeeping stay consistent. `new Season(league,
+{ minors: false })` skips affiliate games (calibration and most tests use this).
 
 ## Conventions
 
@@ -25,6 +35,9 @@ README.md for the design.
   Add a counting stat by adding a key to the interface and the key list.
 - Advanced-stat constants come from the simulated season itself
   (`Season.context()`), never hard-coded MLB values.
+- Hot paths matter (a full organizational season is ~130k games of pitches): stat lines
+  use literal factories and explicit adders in src/stats/lines.ts; profile with
+  `node --cpu-prof` on an esbuild bundle before optimizing.
 
 ## Calibration workflow
 

@@ -126,35 +126,145 @@ export interface FieldingLine {
 
 type NumericRecord = { [k: string]: number };
 
-function zeroed<T extends NumericRecord>(keys: readonly (keyof T)[]): () => T {
-  return () => {
-    const o = {} as NumericRecord;
-    for (const k of keys) o[k as string] = 0;
-    return o as T;
-  };
+// Literal factories keep every line on one hidden class, which matters when
+// a season creates hundreds of thousands of them.
+export const emptyBatting = (): BattingLine => ({
+  G: 0, PA: 0, AB: 0, H: 0, "1B": 0, "2B": 0, "3B": 0, HR: 0, R: 0, RBI: 0, BB: 0, IBB: 0, HBP: 0, SO: 0,
+  SF: 0, GIDP: 0, ROE: 0, SB: 0, CS: 0, pitches: 0, zonePitches: 0, zoneSwings: 0, zoneContact: 0,
+  outPitches: 0, outSwings: 0, outContact: 0, BBE: 0, GB: 0, LD: 0, FB: 0, PU: 0, evSum: 0, laSum: 0,
+  hardHit: 0, barrels: 0, sweetSpot: 0, x1B: 0, x2B: 0, x3B: 0, xHR: 0,
+});
+export const emptyPitching = (): PitchingLine => ({
+  G: 0, GS: 0, W: 0, L: 0, SV: 0, HLD: 0, BS: 0, outs: 0, BF: 0, H: 0, "2B": 0, "3B": 0, HR: 0, R: 0,
+  ER: 0, BB: 0, IBB: 0, HBP: 0, SO: 0, WP: 0, SB: 0, CS: 0, pitches: 0, strikes: 0, swings: 0, whiffs: 0,
+  calledStrikes: 0, zonePitches: 0, outPitches: 0, outSwings: 0, BBE: 0, GB: 0, LD: 0, FB: 0, PU: 0,
+  evSum: 0, hardHit: 0, barrels: 0, x1B: 0, x2B: 0, x3B: 0, xHR: 0,
+});
+export const emptyFielding = (): FieldingLine => ({
+  outsC: 0, outs1B: 0, outs2B: 0, outs3B: 0, outsSS: 0, outsLF: 0, outsCF: 0, outsRF: 0, gamesDH: 0,
+  chances: 0, errors: 0, exp1B: 0, exp2B: 0, exp3B: 0, act1B: 0, act2B: 0, act3B: 0, framingActual: 0,
+  framingExpected: 0, sbAllowed: 0, sbExpected: 0, sbAttempts: 0,
+});
+
+// Explicit adders (plain property access) are several times faster than a
+// loop over key names in the season's hottest path.
+export function addBatting(t: BattingLine, s: BattingLine): BattingLine {
+  t.G += s.G;
+  t.PA += s.PA;
+  t.AB += s.AB;
+  t.H += s.H;
+  t["1B"] += s["1B"];
+  t["2B"] += s["2B"];
+  t["3B"] += s["3B"];
+  t.HR += s.HR;
+  t.R += s.R;
+  t.RBI += s.RBI;
+  t.BB += s.BB;
+  t.IBB += s.IBB;
+  t.HBP += s.HBP;
+  t.SO += s.SO;
+  t.SF += s.SF;
+  t.GIDP += s.GIDP;
+  t.ROE += s.ROE;
+  t.SB += s.SB;
+  t.CS += s.CS;
+  t.pitches += s.pitches;
+  t.zonePitches += s.zonePitches;
+  t.zoneSwings += s.zoneSwings;
+  t.zoneContact += s.zoneContact;
+  t.outPitches += s.outPitches;
+  t.outSwings += s.outSwings;
+  t.outContact += s.outContact;
+  t.BBE += s.BBE;
+  t.GB += s.GB;
+  t.LD += s.LD;
+  t.FB += s.FB;
+  t.PU += s.PU;
+  t.evSum += s.evSum;
+  t.laSum += s.laSum;
+  t.hardHit += s.hardHit;
+  t.barrels += s.barrels;
+  t.sweetSpot += s.sweetSpot;
+  t.x1B += s.x1B;
+  t.x2B += s.x2B;
+  t.x3B += s.x3B;
+  t.xHR += s.xHR;
+  return t;
 }
 
-const BATTING_KEYS: (keyof BattingLine)[] = [
-  "G", "PA", "AB", "H", "1B", "2B", "3B", "HR", "R", "RBI", "BB", "IBB", "HBP", "SO", "SF", "GIDP", "ROE", "SB", "CS",
-  "pitches", "zonePitches", "zoneSwings", "zoneContact", "outPitches", "outSwings", "outContact",
-  "BBE", "GB", "LD", "FB", "PU", "evSum", "laSum", "hardHit", "barrels", "sweetSpot", "x1B", "x2B", "x3B", "xHR",
-];
-const PITCHING_KEYS: (keyof PitchingLine)[] = [
-  "G", "GS", "W", "L", "SV", "HLD", "BS", "outs", "BF", "H", "2B", "3B", "HR", "R", "ER", "BB", "IBB", "HBP", "SO",
-  "WP", "SB", "CS", "pitches", "strikes", "swings", "whiffs", "calledStrikes", "zonePitches", "outPitches", "outSwings",
-  "BBE", "GB", "LD", "FB", "PU", "evSum", "hardHit", "barrels", "x1B", "x2B", "x3B", "xHR",
-];
-const FIELDING_KEYS: (keyof FieldingLine)[] = [
-  "outsC", "outs1B", "outs2B", "outs3B", "outsSS", "outsLF", "outsCF", "outsRF", "gamesDH", "chances", "errors",
-  "exp1B", "exp2B", "exp3B", "act1B", "act2B", "act3B", "framingActual", "framingExpected", "sbAllowed", "sbExpected",
-  "sbAttempts",
-];
+export function addPitching(t: PitchingLine, s: PitchingLine): PitchingLine {
+  t.G += s.G;
+  t.GS += s.GS;
+  t.W += s.W;
+  t.L += s.L;
+  t.SV += s.SV;
+  t.HLD += s.HLD;
+  t.BS += s.BS;
+  t.outs += s.outs;
+  t.BF += s.BF;
+  t.H += s.H;
+  t["2B"] += s["2B"];
+  t["3B"] += s["3B"];
+  t.HR += s.HR;
+  t.R += s.R;
+  t.ER += s.ER;
+  t.BB += s.BB;
+  t.IBB += s.IBB;
+  t.HBP += s.HBP;
+  t.SO += s.SO;
+  t.WP += s.WP;
+  t.SB += s.SB;
+  t.CS += s.CS;
+  t.pitches += s.pitches;
+  t.strikes += s.strikes;
+  t.swings += s.swings;
+  t.whiffs += s.whiffs;
+  t.calledStrikes += s.calledStrikes;
+  t.zonePitches += s.zonePitches;
+  t.outPitches += s.outPitches;
+  t.outSwings += s.outSwings;
+  t.BBE += s.BBE;
+  t.GB += s.GB;
+  t.LD += s.LD;
+  t.FB += s.FB;
+  t.PU += s.PU;
+  t.evSum += s.evSum;
+  t.hardHit += s.hardHit;
+  t.barrels += s.barrels;
+  t.x1B += s.x1B;
+  t.x2B += s.x2B;
+  t.x3B += s.x3B;
+  t.xHR += s.xHR;
+  return t;
+}
 
-export const emptyBatting = zeroed<BattingLine & NumericRecord>(BATTING_KEYS) as () => BattingLine;
-export const emptyPitching = zeroed<PitchingLine & NumericRecord>(PITCHING_KEYS) as () => PitchingLine;
-export const emptyFielding = zeroed<FieldingLine & NumericRecord>(FIELDING_KEYS) as () => FieldingLine;
+export function addFielding(t: FieldingLine, s: FieldingLine): FieldingLine {
+  t.outsC += s.outsC;
+  t.outs1B += s.outs1B;
+  t.outs2B += s.outs2B;
+  t.outs3B += s.outs3B;
+  t.outsSS += s.outsSS;
+  t.outsLF += s.outsLF;
+  t.outsCF += s.outsCF;
+  t.outsRF += s.outsRF;
+  t.gamesDH += s.gamesDH;
+  t.chances += s.chances;
+  t.errors += s.errors;
+  t.exp1B += s.exp1B;
+  t.exp2B += s.exp2B;
+  t.exp3B += s.exp3B;
+  t.act1B += s.act1B;
+  t.act2B += s.act2B;
+  t.act3B += s.act3B;
+  t.framingActual += s.framingActual;
+  t.framingExpected += s.framingExpected;
+  t.sbAllowed += s.sbAllowed;
+  t.sbExpected += s.sbExpected;
+  t.sbAttempts += s.sbAttempts;
+  return t;
+}
 
-/** target += source, field by field. */
+/** target += source, field by field (generic; prefer the typed adders in hot paths). */
 export function addLine<T extends object>(target: T, source: T): T {
   const t = target as unknown as NumericRecord;
   const s = source as unknown as NumericRecord;
@@ -162,16 +272,30 @@ export function addLine<T extends object>(target: T, source: T): T {
   return target;
 }
 
-export function sumLines<T extends object>(lines: Iterable<T>, empty: () => T): T {
+export function sumLines<T extends object>(lines: Iterable<T>, empty: () => T, add: (t: T, s: T) => T = addLine): T {
   const total = empty();
-  for (const l of lines) addLine(total, l);
+  for (const l of lines) add(total, l);
   return total;
 }
 
-/** Keyed collection of lines that creates entries on first touch. */
+/**
+ * Keyed collection of lines that creates entries on first touch. With
+ * `running: true` it also keeps a league total as other books are merged in
+ * (season books), so totals are free to read.
+ */
 export class LineBook<T extends object> {
   readonly lines = new Map<number, T>();
-  constructor(private readonly empty: () => T) {}
+  private sum: T | null;
+
+  private readonly add: (target: T, source: T) => T;
+
+  constructor(
+    private readonly empty: () => T,
+    opts: { running?: boolean; add?: (target: T, source: T) => T } = {},
+  ) {
+    this.sum = opts.running ? empty() : null;
+    this.add = opts.add ?? addLine;
+  }
 
   get(id: number): T {
     let l = this.lines.get(id);
@@ -183,11 +307,25 @@ export class LineBook<T extends object> {
   }
 
   merge(other: LineBook<T>): void {
-    for (const [id, line] of other.lines) addLine(this.get(id), line);
+    for (const [id, line] of other.lines) {
+      this.add(this.get(id), line);
+      if (this.sum) this.add(this.sum, line);
+    }
   }
 
   total(): T {
-    return sumLines(this.lines.values(), this.empty);
+    if (this.sum) return this.add(this.empty(), this.sum);
+    return sumLines(this.lines.values(), this.empty, this.add);
+  }
+
+  toJSON(): [number, T][] {
+    return [...this.lines];
+  }
+
+  load(entries: [number, T][]): void {
+    this.lines.clear();
+    for (const [id, line] of entries) this.lines.set(id, this.add(this.empty(), line));
+    if (this.sum) this.sum = sumLines(this.lines.values(), this.empty, this.add);
   }
 }
 

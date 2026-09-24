@@ -21,7 +21,8 @@ const t0 = Date.now();
 const done: Season[] = [];
 for (let i = 0; i < seasons; i++) {
   const league = generateLeague({ seed: seasons === 1 ? seed : `${seed}-${i}` });
-  const season = new Season(league);
+  // The minors don't affect big-league calibration; skip them for speed.
+  const season = new Season(league, { minors: false });
   season.simToEnd();
   done.push(season);
 }

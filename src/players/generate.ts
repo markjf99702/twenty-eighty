@@ -161,8 +161,8 @@ export function generateHitter(rng: Rng, opts: HitterOptions): Player {
     positions,
     hitting,
     traits: {
-      launch: clamp(0.35 * powZ + 0.9 * rng.normal(), -2.5, 2.5),
-      pull: clamp(0.3 * powZ + 0.95 * rng.normal(), -2.5, 2.5),
+      launch: clamp(0.35 * powZ + 0.9 * rng.normal(), -2, 2),
+      pull: clamp(0.3 * powZ + 0.95 * rng.normal(), -2, 2),
       aggression: clamp(0.4 * ((hitting.speed.present - 50) / 10) + 0.9 * rng.normal(), -2.5, 2.5),
     },
     ...unassigned(rng),

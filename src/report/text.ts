@@ -2,7 +2,16 @@ import { formatPresentFuture, gradeLabel, scoutRound } from "../core/grades";
 import type { League, Team } from "../league/types";
 import { teamName } from "../league/types";
 import { defenseGrade } from "../players/defense";
-import { FIELD_POSITIONS, MINOR_LEVELS, PITCH_NAMES, type Player, playerName } from "../players/types";
+import { canBeOptioned } from "../org/roster";
+import {
+  FIELD_POSITIONS,
+  MAX_OPTION_YEARS,
+  MINOR_LEVELS,
+  PITCH_NAMES,
+  type Player,
+  playerName,
+  SERVICE_DAYS_PER_YEAR,
+} from "../players/types";
 import type { PostseasonResult } from "../season/postseason";
 import type { HitterRow, PitcherRow, Season, SeasonStats } from "../season/season";
 import type { GameResult } from "../sim/game";
@@ -152,16 +161,18 @@ export function formatBoxScore(r: GameResult, league: League): string {
 
   [0, 1].forEach((i) => {
     out.push("", `${pad(teamName(teams[i]!), 30)}${lpad("AB", 4)}${lpad("R", 3)}${lpad("H", 3)}${lpad("RBI", 4)}${lpad("BB", 3)}${lpad("K", 3)}  ${lpad("EV", 5)}`);
-    for (const slot of r.lineups[i]!) {
+    const SUB_LABEL = { PH: "PH", PR: "PR", DEF: "DEF", INJ: "sub" } as const;
+    for (const slot of r.battingOrder[i]!.flat()) {
       const b = r.batting.get(slot.id);
       const p = players[slot.id]!;
       const ev = b.BBE > 0 ? f1(b.evSum / b.BBE) : "";
+      const name = slot.sub ? ` ${SUB_LABEL[slot.sub]}-${playerName(p)} ${slot.pos}` : `${playerName(p)} ${slot.pos}`;
       out.push(
-        `  ${pad(`${playerName(p)} ${slot.pos}`, 28)}${lpad(b.AB, 4)}${lpad(b.R, 3)}${lpad(b.H, 3)}${lpad(b.RBI, 4)}${lpad(b.BB, 3)}${lpad(b.SO, 3)}  ${lpad(ev, 5)}`,
+        `  ${pad(name, 28)}${lpad(b.AB, 4)}${lpad(b.R, 3)}${lpad(b.H, 3)}${lpad(b.RBI, 4)}${lpad(b.BB, 3)}${lpad(b.SO, 3)}  ${lpad(ev, 5)}`,
       );
     }
     const extras: string[] = [];
-    for (const slot of r.lineups[i]!) {
+    for (const slot of r.battingOrder[i]!.flat()) {
       const b = r.batting.get(slot.id);
       const name = players[slot.id]!.lastName;
       if (b["2B"]) extras.push(`2B: ${name}${b["2B"] > 1 ? ` ${b["2B"]}` : ""}`);
@@ -171,6 +182,10 @@ export function formatBoxScore(r: GameResult, league: League): string {
     }
     if (extras.length) out.push(`  ${extras.join("; ")}`);
   });
+
+  if (r.injuries.length) {
+    out.push("", "Injuries: " + r.injuries.map((x) => `${playerName(players[x.playerId]!)} (${x.injury.name}, ~${x.injury.days} days)`).join("; "));
+  }
 
   [0, 1].forEach((i) => {
     out.push("", `${pad(teams[i]!.abbrev + " pitching", 30)}${lpad("IP", 5)}${lpad("H", 3)}${lpad("R", 3)}${lpad("ER", 3)}${lpad("BB", 3)}${lpad("K", 3)}${lpad("HR", 3)}${lpad("P", 5)}`);
@@ -193,6 +208,22 @@ export function formatBoxScore(r: GameResult, league: League): string {
 
 const g = (x: { present: number; future: number }) => formatPresentFuture(x.present, x.future);
 
+/** 40-man, option and service notes: "40-man, 1 option left, 3.052 service, IL (hamstring strain, 12 days)". */
+export function statusNote(p: Player): string {
+  const notes: string[] = [];
+  if (p.onFortyMan || p.il === "IL60") notes.push("40-man");
+  const years = Math.floor(p.service / SERVICE_DAYS_PER_YEAR);
+  const days = p.service % SERVICE_DAYS_PER_YEAR;
+  if (p.service > 0) notes.push(`${years}.${String(days).padStart(3, "0")} service`);
+  if (p.onFortyMan) {
+    const left = MAX_OPTION_YEARS - p.options.used;
+    notes.push(canBeOptioned(p) ? `${left} option${left === 1 ? "" : "s"} left${p.options.usedThisYear ? " (+this year)" : ""}` : "out of options");
+  }
+  if (p.il) notes.push(`${p.il}`);
+  if (p.injury) notes.push(`${p.injury.name.charAt(0).toLowerCase()}${p.injury.name.slice(1)}, ${p.injury.daysLeft}d`);
+  return notes.length ? `  [${notes.join(", ")}]` : "";
+}
+
 export function formatHitterCard(p: Player): string {
   const h = p.hitting;
   const best = FIELD_POSITIONS.map((pos) => [pos, defenseGrade(p, pos)] as const)
@@ -200,7 +231,7 @@ export function formatHitterCard(p: Player): string {
     .map(([pos, grade]) => `${pos} ${scoutRound(grade)}`)
     .join(", ");
   return [
-    `${playerName(p)}  ${p.position}  age ${p.age}  B/T ${p.bats}/${p.throws}`,
+    `${playerName(p)}  ${p.position}  age ${p.age}  B/T ${p.bats}/${p.throws}${statusNote(p)}`,
     `  Hit ${g(h.hit)}  Power ${g(h.power)}  Eye ${g(h.eye)}  Run ${g(h.speed)}  Field ${g(h.field)}  Arm ${g(h.arm)}`,
     `  Defense by position: ${best || "DH only"}   Swing: ${p.traits.launch > 0.5 ? "fly-ball" : p.traits.launch < -0.5 ? "ground-ball" : "balanced"}, ${p.traits.pull > 0.5 ? "pull" : p.traits.pull < -0.5 ? "all-fields" : "neutral"}`,
   ].join("\n");
@@ -210,7 +241,7 @@ export function formatPitcherCard(p: Player): string {
   const pit = p.pitching!;
   const pitches = pit.pitches.map((x) => `${PITCH_NAMES[x.type]} ${g(x.grade)}`).join(", ");
   return [
-    `${playerName(p)}  ${p.role}  age ${p.age}  throws ${p.throws}  FB ${pit.velocity.toFixed(0)} mph`,
+    `${playerName(p)}  ${p.role}  age ${p.age}  throws ${p.throws}  FB ${pit.velocity.toFixed(0)} mph${statusNote(p)}`,
     `  ${pitches}`,
     `  Control ${g(pit.control)}  Command ${g(pit.command)}  Stamina ${scoutRound(pit.stamina.present)}`,
   ].join("\n");
@@ -226,6 +257,10 @@ export function formatTeamScouting(team: Team, league: League): string {
   for (const id of team.depth.rotation) out.push(formatPitcherCard(P[id]!));
   out.push("", "BULLPEN");
   for (const id of team.depth.bullpen) out.push(formatPitcherCard(P[id]!));
+  if (team.injured.length) {
+    out.push("", "INJURED LIST");
+    for (const id of team.injured) out.push(P[id]!.pitching ? formatPitcherCard(P[id]!) : formatHitterCard(P[id]!));
+  }
   for (const level of MINOR_LEVELS) {
     out.push("", `${level} - ${team.affiliates[level].name}`);
     for (const id of team.rosters[level]) {

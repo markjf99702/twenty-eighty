@@ -6,7 +6,7 @@ import { Season } from "../src/season/season";
 
 // A full 2,430-game season takes a few seconds; the realism checks below
 // use generous bands so they catch broken physics, not normal variance.
-const season = new Season(generateLeague({ seed: "test-season" }));
+const season = new Season(generateLeague({ seed: "test-season" }), { minors: false });
 season.simToEnd();
 const stats = season.stats();
 const m = leagueMetrics([season]);

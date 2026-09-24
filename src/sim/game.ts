@@ -1,10 +1,14 @@
 import { sigmoid } from "../core/math";
 import type { Rng } from "../core/rng";
 import type { League, Park, Team } from "../league/types";
-import { armZ, defenseZ } from "../players/defense";
-import type { FieldPosition, LineupPosition } from "../players/types";
+import { armZ, defenseGrade, defenseZ } from "../players/defense";
+import { injuryChance, rollInjury, INJURY_RATES } from "../players/injuries";
+import type { FieldPosition, Injury, LineupPosition } from "../players/types";
 import { FIELD_POSITIONS } from "../players/types";
 import {
+  addBatting,
+  addFielding,
+  addPitching,
   emptyBatting,
   emptyFielding,
   emptyPitching,
@@ -43,6 +47,8 @@ export interface TeamGameSetup {
   team: Team;
   /** Batting order (9) with each hitter's defensive position (one DH). */
   lineup: LineupSlot[];
+  /** Healthy bench players available as substitutes. */
+  bench?: number[];
   starter: number;
   /** The whole bullpen, best first. */
   bullpen: number[];
@@ -50,6 +56,8 @@ export interface TeamGameSetup {
   unavailable?: ReadonlySet<number>;
   /** Pre-game fatigue (z) from recent workload, by pitcher id. */
   fatigue?: ReadonlyMap<number, number>;
+  /** Ballpark when this club is home (defaults to the MLB park). */
+  park?: Park;
 }
 
 /** League-wide baserunning tallies, used to calibrate the running game. */
@@ -118,6 +126,8 @@ export interface SimEnv {
   tracker?: RunTracker;
   running?: RunningCounters;
   battedBalls?: BattedBallCounters;
+  /** Compute expected stats and defensive credit (skipped in the minors to save time). */
+  detailed?: boolean;
 }
 
 export interface GameResult {
@@ -133,14 +143,26 @@ export interface GameResult {
   losingPitcher: number | null;
   savePitcher: number | null;
   starters: [number, number];
-  /** Batting orders and pitchers used, in order, [away, home]. */
+  /** Starting lineups, [away, home]. */
   lineups: [LineupSlot[], LineupSlot[]];
+  /** Everyone who batted in each lineup slot, starter first, [away, home]. */
+  battingOrder: [SlotEntry[][], SlotEntry[][]];
+  /** Injuries suffered during the game. */
+  injuries: { playerId: number; injury: Injury }[];
   pitchersUsed: [number[], number[]];
   /** Pitches thrown by each pitcher who appeared. */
   pitchCounts: Map<number, number>;
   batting: LineBook<BattingLine>;
   pitching: LineBook<PitchingLine>;
   fielding: LineBook<FieldingLine>;
+}
+
+export type SubType = "PH" | "PR" | "DEF" | "INJ";
+
+export interface SlotEntry extends LineupSlot {
+  /** How he entered the game (absent for starters). */
+  sub?: SubType;
+  inning?: number;
 }
 
 interface Runner {
@@ -170,11 +192,16 @@ interface Stint {
   exitLead: number;
   blew: boolean;
   faced: Map<number, number>;
+  /** Pitch count at which an arm injury strikes during this outing, if one does. */
+  injuryAtPitch: number | null;
 }
 
 interface Side {
   setup: TeamGameSetup;
-  order: LineupSlot[];
+  order: SlotEntry[];
+  slots: SlotEntry[][];
+  bench: number[];
+  defensiveSubs: number;
   batters: BatterProfile[];
   next: number;
   defense: Record<Fielder, number>;
@@ -205,9 +232,9 @@ type Hit = "1B" | "2B" | "3B" | "HR";
 
 export class GameSim {
   private readonly sides: [Side, Side];
-  private readonly batting = new LineBook<BattingLine>(emptyBatting);
-  private readonly pitching = new LineBook<PitchingLine>(emptyPitching);
-  private readonly fielding = new LineBook<FieldingLine>(emptyFielding);
+  private readonly batting = new LineBook<BattingLine>(emptyBatting, { add: addBatting });
+  private readonly pitching = new LineBook<PitchingLine>(emptyPitching, { add: addPitching });
+  private readonly fielding = new LineBook<FieldingLine>(emptyFielding, { add: addFielding });
   private readonly park: Park;
   private readonly score: [number, number] = [0, 0];
   private inning = 1;
@@ -219,14 +246,17 @@ export class GameSim {
   private markState = 0;
   private winCandidate: [number | null, number | null] = [null, null];
   private loseCandidate: [number | null, number | null] = [null, null];
+  private readonly injuries: { playerId: number; injury: Injury }[] = [];
+  private readonly hurt = new Set<number>();
 
   constructor(
     private readonly env: SimEnv,
     away: TeamGameSetup,
     home: TeamGameSetup,
     private readonly rng: Rng,
+    private readonly day = 0,
   ) {
-    this.park = home.team.park;
+    this.park = home.park ?? home.team.park;
     this.sides = [this.makeSide(away), this.makeSide(home)];
   }
 
@@ -242,6 +272,7 @@ export class GameSim {
     }
     defSkill.P = { range: 0, arm: 0 };
     const catcher = players[defense.C]!;
+    const inLineup = new Set(setup.lineup.map((s) => s.id));
 
     for (const slot of setup.lineup) {
       this.batting.get(slot.id).G += 1;
@@ -249,9 +280,13 @@ export class GameSim {
     }
     const starter = this.newStint(setup, setup.starter, true, 0, 0);
     this.pitching.get(setup.starter).GS += 1;
+    const order: SlotEntry[] = setup.lineup.map((s) => ({ ...s }));
     return {
       setup,
-      order: setup.lineup,
+      order,
+      slots: order.map((s) => [s]),
+      bench: (setup.bench ?? []).filter((id) => !inLineup.has(id)),
+      defensiveSubs: 0,
       batters: setup.lineup.map((s) => batterProfile(players[s.id]!)),
       next: 0,
       defense,
@@ -273,6 +308,10 @@ export class GameSim {
     const preFatigue = setup.fatigue?.get(id) ?? 0;
     const jitter = starter ? this.rng.normal(0, ENGINE.fatigue.limitJitter) : this.rng.normal(0, 2);
     this.pitching.get(id).G += 1;
+    // Arm injuries: a per-appearance risk (strikes at some point in the outing)
+    // plus a per-pitch risk checked as he throws.
+    const risk = injuryChance(player, 0);
+    const injuryAtPitch = this.rng.chance(risk) ? this.rng.int(1, starter ? 90 : 25) : null;
     return {
       id,
       profile,
@@ -289,6 +328,7 @@ export class GameSim {
       exitLead: lead,
       blew: false,
       faced: new Map(),
+      injuryAtPitch,
     };
   }
 
@@ -344,6 +384,7 @@ export class GameSim {
     const runsBefore = this.score[half]!;
 
     this.maybeChangePitcher(true);
+    this.considerDefensiveSubs();
     if (this.inning >= 10) {
       // Extra innings start with the previous hitter on second (unearned if he scores).
       const b = bat.batters[(bat.next + 8) % 9]!;
@@ -352,7 +393,9 @@ export class GameSim {
     this.mark();
     while (this.outs < 3 && !this.walkoff) {
       this.maybeChangePitcher(false);
+      this.considerPinchHitter();
       this.plateAppearance();
+      if (this.outs < 3 && !this.walkoff) this.considerPinchRunner();
     }
     this.env.tracker?.endHalf(this.outs >= 3);
 
@@ -397,6 +440,9 @@ export class GameSim {
       ctx.runnersOn = this.bases[0] !== null || this.bases[1] !== null || this.bases[2] !== null;
       const o = simulatePitch(ctx, balls, strikes, this.rng);
       stint.pitches++;
+      if (stint.injuryAtPitch === null && this.rng.chance(INJURY_RATES.pitcherPerPitch * this.riskOf(stint.id))) {
+        stint.injuryAtPitch = stint.pitches;
+      }
       this.recordPitch(batter.id, stint.id, o, field);
 
       if (o.kind === "ball") {
@@ -430,7 +476,9 @@ export class GameSim {
     stint.battersFaced++;
     this.pitching.get(stint.id).BF += 1;
     this.batting.get(batter.id).PA += 1;
+    const slot = bat.next;
     bat.next = (bat.next + 1) % 9;
+    this.maybeInjureHitter(bat, slot);
   }
 
   private fatigueOf(stint: Stint): number {
@@ -634,7 +682,7 @@ export class GameSim {
     // Defensive credit: this fielder vs. an average one on the same ball.
     const fielderId = field.defense[odds.fielder];
     let fl: FieldingLine | null = null;
-    if (outcome !== "HR" && odds.fielder !== "P") {
+    if (outcome !== "HR" && odds.fielder !== "P" && this.env.detailed !== false) {
       const avg = battedBallOdds(bb, this.park, this.env.avgDefense, batter.speed);
       const inPlay = 1 - avg.hr;
       if (inPlay > 0.01) {
@@ -673,7 +721,7 @@ export class GameSim {
   }
 
   private recordBattedBall(batterId: number, pitcherId: number, bb: BattedBall, odds: BipOdds): void {
-    const x = battedBallOdds(bb, this.env.neutralPark, this.env.avgDefense, 0);
+    const x = this.env.detailed !== false ? battedBallOdds(bb, this.env.neutralPark, this.env.avgDefense, 0) : NO_XSTATS;
     const b = this.batting.get(batterId);
     const p = this.pitching.get(pitcherId);
     const hard = bb.ev >= 95 ? 1 : 0;
@@ -922,7 +970,11 @@ export class GameSim {
     const lead = this.fieldingLead;
     const runners = (this.bases[0] ? 1 : 0) + (this.bases[1] ? 1 : 0) + (this.bases[2] ? 1 : 0);
     let pull = false;
-    if (s.pitches >= s.limit) pull = true;
+    const hurt = s.injuryAtPitch !== null && s.pitches >= s.injuryAtPitch;
+    if (hurt) {
+      this.injure(s.id);
+      pull = true;
+    } else if (s.pitches >= s.limit) pull = true;
     else if (s.starter) {
       if (s.runs >= 6 && s.pitches >= 40) pull = true;
       else if (s.runs >= 5 && this.inning <= 5 && s.pitches >= 60) pull = true;
@@ -973,9 +1025,170 @@ export class GameSim {
   }
 
   // -------------------------------------------------------------------------
+  // Injuries and substitutions
+
+  private riskOf(id: number): number {
+    const p = this.env.league.players[id]!;
+    // injuryChance for a pitcher with 0 pitches is the per-appearance rate; strip it to get the multiplier.
+    return injuryChance(p, 0) / INJURY_RATES.pitcherPerAppearance;
+  }
+
+  private injure(id: number): void {
+    if (this.hurt.has(id)) return;
+    this.hurt.add(id);
+    this.injuries.push({ playerId: id, injury: rollInjury(this.env.league.players[id]!, this.day, this.rng) });
+  }
+
+  /** Per-PA injury risk for the hitter who just batted; if hurt he leaves the game. */
+  private maybeInjureHitter(side: Side, slot: number): void {
+    const entry = side.order[slot]!;
+    const p = this.env.league.players[entry.id]!;
+    const perPa = injuryChance(p, 0) / 4.2;
+    if (!this.rng.chance(perPa)) return;
+    this.injure(p.id);
+    const sub = this.bestSub(side, entry.pos, "defense");
+    if (sub === undefined) return; // no one left: he plays through it
+    this.substitute(side, slot, sub, "INJ");
+  }
+
+  /** Offensive value (runs per 600 PA) of a hitter against this pitcher's hand. */
+  private matchupValue(b: BatterProfile, throws: "L" | "R"): number {
+    const side = battingSide(b.bats, throws);
+    const platoon = side === throws ? -8 : 3;
+    return 19 * b.contact + 19 * b.power + 6 * b.eye + 5 * b.speed + platoon;
+  }
+
+  private canPlay(id: number, pos: LineupPosition): boolean {
+    if (pos === "DH") return true;
+    const p = this.env.league.players[id]!;
+    return p.positions.includes(pos) || defenseGrade(p, pos) >= 40;
+  }
+
+  private bestSub(side: Side, pos: LineupPosition, by: "defense" | "speed" | "bat", throws: "L" | "R" = "R"): number | undefined {
+    const players = this.env.league.players;
+    let best: number | undefined;
+    let bestScore = -Infinity;
+    for (const id of side.bench) {
+      if (this.hurt.has(id)) continue;
+      const p = players[id]!;
+      const eligible = this.canPlay(id, pos);
+      let score: number;
+      if (by === "defense") score = (pos === "DH" ? 0 : defenseGrade(p, pos)) + (eligible ? 100 : 0) + batterProfile(p).power;
+      else if (by === "speed") score = p.hitting.speed.present + (eligible ? 100 : 0);
+      else score = this.matchupValue(batterProfile(p), throws) + (eligible ? 1000 : -1000);
+      if (score > bestScore) {
+        bestScore = score;
+        best = id;
+      }
+    }
+    return best;
+  }
+
+  private substitute(side: Side, slot: number, id: number, type: SubType): void {
+    const players = this.env.league.players;
+    const old = side.order[slot]!;
+    const entry: SlotEntry = { id, pos: old.pos, sub: type, inning: this.inning };
+    side.order[slot] = entry;
+    side.slots[slot]!.push(entry);
+    side.batters[slot] = batterProfile(players[id]!);
+    side.bench = side.bench.filter((b) => b !== id);
+    this.batting.get(id).G += 1;
+    if (old.pos === "DH") {
+      this.fielding.get(id).gamesDH += 1;
+    } else {
+      side.defense[old.pos] = id;
+      side.defSkill[old.pos] = { range: defenseZ(players[id]!, old.pos), arm: armZ(players[id]!) };
+      if (old.pos === "C") {
+        side.catcherFraming = defenseZ(players[id]!, "C");
+        side.catcherArm = armZ(players[id]!);
+      }
+    }
+    // A pinch runner (or an injured runner's replacement) takes his place on base.
+    for (let b = 0; b < 3; b++) {
+      const r = this.bases[b];
+      if (r && r.id === old.id) {
+        const prof = side.batters[slot]!;
+        this.bases[b] = { ...r, id, speed: prof.speed, aggression: prof.aggression };
+      }
+    }
+  }
+
+  private closeGame(maxDeficit: number, maxLead: number): boolean {
+    const diff = this.score[this.half]! - this.score[1 - this.half]!;
+    return diff <= maxLead && diff >= -maxDeficit;
+  }
+
+  private considerPinchHitter(): void {
+    if (this.inning < 7 || !this.closeGame(4, 1)) return;
+    const bat = this.battingSide;
+    if (bat.bench.length === 0) return;
+    const slot = bat.next;
+    const cur = bat.order[slot]!;
+    const throws = this.fieldingSide.pitcher.profile.throws;
+    const sub = this.bestSub(bat, cur.pos, "bat", throws);
+    if (sub === undefined || !this.canPlay(sub, cur.pos)) return;
+    const gain =
+      this.matchupValue(batterProfile(this.env.league.players[sub]!), throws) - this.matchupValue(bat.batters[slot]!, throws);
+    // Don't burn the backup catcher unless it's late.
+    const players = this.env.league.players;
+    const isCatcher = players[sub]!.position === "C";
+    if (isCatcher && this.inning < 9) return;
+    if (gain >= 12) this.substitute(bat, slot, sub, "PH");
+  }
+
+  private considerPinchRunner(): void {
+    if (this.inning < 8 || !this.closeGame(1, 1)) return;
+    const bat = this.battingSide;
+    if (bat.bench.length === 0) return;
+    for (let b = 2; b >= 0; b--) {
+      const r = this.bases[b];
+      if (!r || r.speed > -0.6) continue;
+      const slot = bat.order.findIndex((e) => e.id === r.id);
+      if (slot < 0) continue;
+      const pos = bat.order[slot]!.pos;
+      const sub = this.bestSub(bat, pos, "speed");
+      if (sub === undefined || !this.canPlay(sub, pos)) continue;
+      if ((this.env.league.players[sub]!.hitting.speed.present - 50) / 10 < r.speed + 1.2) continue;
+      this.substitute(bat, slot, sub, "PR");
+      return;
+    }
+  }
+
+  private considerDefensiveSubs(): void {
+    const field = this.fieldingSide;
+    const lead = this.fieldingLead;
+    if (this.inning < 8 || lead < 1 || lead > 3 || field.defensiveSubs >= 2 || field.bench.length === 0) return;
+    const players = this.env.league.players;
+    for (const pos of FIELD_POSITIONS) {
+      if (field.defensiveSubs >= 2) return;
+      const curId = field.defense[pos];
+      const cur = defenseGrade(players[curId]!, pos);
+      let best: number | undefined;
+      let bestGrade = cur + 10;
+      for (const id of field.bench) {
+        if (this.hurt.has(id) || !players[id]!.positions.includes(pos)) continue;
+        const g = defenseGrade(players[id]!, pos);
+        if (g > bestGrade) {
+          bestGrade = g;
+          best = id;
+        }
+      }
+      if (best === undefined) continue;
+      const slot = field.order.findIndex((e) => e.id === curId);
+      if (slot < 0) continue;
+      this.substitute(field, slot, best, "DEF");
+      field.defensiveSubs++;
+    }
+  }
+
+  // -------------------------------------------------------------------------
   // Wrap-up
 
   private finish(): GameResult {
+    // Arm injuries that struck after the pitcher's last check-in still count.
+    for (const side of this.sides) {
+      for (const st of side.stints) if (st.injuryAtPitch !== null && st.pitches >= st.injuryAtPitch) this.injure(st.id);
+    }
     const winner = this.score[1] > this.score[0] ? 1 : 0;
     const loser = 1 - winner;
     const [away, home] = this.sides;
@@ -1037,7 +1250,9 @@ export class GameSim {
       losingPitcher: lp,
       savePitcher: sv,
       starters: [away.stints[0]!.id, home.stints[0]!.id],
-      lineups: [away.order, home.order],
+      lineups: [away.setup.lineup, home.setup.lineup],
+      battingOrder: [away.slots, home.slots],
+      injuries: this.injuries,
       pitchersUsed: [away.stints.map((s) => s.id), home.stints.map((s) => s.id)],
       pitchCounts,
       batting: this.batting,
@@ -1046,6 +1261,8 @@ export class GameSim {
     };
   }
 }
+
+const NO_XSTATS = { single: 0, double: 0, triple: 0, hr: 0 };
 
 function errorRate(type: BattedBallType, skill: number): number {
   const E = ENGINE.errors;
@@ -1057,6 +1274,6 @@ function zoneShare(region: Region): number {
   return region === "heart" ? 1 : region === "shadow" ? 0.5 : 0;
 }
 
-export function simulateGame(env: SimEnv, away: TeamGameSetup, home: TeamGameSetup, rng: Rng): GameResult {
-  return new GameSim(env, away, home, rng).run();
+export function simulateGame(env: SimEnv, away: TeamGameSetup, home: TeamGameSetup, rng: Rng, day = 0): GameResult {
+  return new GameSim(env, away, home, rng, day).run();
 }

@@ -48,6 +48,8 @@ export interface Team {
   depth: DepthChart;
   /** The user has set this club's depth chart by hand; the AI only patches holes. */
   manualDepth?: boolean;
+  /** The user makes this club's roster moves; the AI stays out. */
+  manualRoster?: boolean;
   affiliates: Record<MinorLevel, Affiliate>;
 }
 

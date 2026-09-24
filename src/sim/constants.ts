@@ -150,7 +150,7 @@ export const ENGINE = {
     airPull: 2,
     /** Degrees per z of pull tendency. */
     groundPullZ: 4,
-    airPullZ: 3,
+    airPullZ: 2,
     groundSd: 19,
     airSd: 22,
   },

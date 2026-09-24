@@ -172,14 +172,15 @@ export function canOption(ctx: RosterContext, team: Team, p: Player): RosterResu
 export function optionPlayer(ctx: RosterContext, team: Team, p: Player, to: MinorLevel = "AAA"): RosterResult {
   const check = canOption(ctx, team, p);
   if (!check.ok) return check;
+  let note = "option year already used this season";
   if (!p.options.usedThisYear) {
     p.options.used++;
     p.options.usedThisYear = true;
+    note = `option year ${p.options.used} of ${MAX_OPTION_YEARS}`;
   }
   moveLevel(team, p, to);
   p.optionedDay = ctx.day;
-  const left = optionsRemaining(p);
-  logTransaction(ctx.league, ctx.day, team, p, "option", `Optioned ${label(p)} to ${to} (${left} option year${left === 1 ? "" : "s"} left)`);
+  logTransaction(ctx.league, ctx.day, team, p, "option", `Optioned ${label(p)} to ${to} (${note})`);
   refreshDepth(ctx.league, team);
   return ok;
 }
@@ -219,7 +220,8 @@ export function placeOnIl(ctx: RosterContext, team: Team, p: Player, type?: IlTy
   }
   const kind = il === "IL60" ? "60-day" : il === "IL15" ? "15-day" : "10-day";
   p.ilDay = ctx.day;
-  logTransaction(ctx.league, ctx.day, team, p, "il-place", `Placed ${label(p)} on the ${kind} injured list (${p.injury.name.toLowerCase()})`);
+  const why = p.injury.name.charAt(0).toLowerCase() + p.injury.name.slice(1);
+  logTransaction(ctx.league, ctx.day, team, p, "il-place", `Placed ${label(p)} on the ${kind} injured list (${why})`);
   refreshDepth(ctx.league, team);
   return ok;
 }

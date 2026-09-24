@@ -127,8 +127,33 @@ function levelRoster(rng: Rng, level: Level, strength: number, players: Player[]
       }),
     );
   }
-  for (const id of ids) players[id]!.level = level;
+  for (const id of ids) {
+    const p = players[id]!;
+    p.level = level;
+    rawness(p, level);
+  }
   return ids;
+}
+
+/**
+ * Minor leaguers are raw in characteristic ways: pitchers are wilder and
+ * hitters chase more. Shift grades between tools without changing overall
+ * value, so the low minors walk and strike out more than the majors.
+ */
+const RAWNESS: Record<Level, number> = { MLB: 0, AAA: 0.25, AA: 0.45, "A+": 0.65, A: 0.85 };
+
+function rawness(p: Player, level: Level): void {
+  const r = RAWNESS[level];
+  if (r === 0) return;
+  if (p.pitching) {
+    const ctl = 10 * r;
+    p.pitching.control.present = clampGrade(p.pitching.control.present - ctl);
+    for (const pitch of p.pitching.pitches) pitch.grade.present = clampGrade(pitch.grade.present + (ctl * 4) / 22);
+  } else {
+    const eye = 8 * r;
+    p.hitting.eye.present = clampGrade(p.hitting.eye.present - eye);
+    p.hitting.power.present = clampGrade(p.hitting.power.present + (eye * 6) / 19);
+  }
 }
 
 function affiliatePark(rng: Rng, name: string, level: MinorLevel): Park {

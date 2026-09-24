@@ -35,7 +35,7 @@ describe("a simulated game", () => {
       [0, 1].forEach((side) => {
         const lineRuns = r.lineScore[side]!.reduce((s, x) => s + x, 0);
         expect(lineRuns).toBe(r.score[side]);
-        const batterRuns = r.lineups[side]!.reduce((s, slot) => s + r.batting.get(slot.id).R, 0);
+        const batterRuns = r.battingOrder[side]!.flat().reduce((s, slot) => s + r.batting.get(slot.id).R, 0);
         expect(batterRuns).toBe(r.score[side]);
         const allowed = r.pitchersUsed[1 - side]!.reduce((s, id) => s + r.pitching.get(id).R, 0);
         expect(allowed).toBe(r.score[side]);
@@ -73,8 +73,8 @@ describe("a simulated game", () => {
 
   it("balances plate appearances: every PA ends as an out, a hit, a walk, HBP or reaching on error", () => {
     for (const r of results) {
-      for (const lineup of r.lineups) {
-        for (const slot of lineup) {
+      for (const lineup of r.battingOrder) {
+        for (const slot of lineup.flat()) {
           const b = r.batting.get(slot.id);
           expect(b.PA).toBe(b.AB + b.BB + b.HBP + b.SF);
           expect(b.H).toBe(b["1B"] + b["2B"] + b["3B"] + b.HR);

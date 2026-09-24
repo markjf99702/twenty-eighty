@@ -112,7 +112,7 @@ export const FIELD = {
   race: {
     home2second: 8.2,
     perZ2: 0.18,
-    home2third: 11.9,
+    home2third: 12.1,
     perZ3: 0.28,
     sigma: 0.55,
     transfer: 1.1,
@@ -147,6 +147,10 @@ export const FIELDER_SPOTS: Record<Fielder, [number, number]> = {
 };
 
 const FIELDERS: readonly Fielder[] = ["P", "C", "1B", "2B", "SS", "3B", "LF", "CF", "RF"];
+/** Fielder starting spots in feet (x toward right field, y toward center). */
+const SPOT_XY = Object.fromEntries(
+  Object.entries(FIELDER_SPOTS).map(([f, [ang, depth]]) => [f, [depth * Math.sin(ang * DEG), depth * Math.cos(ang * DEG)]]),
+) as Record<Fielder, [number, number]>;
 const RETRIEVERS: readonly Fielder[] = ["1B", "2B", "SS", "3B", "LF", "CF", "RF"];
 const OUTFIELD: ReadonlySet<Fielder> = new Set(["LF", "CF", "RF"]);
 const GROUND_FIELDERS: readonly Fielder[] = ["3B", "SS", "2B", "1B"];
@@ -194,7 +198,8 @@ export function hangTime(ev: number, la: number): number {
 
 /**
  * When an uncaught ball lands, it keeps rolling away from the plate along its
- * spray line. Find when the quickest outfielder can intercept it.
+ * spray line. Find when the quickest fielder can intercept it: a coarse scan
+ * over time, then a short bisection for the winner.
  */
 function retrievalTime(
   x: number,
@@ -212,27 +217,58 @@ function retrievalTime(
   const d0 = Math.hypot(x, y);
   const v0 = horizSpeed;
   const stopTime = v0 / R.rollDecel;
-  const maxRoll = Math.max(0, Math.min(v0 * stopTime - 0.5 * R.rollDecel * stopTime * stopTime, fenceDist - d0));
-  let best = { time: Infinity, fielder: "CF" as Fielder, ball: [x, y] as [number, number], wall: false };
-  for (const f of RETRIEVERS) {
-    const [ang, depth] = FIELDER_SPOTS[f];
-    const fx = depth * Math.sin(ang * DEG);
-    const fy = depth * Math.cos(ang * DEG);
+  const freeRoll = v0 * stopTime - 0.5 * R.rollDecel * stopTime * stopTime;
+  const maxRoll = Math.max(0, Math.min(freeRoll, fenceDist - d0));
+  const rollAt = (tau: number) => {
+    const tr = Math.min(tau, stopTime);
+    return Math.min(maxRoll, v0 * tr - 0.5 * R.rollDecel * tr * tr);
+  };
+
+  let bestTau = Infinity;
+  let bestFielder: Fielder = "CF";
+  const STEP = 0.25;
+  // Only the three fielders nearest the landing spot can realistically get there first.
+  const nearest = [...RETRIEVERS]
+    .sort((a, b) => Math.hypot(x - SPOT_XY[a][0], y - SPOT_XY[a][1]) - Math.hypot(x - SPOT_XY[b][0], y - SPOT_XY[b][1]))
+    .slice(0, 3);
+  for (const f of nearest) {
+    const [fx, fy] = SPOT_XY[f];
     const speed = (OUTFIELD.has(f) ? R.chaseSpeed : R.infieldChaseSpeed) + A.speedPerZ * def[f].range;
-    for (let tau = 0; tau <= 8; tau += 0.1) {
-      const tr = Math.min(tau, stopTime);
-      const roll = Math.min(maxRoll, v0 * tr - 0.5 * R.rollDecel * tr * tr);
-      const bx = x + dx * roll;
-      const by = y + dy * roll;
-      const arrive = A.ofReact + Math.hypot(bx - fx, by - fy) / speed;
-      if (arrive <= t + tau) {
-        if (t + tau < best.time) best = { time: t + tau, fielder: f, ball: [bx, by], wall: roll >= maxRoll - 1 && maxRoll < v0 * stopTime };
+    const caught = (tau: number) => {
+      const roll = rollAt(tau);
+      return A.ofReact + Math.hypot(x + dx * roll - fx, y + dy * roll - fy) / speed <= t + tau;
+    };
+    let hit = -1;
+    for (let tau = 0; tau <= 8 && tau < bestTau; tau += STEP) {
+      if (caught(tau)) {
+        hit = tau;
         break;
       }
     }
+    if (hit < 0) continue;
+    let lo = Math.max(0, hit - STEP);
+    let hi = hit;
+    if (hit > 0) {
+      for (let i = 0; i < 4; i++) {
+        const mid = (lo + hi) / 2;
+        if (caught(mid)) hi = mid;
+        else lo = mid;
+      }
+    }
+    if (hi < bestTau) {
+      bestTau = hi;
+      bestFielder = f;
+    }
   }
-  best.time += R.pickup + (best.wall ? R.wallCarom : 0);
-  return best;
+  if (!Number.isFinite(bestTau)) bestTau = 8;
+  const roll = rollAt(bestTau);
+  const wall = roll >= maxRoll - 1 && maxRoll < freeRoll;
+  return {
+    time: t + bestTau + R.pickup + (wall ? R.wallCarom : 0),
+    fielder: bestFielder,
+    ball: [x + dx * roll, y + dy * roll],
+    wall,
+  };
 }
 
 /** Linear interpolation of a park's five reference values by spray angle. */
@@ -334,8 +370,7 @@ export function battedBallOdds(bb: BattedBall, park: Park, def: Defense, speedZ:
     // The catcher only plays pop-ups near the plate.
     if (f === "C" && (type !== "PU" || d > 90)) continue;
     const [ang, depth] = FIELDER_SPOTS[f];
-    const fx = depth * Math.sin(ang * DEG);
-    const fy = depth * Math.cos(ang * DEG);
+    const [fx, fy] = SPOT_XY[f];
     const dist = Math.hypot(x - fx, y - fy);
     const isOf = OUTFIELD.has(f);
     const speed = (isOf ? A.ofSpeed : A.ifSpeed) + A.speedPerZ * def[f].range;
