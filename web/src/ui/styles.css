@@ -288,14 +288,41 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 .board .btn.primary { background: var(--bulb); border-color: var(--bulb); color: #16241d; }
 .board .btn.primary:hover:not(:disabled) { color: #16241d; filter: brightness(1.05); }
 
+/* Sim speed: a small scoreboard switch. */
+.pace {
+  display: inline-flex;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.pace button {
+  background: transparent;
+  border: 0;
+  border-right: 1px solid rgba(255, 255, 255, 0.22);
+  color: var(--board-dim);
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 4px 8px;
+  cursor: pointer;
+}
+.pace button:last-child { border-right: 0; }
+.pace button:hover { color: var(--bulb); }
+.pace button.on { background: var(--board-2); color: var(--bulb); }
+.pace button:focus-visible { outline: 2px solid var(--bulb); outline-offset: -2px; }
+
 .progress {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 10px;
+  gap: 8px 10px;
   min-width: min(320px, 100%);
 }
 .progress .bar {
-  flex: 1;
+  flex: 1 1 90px;
+  min-width: 90px;
   height: 8px;
   background: var(--board-2);
   border-radius: 4px;
@@ -359,6 +386,8 @@ main > * { min-width: 0; }
     grid-template-areas: "board" "rail" "main";
   }
   .board { position: static; padding: 8px 16px; gap: 8px 14px; }
+  /* While a sim runs, keep the Stop button in reach. */
+  .board.simming { position: sticky; }
   .sim { margin-left: 0; width: 100%; }
   .sim .label { display: none; }
   .board .btn { padding: 3px 10px; }

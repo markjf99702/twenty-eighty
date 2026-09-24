@@ -593,9 +593,12 @@ export interface Api {
   importSave: { req: { text: string }; res: Status };
   exportSave: { req: void; res: string };
   deleteSave: { req: void; res: Status };
-  sim: { req: { days: number | "end" }; res: Status };
+  /** `msPerDay`: at least this long per simulated day, so a page can be watched as it plays (0 = as fast as possible). */
+  sim: { req: { days: number | "end"; msPerDay?: number }; res: Status };
   /** Stop a running sim after the current day. */
   stop: { req: void; res: { ok: boolean } };
+  /** Change the pace of a running (or the next) sim. */
+  setPace: { req: { msPerDay: number }; res: { ok: boolean } };
   playoffs: { req: void; res: Status };
   dashboard: { req: void; res: DashboardView };
   standings: { req: { level: Level }; res: StandingsView };

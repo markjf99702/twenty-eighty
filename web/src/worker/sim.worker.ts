@@ -82,6 +82,8 @@ let preview: { seed: string; league: League } | null = null;
 let saveExists = false;
 let simulating = false;
 let stopRequested = false;
+/** Minimum wall-clock time per simulated day (the user's sim speed). */
+let msPerDay = 0;
 
 /** Box scores for the last week of MLB games, plus every game the user's club plays. */
 const boxes = new Map<string, BoxScoreView>();
@@ -243,7 +245,18 @@ function validDepth(team: Team, league: League, d: DepthChart): string | null {
 type Progress = (day: number, total: number) => void;
 type Handlers = { [K in ApiName]: (req: Api[K]["req"], progress: Progress) => Api[K]["res"] | Promise<Api[K]["res"]> };
 
-const pause = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
+const pause = () => sleep(0);
+
+/** Hold a day on screen until its time is up, checking often so Stop and speed changes take effect at once. */
+async function holdDay(started: number): Promise<void> {
+  await pause();
+  for (;;) {
+    const left = started + msPerDay - performance.now();
+    if (stopRequested || left <= 0) return;
+    await sleep(Math.min(40, left));
+  }
+}
 
 function qualifying(s: Season, level: Level): { pa: number; ip: number } {
   const recs = s.levels[level].records;
@@ -301,18 +314,20 @@ const handlers: Handlers = {
     return currentStatus();
   },
 
-  async sim({ days }, progress) {
+  async sim({ days, msPerDay: pace }, progress) {
     const s = requireSeason();
     if (simulating) throw new Error("Already simulating.");
     simulating = true;
     stopRequested = false;
+    if (pace !== undefined) msPerDay = Math.max(0, pace);
     try {
       const start = s.day;
       const target = days === "end" ? s.totalDays : Math.min(s.totalDays, s.day + days);
       while (s.day < target && !stopRequested) {
+        const started = performance.now();
         s.simDay();
         progress(s.day - start, target - start);
-        await pause();
+        await holdDay(started);
       }
     } finally {
       simulating = false;
@@ -324,6 +339,11 @@ const handlers: Handlers = {
   stop() {
     stopRequested = true;
     return { ok: simulating };
+  },
+
+  setPace({ msPerDay: pace }) {
+    msPerDay = Math.max(0, pace);
+    return { ok: true };
   },
 
   async playoffs() {

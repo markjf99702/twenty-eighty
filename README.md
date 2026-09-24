@@ -47,7 +47,10 @@ that any web server can host. Pick a seed and a club, and you're the GM:
 
 - **Scoreboard sims**: play a day, a week, a month or the rest of the season, then the
   postseason. A full season with all four affiliates takes about 15-20 seconds, running in
-  a Web Worker so the page stays responsive.
+  a Web Worker so the page stays responsive. Set the speed to **Steady** (about a month
+  in 12 seconds) or **Slow** (about a week in 8) and whatever page you're on follows
+  along day by day, so you can watch the standings and stop (the button or Esc) when
+  you see a losing streak; the speed can change mid-sim and is remembered.
 - **Front office**: record, division race, recent games, club leaders, injuries, your top
   prospects, and the transaction wire.
 - **My club**: the active roster, injured list and every affiliate, with each player's

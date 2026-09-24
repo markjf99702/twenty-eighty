@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useEffect, useRef, useState } from "preact/hooks";
 import { bump, call } from "../api/client";
 import type { Status } from "../api/protocol";
 import { notify, Toasts } from "./components/Common";
@@ -27,11 +27,53 @@ export interface SimState {
   label?: string;
 }
 
+/** Sim speed: how long each simulated day stays on screen at least. */
+type Pace = "fast" | "steady" | "slow";
+const PACES: { key: Pace; label: string; ms: number; title: string }[] = [
+  { key: "fast", label: "Fast", ms: 0, title: "As fast as the sim runs" },
+  { key: "steady", label: "Steady", ms: 400, title: "About a month in 12 seconds" },
+  { key: "slow", label: "Slow", ms: 1200, title: "About a week in 8 seconds" },
+];
+const PACE_KEY = "twenty-eighty.pace";
+const paceMs = (p: Pace) => PACES.find((x) => x.key === p)!.ms;
+
+function storedPace(): Pace {
+  try {
+    const v = localStorage.getItem(PACE_KEY);
+    return PACES.some((p) => p.key === v) ? (v as Pace) : "fast";
+  } catch {
+    return "fast";
+  }
+}
+
 export function App() {
   const [status, setStatus] = useState<Status | null>(null);
   const [booting, setBooting] = useState("Opening the front office");
   const [sim, setSim] = useState<SimState | null>(null);
+  const [pace, setPace] = useState<Pace>(storedPace);
+  const paceRef = useRef(pace);
   const route = useRoute();
+
+  const changePace = (p: Pace) => {
+    setPace(p);
+    paceRef.current = p;
+    try {
+      localStorage.setItem(PACE_KEY, p);
+    } catch {
+      // Private windows can refuse storage; the choice still holds for this session.
+    }
+    void call("setPace", { msPerDay: paceMs(p) });
+  };
+
+  // Esc stops a running sim.
+  useEffect(() => {
+    if (!sim || sim.total <= 1) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") void call("stop", undefined);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [sim !== null && sim.total > 1]);
 
   useEffect(() => {
     (async () => {
@@ -56,9 +98,10 @@ export function App() {
     setSim({ done: 0, total: 1 });
     let lastBump = 0;
     try {
-      const st = await call("sim", { days }, (done, total) => {
+      const st = await call("sim", { days, msPerDay: paceMs(paceRef.current) }, (done, total) => {
         setSim({ done, total });
-        if (done - lastBump >= 5) {
+        // Watching at a slower speed: every page follows along day by day.
+        if (done - lastBump >= (paceRef.current === "fast" ? 5 : 1)) {
           lastBump = done;
           bump();
           void refresh();
@@ -132,7 +175,7 @@ export function App() {
 
   return (
     <div class="app">
-      <Board status={status} sim={sim} onSim={runSim} onPlayoffs={playoffs} onWinter={winterStep} />
+      <Board status={status} sim={sim} onSim={runSim} onPlayoffs={playoffs} onWinter={winterStep} pace={pace} onPace={changePace} />
       <Rail status={status} route={route} />
       <main>
         <Page route={route} status={status} onStatus={setStatus} onWinter={winterStep} />
@@ -199,17 +242,38 @@ function Board({
   onSim,
   onPlayoffs,
   onWinter,
+  pace,
+  onPace,
 }: {
   status: Status | null;
   sim: SimState | null;
   onSim?: (days: number | "end") => void;
   onPlayoffs?: () => void;
   onWinter?: (kind: "beginOffseason" | "advance" | "winterWeek") => void;
+  pace?: Pace;
+  onPace?: (p: Pace) => void;
 }) {
   const game = status?.hasGame ? status : null;
+  const speed = pace && onPace && (
+    <div class="pace" role="radiogroup" aria-label="Sim speed">
+      {PACES.map((p) => (
+        <button
+          type="button"
+          role="radio"
+          key={p.key}
+          aria-checked={pace === p.key}
+          class={pace === p.key ? "on" : ""}
+          title={p.title}
+          onClick={() => onPace(p.key)}
+        >
+          {p.label}
+        </button>
+      ))}
+    </div>
+  );
   const user = game?.teams?.find((t) => t.id === game.userTeamId);
   return (
-    <header class="board">
+    <header class={`board${sim && sim.total > 1 ? " simming" : ""}`}>
       <a class="wordmark" href="#home">
         Twenty-Eighty <span class="scale">20–80</span>
       </a>
@@ -251,8 +315,9 @@ function Board({
                 <span style={{ width: `${sim.total ? (100 * sim.done) / sim.total : 100}%` }} />
               </div>
               <span class="txt">{sim.total ? `Day ${sim.done} of ${sim.total}` : (sim.label ?? "Working")}</span>
+              {sim.total > 1 && speed}
               {sim.total > 1 && (
-                <button type="button" class="btn" onClick={() => void call("stop", undefined)}>
+                <button type="button" class="btn" title="Stop after this day (Esc)" onClick={() => void call("stop", undefined)}>
                   Stop
                 </button>
               )}
@@ -272,6 +337,7 @@ function Board({
               <button type="button" class="btn" onClick={() => onSim("end")}>
                 To end
               </button>
+              {speed}
             </>
           ) : game.phase === "postseason" ? (
             <button type="button" class="btn primary" onClick={onPlayoffs}>
