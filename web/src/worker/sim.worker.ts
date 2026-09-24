@@ -6,6 +6,9 @@
 import { bestTicketPrice } from "../../../src/finance/finance";
 import { acceptJob, hireGm } from "../../../src/finance/owner";
 import { generateLeague } from "../../../src/league/generate";
+import { answerOffer } from "../../../src/org/offers";
+import { TRADE_DEADLINE_DAY } from "../../../src/org/trades";
+import { IL_THRESHOLD_DAYS } from "../../../src/players/injuries";
 import type { DepthChart, League, Team } from "../../../src/league/types";
 import {
   activateFromIl,
@@ -19,6 +22,7 @@ import {
   releasePlayer,
   type RosterContext,
   type RosterResult,
+  rosterProblems,
 } from "../../../src/org/roster";
 import { payroll } from "../../../src/org/contracts";
 import { evaluateTrade, executeTrade } from "../../../src/org/trades";
@@ -36,7 +40,7 @@ import { overallGrade } from "../../../src/org/value";
 import { makePick, simDraft } from "../../../src/offseason/draft";
 import { validateOffer } from "../../../src/offseason/freeAgency";
 import { signInternational } from "../../../src/offseason/international";
-import { advanceOffseason, beginOffseason, WINTER_DAYS, winterContext, winterWeek } from "../../../src/offseason/offseason";
+import { advanceOffseason, beginOffseason, offerClock, WINTER_DAYS, winterContext, winterWeek } from "../../../src/offseason/offseason";
 import { FIELD_POSITIONS, MINOR_LEVELS, type Level } from "../../../src/players/types";
 import { deserialize, loadGame, saveGame, serialize } from "../../../src/save/save";
 import { runPostseason } from "../../../src/season/postseason";
@@ -51,10 +55,12 @@ import type {
   ScoresView,
   ScoutingView,
   StatsView,
+  StopNote,
+  StopRules,
 } from "../api/protocol";
 import { clearSave, hasSave, readSave, writeSave } from "./storage";
 import { financeView, ownerView } from "./business";
-import { historyView, offseasonView, tradeSide } from "./winter";
+import { historyView, offerViews, offseasonView, tradeSide } from "./winter";
 import {
   boxScoreView,
   dashboardView,
@@ -84,6 +90,42 @@ let simulating = false;
 let stopRequested = false;
 /** Minimum wall-clock time per simulated day (the user's sim speed). */
 let msPerDay = 0;
+/** When a running sim stops by itself. */
+let stops: StopRules = { streak: 0, injury: false, offer: true, deadline: true };
+
+/** What the day just played changed that the user asked to be stopped for. */
+function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number }): StopNote | null {
+  const league = s.league;
+  const user = league.userTeamId;
+  if (user === null) return null;
+  const team = s.team(user);
+  if (stops.offer) {
+    const o = league.tradeOffers.find((x) => x.status === "open" && !before.offers.has(x.id));
+    if (o) return { kind: "offer", text: `Trade offer. ${o.pitch}`, href: "#trades" };
+  }
+  if (stops.injury) {
+    for (const t of league.transactions.slice(before.tx)) {
+      if (t.type !== "injury" || t.teamId !== user) continue;
+      const p = league.players[t.playerId]!;
+      if ((p.injury?.daysLeft ?? 0) >= IL_THRESHOLD_DAYS) return { kind: "injury", text: t.text, href: `#player-${p.id}` };
+    }
+  }
+  const streak = s.records[user]!.streak;
+  if (stops.streak > 0 && streak === -stops.streak && before.streak !== streak) {
+    return { kind: "streak", text: `The ${team.nickname} have lost ${stops.streak} straight.`, href: "#home" };
+  }
+  if (stops.deadline && s.day === TRADE_DEADLINE_DAY && before.start < TRADE_DEADLINE_DAY) {
+    return { kind: "deadline", text: "It's trade deadline day: today is the last day to make a trade.", href: "#trades" };
+  }
+  return null;
+}
+
+/** A roster problem to flag after the user trades. */
+function rosterWarning(team: Team): string | undefined {
+  const problems = rosterProblems(ctx(), team);
+  if (problems.length === 0) return undefined;
+  return team.manualRoster ? `${problems[0]} Make room before the next game.` : `${problems[0]} Your assistant GM will make room before the next game.`;
+}
 
 /** Box scores for the last week of MLB games, plus every game the user's club plays. */
 const boxes = new Map<string, BoxScoreView>();
@@ -314,26 +356,37 @@ const handlers: Handlers = {
     return currentStatus();
   },
 
-  async sim({ days, msPerDay: pace }, progress) {
+  async sim({ days, msPerDay: pace, stops: rules }, progress) {
     const s = requireSeason();
     if (simulating) throw new Error("Already simulating.");
     simulating = true;
     stopRequested = false;
     if (pace !== undefined) msPerDay = Math.max(0, pace);
+    if (rules) stops = rules;
+    let note: StopNote | null = null;
     try {
       const start = s.day;
       const target = days === "end" ? s.totalDays : Math.min(s.totalDays, s.day + days);
       while (s.day < target && !stopRequested) {
         const started = performance.now();
+        const user = s.league.userTeamId;
+        const before = {
+          tx: s.league.transactions.length,
+          offers: new Set(s.league.tradeOffers.map((o) => o.id)),
+          streak: user !== null ? s.records[user]!.streak : 0,
+          start,
+        };
         s.simDay();
         progress(s.day - start, target - start);
+        note = stopCheck(s, before);
+        if (note) break;
         await holdDay(started);
       }
     } finally {
       simulating = false;
     }
     await persist();
-    return currentStatus();
+    return note ? { ...currentStatus(), stop: note } : currentStatus();
   },
 
   stop() {
@@ -343,6 +396,11 @@ const handlers: Handlers = {
 
   setPace({ msPerDay: pace }) {
     msPerDay = Math.max(0, pace);
+    return { ok: true };
+  },
+
+  setStops(rules) {
+    stops = rules;
     return { ok: true };
   },
 
@@ -561,7 +619,22 @@ const handlers: Handlers = {
     executeTrade(ctx(), mine, partner, give, get);
     stats.clear();
     persistSoon();
-    return { ...check, done: true };
+    return { ...check, done: true, warning: rosterWarning(mine) };
+  },
+
+  offers() {
+    return offerViews(requireSeason(), stats);
+  },
+
+  answerOffer({ id, accept }) {
+    const s = requireSeason();
+    const st = currentStatus();
+    if (accept && !st.canTrade) return { ok: false, reason: st.tradeNote };
+    const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
+    const res = answerOffer(ctx(), id, accept, offerClock(s.league, s), fraction, (viewer, p) => warShift(s, viewer, p));
+    if (res.ok && accept) stats.clear();
+    persistSoon();
+    return res.ok && accept ? { ...res, warning: rosterWarning(userTeam()) } : res;
   },
 
   history() {

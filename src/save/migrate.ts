@@ -9,7 +9,7 @@ import { defaultScouting } from "../scouting/scouting";
  * Bring an older save up to date. Version 1 predates contracts, careers and
  * league history: those start fresh, with contracts assigned the way a new
  * universe's are. Version 2 predates scouting departments; version 3
- * predates finances and owners.
+ * predates finances and owners; version 4, trade offers.
  */
 export function migrateLeague(league: League, fromVersion: number): void {
   if (fromVersion < 2) {
@@ -44,5 +44,9 @@ export function migrateLeague(league: League, fromVersion: number): void {
     }
     (league as Partial<League> & League).gm ??= null;
     if (league.userTeamId !== null && !league.gm) hireGm(league, league.userTeamId);
+  }
+  if (fromVersion < 5) {
+    // Trade offers to the user arrive.
+    (league as Partial<League> & League).tradeOffers ??= [];
   }
 }

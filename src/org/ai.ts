@@ -297,7 +297,27 @@ function balanceMinors(ctx: RosterContext, team: Team, opts: AiOptions): void {
   }
 }
 
+/** After a trade brings in more than it sends: back under the active-roster and pitching-staff limits. */
+function trimActiveRoster(ctx: RosterContext, team: Team, opts: AiOptions): void {
+  for (let guard = 0; guard < 4; guard++) {
+    const tooManyArms = activePitchers(ctx.league, team) > pitcherLimit(ctx);
+    if (team.rosters.MLB.length <= activeLimit(ctx) && !tooManyArms) return;
+    const protectCatchers = catchersActive(ctx, team) <= 2;
+    const pool = players(ctx, team.rosters.MLB)
+      .filter((p) => (!tooManyArms || isPitcher(p)) && !(protectCatchers && p.position === "C"))
+      .sort((a, b) => estimate(a, opts.performance) - estimate(b, opts.performance));
+    const optionable = pool.find((p) => canOption(ctx, team, p).ok);
+    // Option the weakest who can go down; designate the weakest if nobody can (or he's clearly the one to go).
+    if (optionable && (pool[0] === optionable || estimate(optionable, opts.performance) < estimate(pool[0]!, opts.performance) + 10)) {
+      if (!optionPlayer(ctx, team, optionable).ok) return;
+    } else if (pool[0]) {
+      if (!designateForAssignment(ctx, team, pool[0], opts.waiverOrder).ok) return;
+    } else return;
+  }
+}
+
 export function manageOrganization(ctx: RosterContext, team: Team, opts: AiOptions): void {
+  trimActiveRoster(ctx, team, opts);
   handleInjuries(ctx, team, opts);
   handleActivations(ctx, team, opts);
   fillActiveRoster(ctx, team, opts);

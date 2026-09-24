@@ -50,7 +50,10 @@ that any web server can host. Pick a seed and a club, and you're the GM:
   a Web Worker so the page stays responsive. Set the speed to **Steady** (about a month
   in 12 seconds) or **Slow** (about a week in 8) and whatever page you're on follows
   along day by day, so you can watch the standings and stop (the button or Esc) when
-  you see a losing streak; the speed can change mid-sim and is remembered.
+  you see a losing streak; the speed can change mid-sim and is remembered. **Stops**
+  pause the sim by themselves when your club loses a set number in a row, a big
+  leaguer goes down for injured-list time, a club makes you a trade offer, or it's
+  trade deadline day (with the day still to play), and a note says why it stopped.
 - **Front office**: record, division race, recent games, club leaders, injuries, your top
   prospects, and the transaction wire.
 - **My club**: the active roster, injured list and every affiliate, with each player's
@@ -77,7 +80,12 @@ that any web server can host. Pick a seed and a club, and you're the GM:
   spring training. Then the next season starts.
 - **Trades** at any time before the July 31 deadline or in the winter: pick players from
   both sides and the other club tells you whether it would say yes (and roughly how much
-  more it wants if not). **Payroll** shows every contract, your budget and future
+  more it wants if not). Clubs call you, too: a contender asks for one of your veterans,
+  or a seller offers you one of theirs, each valuing players through its own scouts (so
+  an offer can be a steal or a trap). Offers stand for three days (a week in the winter);
+  accept, decline, or load one into the builder to counter. AI clubs deal with each
+  other from late May, busiest in the last three weeks before the deadline, and those
+  trades show up on the wire. **Payroll** shows every contract, your budget and future
   commitments; **History** keeps champions and award winners.
 - **Finances**: this season's books (gate, concessions, media, sponsorship, national
   money, postseason gates; payroll, dead money, departments, operations, bonuses),

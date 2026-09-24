@@ -121,6 +121,27 @@ export interface League {
   scouting: ScoutingState;
   /** The user's job: the owner's goals and confidence (null when no club is the user's). */
   gm: GmState | null;
+  /** Trade proposals AI clubs have made to the user (recent ones, whatever became of them). */
+  tradeOffers: TradeOffer[];
+}
+
+/** An AI club's proposal to the user. */
+export interface TradeOffer {
+  id: number;
+  teamId: number;
+  /** The user's players they want. */
+  give: number[];
+  /** Their players for the user. */
+  get: number[];
+  /** They're buying one of the user's players, or selling one of theirs. */
+  kind: "buy" | "sell";
+  /** The club's pitch, in a sentence or two. */
+  pitch: string;
+  year: number;
+  /** When it was made and the last moment it stands, on the offer clock (season days; winter days run from 1000). */
+  made: number;
+  expires: number;
+  status: "open" | "accepted" | "declined" | "expired";
 }
 
 export interface Award {

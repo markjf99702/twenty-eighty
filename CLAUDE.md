@@ -54,6 +54,15 @@ distribution, interest, next budgets) before contracts roll. `league.gm` is null
 the user runs a club; `hireGm` creates it, spring goals come from `setGoals`, and a
 firing leaves `gm.fired` with `offers` until `acceptJob`.
 
+Trades during the season (src/org/offers.ts): `Season.simDay` ends with `tradeDay`,
+which runs the AI market between contenders and sellers by the standings (weekly from
+late May, more near `TRADE_DEADLINE_DAY`) and now and then proposes a deal to the user
+(`proposeToUser`; winter weeks call `winterOffer`). Offers live in `league.tradeOffers`
+on one clock (`offerClock`: season days, then 1000 plus the winter day) and are only
+made if the club would accept them as a proposal. After a trade the AI trims active
+rosters the next morning (`trimActiveRoster`). Sim stop triggers are checked in the
+worker after each day.
+
 The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
 owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with
 plain view models built in `web/src/worker/views.ts`. Pages call it through `useApi`

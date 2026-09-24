@@ -26,6 +26,8 @@ import { FORTY_MAN_LIMIT, logTransaction, refreshDepth, type RosterContext } fro
 
 /** Each year further out is worth this much less. */
 const DISCOUNT = 0.1;
+/** The last day of the season (from Opening Day) that trades are allowed: July 31. */
+export const TRADE_DEADLINE_DAY = 127;
 /** What an AI club wants on top of fair value before it says yes to the user. */
 const AI_MARGIN = 0.1;
 
@@ -204,23 +206,41 @@ export function teamStrength(league: League, team: Team): number {
   return wars.slice(0, 26).reduce((s, x) => s + Math.max(0, x), 0);
 }
 
-/**
- * The AI trade market: contenders buy established players from rebuilding
- * clubs with prospects of similar surplus value. Returns trades made.
- */
-export function aiTradeMarket(ctx: RosterContext, rng: Rng, attempts: number, fraction = 1, seen: WarShift = () => 0): number {
-  const league = ctx.league;
+/** Contenders and sellers: in the winter by projected strength (the user's club left out). */
+export function marketSides(league: League): { buyers: Team[]; sellers: Team[] } {
   const clubs = league.teams.filter((t) => t.id !== league.userTeamId);
   const ranked = [...clubs].sort((a, b) => teamStrength(league, b) - teamStrength(league, a));
-  const buyers = ranked.slice(0, 12);
-  const sellers = ranked.slice(-10);
+  return { buyers: ranked.slice(0, 12), sellers: ranked.slice(-10) };
+}
+
+/**
+ * The AI trade market: contenders buy established players from rebuilding
+ * clubs with prospects of similar surplus value. During the season the sides
+ * come from the standings and a buyer pays only what's left of the salary.
+ * Returns trades made.
+ */
+export function aiTradeMarket(
+  ctx: RosterContext,
+  rng: Rng,
+  attempts: number,
+  fraction = 1,
+  seen: WarShift = () => 0,
+  sides: { buyers: Team[]; sellers: Team[] } = marketSides(ctx.league),
+): number {
+  const league = ctx.league;
+  const { buyers, sellers } = sides;
+  if (buyers.length === 0 || sellers.length === 0) return 0;
+  // In the winter spring training trims 40-man rosters; in season they have to fit now.
+  const slack = ctx.offseason ? 1 : 0;
+  const minWar = ctx.offseason ? 2 : 1.2;
   let made = 0;
   for (let i = 0; i < attempts; i++) {
     const buyer = rng.pick(buyers);
     const seller = rng.pick(sellers);
-    const room = budgetRoom(league, buyer);
+    const room = budgetRoom(league, buyer) + (ctx.offseason ? 0 : 0.05 * buyer.budget);
     const target = orgPlayers(league, seller)
-      .filter((p) => p.level === "MLB" && !p.il && p.age >= 27 && seasonWar(p) >= 2 && (p.contract?.salary ?? 0) <= room)
+      // In season, relievers and role players are on the market too.
+      .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 27 && seasonWar(p) >= minWar && (p.contract?.salary ?? 0) * fraction <= room)
       .sort((a, b) => seasonWar(b) - seasonWar(a))[0];
     if (!target) continue;
     const price = surplusValue(target, fraction, seen(seller.id, target));
@@ -234,7 +254,7 @@ export function aiTradeMarket(ctx: RosterContext, rng: Rng, attempts: number, fr
     );
     // The seller prices the prospects it's offered with its own scouts.
     const chips = orgPlayers(league, buyer)
-      .filter((p) => !top.has(p.id) && !p.il && p.age <= 26)
+      .filter((p) => !top.has(p.id) && !p.il && !p.injury && p.age <= 26)
       .map((p) => ({ p, v: surplusValue(p, fraction, seen(seller.id, p)) }))
       .filter((x) => x.v > 1 && x.v < price * 1.3)
       .sort((a, b) => b.v - a.v);
@@ -247,7 +267,7 @@ export function aiTradeMarket(ctx: RosterContext, rng: Rng, attempts: number, fr
     }
     if (sum < price * 1.05) continue;
     const incoming = pkg.map((x) => x.p.id);
-    if (fortyManAfter(league, buyer, incoming, [target.id]) > FORTY_MAN_LIMIT + 1) continue;
+    if (fortyManAfter(league, buyer, incoming, [target.id]) > FORTY_MAN_LIMIT + slack) continue;
     executeTrade(ctx, seller, buyer, [target.id], incoming);
     made++;
   }

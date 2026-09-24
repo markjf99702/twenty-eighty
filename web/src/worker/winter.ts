@@ -4,7 +4,9 @@
 import type { League, Team } from "../../../src/league/types";
 import { payroll } from "../../../src/org/contracts";
 import { orgPlayers } from "../../../src/org/contracts";
-import { surplusValue } from "../../../src/org/trades";
+import { offerLive } from "../../../src/org/offers";
+import { evaluateTrade, surplusValue } from "../../../src/org/trades";
+import { offerClock } from "../../../src/offseason/offseason";
 import { overallGrade } from "../../../src/org/value";
 import { boardValue, onTheClock } from "../../../src/offseason/draft";
 import { acceptBar, offerScore } from "../../../src/offseason/freeAgency";
@@ -13,8 +15,8 @@ import { playerName, type Player } from "../../../src/players/types";
 import { believedWar, warShift } from "../../../src/scouting/analytics";
 import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
-import type { DevRow, HistoryView, OffseasonView, TradeSide } from "../api/protocol";
-import { playerSummary, type StatsCache, teamRef } from "./views";
+import type { DevRow, HistoryView, OffseasonView, OfferView, TradeSide } from "../api/protocol";
+import { dateLabel, playerSummary, type StatsCache, teamRef } from "./views";
 
 const abbrev = (league: League, id: number | null) => (id === null ? "FA" : (league.teams[id]?.abbrev ?? "FA"));
 
@@ -166,6 +168,36 @@ export function tradeSide(season: Season, stats: StatsCache, team: Team): TradeS
     .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p, 1, warShift(season, league.userTeamId, p)) }))
     .sort((a, b) => b.surplus - a.surplus);
   return { team: teamRef(team), players };
+}
+
+/** Trade offers waiting on the user, with every player as the user's scouts see him. */
+export function offerViews(season: Season, stats: StatsCache): OfferView[] {
+  const league = season.league;
+  const user = league.userTeamId;
+  if (user === null) return [];
+  const now = offerClock(league, season);
+  const fraction = league.offseason ? 1 : Math.max(0, 1 - season.day / season.totalDays);
+  const seen = (viewer: number, p: Player) => warShift(season, viewer, p);
+  const row = (id: number) => {
+    const p = league.players[id]!;
+    return { ...playerSummary(p, season, stats), surplus: surplusValue(p, fraction, seen(user, p)) };
+  };
+  return league.tradeOffers
+    .filter((o) => offerLive(league, o, now))
+    .map((o) => {
+      const partner = league.teams[o.teamId]!;
+      const check = evaluateTrade(league, league.teams[user]!, partner, o.give, o.get, fraction, seen);
+      return {
+        id: o.id,
+        team: teamRef(partner),
+        kind: o.kind,
+        pitch: o.pitch,
+        expires: o.expires >= 1000 ? "Until next week" : `Through ${dateLabel(season, o.expires)}`,
+        give: o.give.map(row),
+        get: o.get.map(row),
+        value: { give: check.give, get: check.get },
+      };
+    });
 }
 
 export function historyView(league: League): HistoryView {

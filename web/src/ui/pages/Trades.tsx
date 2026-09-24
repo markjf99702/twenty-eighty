@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
-import type { Status, TradeCheckView, TradeSide } from "../../api/protocol";
+import type { OfferView, Status, TradeCheckView, TradeSide } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
 import { Grade } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
@@ -39,6 +39,94 @@ function SideTable({ side, picked, toggle, filter }: { side: TradeSide; picked: 
   return <Table columns={columns} rows={rows} rowKey={(p) => p.id} sortKey="surplus" limit={25} rowClass={(p) => (picked.has(p.id) ? "mine" : "")} />;
 }
 
+/** The players picked on one side, whether or not they're in view in the table below. */
+function Picked({ side, picked, toggle }: { side: TradeSide; picked: Set<number>; toggle: (id: number) => void }) {
+  const rows = side.players.filter((p) => picked.has(p.id));
+  if (rows.length === 0) return null;
+  return (
+    <div class="traits picked" aria-label="In the deal">
+      {rows.map((p) => (
+        <button type="button" class="trait" key={p.id} onClick={() => toggle(p.id)} title="Take him out of the deal">
+          {p.pos} {p.name} · {money(p.surplus)} ×
+        </button>
+      ))}
+    </div>
+  );
+}
+
+/** A deal to load into the builder once the page switches to its club (from an offer's Adjust). */
+let preset: { partner: number; give: number[]; get: number[] } | null = null;
+
+function OfferSide({ label, players, total }: { label: string; players: OfferView["give"]; total: number }) {
+  return (
+    <div class="offer-side">
+      <div class="k">
+        {label} <span class="dim">({money(total)} by your read)</span>
+      </div>
+      {players.map((p) => (
+        <div class="offer-player" key={p.id}>
+          <span class="pos">{p.pos}</span>
+          <a href={playerHref(p.id)}>{p.name}</a>
+          <span class="dim">
+            {p.age} · {p.status.il ? p.status.il : LEVEL_NAMES[p.level]}
+          </span>
+          <Grade g={p.ovr} />
+          <Grade g={p.fv} />
+          <span class={`num${p.surplus < 0 ? " neg" : ""}`}>{money(p.surplus)}</span>
+          <span class="dim contract">{p.contract?.label ?? ""}</span>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Offers from other clubs, newest first. */
+function Offers({ canTrade, onAdjust }: { canTrade: boolean; onAdjust: (o: OfferView) => void }) {
+  const view = useApi("offers", undefined);
+  if (!view.data || view.data.length === 0) return null;
+  const answer = async (o: OfferView, accept: boolean) => {
+    const res = await call("answerOffer", { id: o.id, accept });
+    if (!res.ok) notify(res.reason ?? "That didn't work.", true);
+    else if (accept) {
+      notify(`Done: the deal with the ${o.team.nickname} is made.`);
+      if (res.warning) notify(res.warning, true);
+    } else notify(`You passed on the ${o.team.nickname}' offer.`);
+    bump();
+  };
+  return (
+    <Section title="Offers on the table" aside={`${view.data.length} waiting`}>
+      <div class="offer-list">
+        {[...view.data].reverse().map((o) => (
+          <div class="trade-offer" key={o.id}>
+            <div class="offer-head">
+              <b>
+                {o.team.city} {o.team.nickname}
+              </b>
+              <span class="dim small">{o.expires}</span>
+            </div>
+            <p class="pitch">{o.pitch}</p>
+            <div class="grid-2">
+              <OfferSide label="You send" players={o.give} total={o.value.give} />
+              <OfferSide label="You get" players={o.get} total={o.value.get} />
+            </div>
+            <div class="offer-actions">
+              <button type="button" class="btn primary" disabled={!canTrade} onClick={() => answer(o, true)}>
+                Accept
+              </button>
+              <button type="button" class="btn" onClick={() => answer(o, false)}>
+                Decline
+              </button>
+              <button type="button" class="btn ghost" onClick={() => onAdjust(o)}>
+                Adjust and counter
+              </button>
+            </div>
+          </div>
+        ))}
+      </div>
+    </Section>
+  );
+}
+
 export function Trades({ partnerId, status }: { partnerId: number | null; status: Status }) {
   const user = status.userTeamId ?? null;
   const partners = (status.teams ?? []).filter((t) => t.id !== user).sort((a, b) => a.city.localeCompare(b.city));
@@ -50,10 +138,24 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
   const [check, setCheck] = useState<TradeCheckView | null>(null);
 
   useEffect(() => {
-    setGive(new Set());
-    setGet(new Set());
+    const p = preset && preset.partner === partner ? preset : null;
+    preset = null;
+    setGive(new Set(p?.give ?? []));
+    setGet(new Set(p?.get ?? []));
     setCheck(null);
   }, [partner]);
+
+  const adjust = (o: OfferView) => {
+    const deal = { partner: o.team.id, give: o.give.map((p) => p.id), get: o.get.map((p) => p.id) };
+    if (deal.partner === partner) {
+      setGive(new Set(deal.give));
+      setGet(new Set(deal.get));
+    } else {
+      preset = deal;
+      go({ page: "trades", partnerId: deal.partner });
+    }
+    notify("The offer is loaded below: change either side and propose it.");
+  };
 
   const key = useMemo(() => `${[...give].join(",")}|${[...get].join(",")}`, [give, get]);
   useEffect(() => {
@@ -79,6 +181,7 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
     const res = await call("trade", { partnerId: partner, give: [...give], get: [...get], execute: true });
     if (res.done) {
       notify("Trade complete.");
+      if (res.warning) notify(res.warning, true);
       setGive(new Set());
       setGet(new Set());
       setCheck(null);
@@ -117,6 +220,14 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
         </select>
       </div>
       {!status.canTrade && <div class="note warn">{status.tradeNote}</div>}
+      {status.canTrade && status.deadline && (
+        <div class="note">
+          {status.deadline.daysLeft === 0
+            ? "It's deadline day: trades close after today's games."
+            : `The trade deadline is ${status.deadline.date}, ${status.deadline.daysLeft} day${status.deadline.daysLeft === 1 ? "" : "s"} away.`}
+        </div>
+      )}
+      <Offers canTrade={Boolean(status.canTrade)} onAdjust={adjust} />
 
       <div class="trade-bar">
         <div>
@@ -146,9 +257,11 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
       {sides.data && (
         <div class="grid-2">
           <Section title={`Your ${sides.data.mine.team.nickname}`} aside={filterSeg(0)}>
+            <Picked side={sides.data.mine} picked={give} toggle={toggle(give, setGive)} />
             <SideTable side={sides.data.mine} picked={give} toggle={toggle(give, setGive)} filter={filters[0]} />
           </Section>
           <Section title={`${sides.data.theirs.team.city} ${sides.data.theirs.team.nickname}`} aside={filterSeg(1)}>
+            <Picked side={sides.data.theirs} picked={get} toggle={toggle(get, setGet)} />
             <SideTable side={sides.data.theirs} picked={get} toggle={toggle(get, setGet)} filter={filters[1]} />
           </Section>
         </div>

@@ -17,6 +17,7 @@ import {
   serviceYears,
 } from "../org/contracts";
 import { logTransaction, refreshDepth, releasePlayer, type RosterContext } from "../org/roster";
+import { winterOffer } from "../org/offers";
 import { aiTradeMarket } from "../org/trades";
 import { believedWar, warShift } from "../scouting/analytics";
 import { clearAmateurLooks, staffCost } from "../scouting/scouting";
@@ -340,6 +341,21 @@ export function winterWeek(league: League, season: Season): void {
   };
   freeAgencyWeek(ctx, fa, rng, waiverOrder(league, season), judge);
   aiTradeMarket(ctx, rng.fork("trades"), 2, 1, (viewer, p) => warShift(season, viewer, p));
+  // A club may call the user; the offer stands until the next week.
+  const now = offerClock(league, season);
+  winterOffer(league, season, now, now);
+}
+
+/**
+ * The clock trade offers run on: the season day during the season, and 1000
+ * plus the winter calendar day in the offseason (free agency adds a day per
+ * week so each week's offers lapse when the next week is played).
+ */
+export function offerClock(league: League, season: Season): number {
+  const w = league.offseason;
+  if (!w) return season.day;
+  const weeks = w.phase === "freeAgency" ? (w.freeAgency?.week ?? 0) : 0;
+  return 1000 + WINTER_DAYS[w.phase] + 7 * weeks;
 }
 
 /** Play an entire offseason with the AI deciding everything (CLI and tests). */

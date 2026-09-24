@@ -1175,3 +1175,104 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .ledger { gap: 14px 22px; }
 .tbl tr.total td { font-weight: 700; border-top: 2px solid var(--line-strong); }
 .profit-line { font-size: 15px; }
+
+/* ------------------------------------------------------------------ stop triggers */
+
+.stops { position: relative; }
+.stops .count {
+  font-family: var(--mono);
+  font-size: 11px;
+  background: var(--board-2);
+  color: var(--bulb);
+  border-radius: 3px;
+  padding: 0 5px;
+  letter-spacing: 0;
+}
+.stops-panel {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  z-index: 40;
+  width: min(320px, calc(100vw - 32px));
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.18);
+  font-size: 13.5px;
+}
+.stops-panel .h {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+}
+.stops-panel label { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 8px; align-items: start; cursor: pointer; }
+.stops-panel input[type="checkbox"] { margin-top: 3px; accent-color: var(--accent); }
+.stops-panel select { font: inherit; padding: 0 2px; }
+@media (max-width: 820px) {
+  /* On a phone the panel drops below the whole scoreboard, full width. */
+  .board { position: relative; }
+  .stops { position: static; }
+  .stops-panel { left: 16px; right: 16px; width: auto; top: calc(100% - 4px); }
+}
+
+.stop-note {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  padding: 9px 12px;
+  border: 1px solid var(--warn);
+  border-left-width: 4px;
+  background: var(--warn-soft);
+  border-radius: var(--radius);
+}
+.stop-note.offer, .stop-note.deadline { border-color: var(--accent); background: var(--accent-soft); }
+.stop-note.injury { border-color: var(--alert); background: var(--alert-soft); }
+.stop-note .k {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.stop-note .t { flex: 1 1 260px; min-width: 0; }
+
+/* ------------------------------------------------------------------ trade offers */
+
+.offer-list { display: grid; gap: 12px; }
+.trade-offer {
+  display: grid;
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-left: 4px solid var(--accent);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.offer-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
+.offer-head b { font-family: var(--display); font-size: 19px; }
+.trade-offer .pitch { margin: 0; max-width: 75ch; }
+.offer-side { display: grid; gap: 4px; min-width: 0; }
+.offer-side .k { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.offer-side .k .dim { text-transform: none; letter-spacing: 0; font-family: var(--ui); }
+.offer-player {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr) auto auto auto 4.8em;
+  gap: 6px 10px;
+  align-items: center;
+  font-size: 13.5px;
+}
+.offer-player .pos { color: var(--ink-3); font-weight: 600; }
+.offer-player a { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.offer-player .num { text-align: right; font-variant-numeric: tabular-nums; }
+.offer-player .contract { grid-column: 2 / -1; font-size: 12.5px; margin-top: -4px; }
+.offer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.traits.picked .trait { cursor: pointer; border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); font: inherit; font-size: 13px; }
+.traits.picked .trait:hover { border-color: var(--alert); color: var(--alert); }

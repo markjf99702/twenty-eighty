@@ -153,6 +153,20 @@ export function Dashboard({ status }: { status: Status }) {
         </div>
       )}
       {status.phase === "done" && <div class="note">The {status.year} season is in the books. Start the offseason from the scoreboard.</div>}
+      {(status.offers ?? 0) > 0 && (
+        <div class="note">
+          {status.offers === 1 ? "A club has made you a trade offer." : `${status.offers} clubs have made you trade offers.`}{" "}
+          <a href={href({ page: "trades", partnerId: null })}>See the offers</a>
+        </div>
+      )}
+      {status.canTrade && status.deadline && status.deadline.daysLeft <= 7 && (
+        <div class="note warn">
+          {status.deadline.daysLeft === 0
+            ? "It's trade deadline day: trades close after today's games."
+            : `The trade deadline is ${status.deadline.date}, ${status.deadline.daysLeft} day${status.deadline.daysLeft === 1 ? "" : "s"} away.`}{" "}
+          <a href={href({ page: "trades", partnerId: null })}>Trade desk</a>
+        </div>
+      )}
       {status.owner?.fired && (
         <div class="note alert">
           You've been let go. <a href={href({ page: "owner" })}>See which clubs called</a>.

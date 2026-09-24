@@ -5,6 +5,7 @@ import { NEUTRAL_PARK } from "../league/parks";
 import type { DepthChart, League, Team } from "../league/types";
 import { manageOrganization, type PerformanceLookup } from "../org/ai";
 import { autoDepthChart } from "../org/depth";
+import { tradeDay } from "../org/offers";
 import { logTransaction, positionLabel, type RosterContext } from "../org/roster";
 import { offenseValue, pitchingValue } from "../org/value";
 import { injuryPhrase } from "../players/injuries";
@@ -636,6 +637,8 @@ export class Season {
     this.accrueService();
     accrueDay(this);
     ownerCheckIn(this);
+    // Overnight: trades between clubs, and now and then an offer to the user.
+    if (this.aiRosters) tradeDay(this);
     this.day++;
     return out;
   }

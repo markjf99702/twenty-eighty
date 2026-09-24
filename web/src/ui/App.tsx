@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { bump, call } from "../api/client";
-import type { Status } from "../api/protocol";
+import type { Status, StopNote, StopRules } from "../api/protocol";
 import { notify, Toasts } from "./components/Common";
 import { href, type Route, useRoute } from "./router";
 import { BoxScorePage } from "./pages/BoxScore";
@@ -37,6 +37,18 @@ const PACES: { key: Pace; label: string; ms: number; title: string }[] = [
 const PACE_KEY = "twenty-eighty.pace";
 const paceMs = (p: Pace) => PACES.find((x) => x.key === p)!.ms;
 
+const STOPS_KEY = "twenty-eighty.stops";
+const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: true, deadline: true };
+
+function storedStops(): StopRules {
+  try {
+    const raw = localStorage.getItem(STOPS_KEY);
+    return raw ? { ...DEFAULT_STOPS, ...(JSON.parse(raw) as Partial<StopRules>) } : DEFAULT_STOPS;
+  } catch {
+    return DEFAULT_STOPS;
+  }
+}
+
 function storedPace(): Pace {
   try {
     const v = localStorage.getItem(PACE_KEY);
@@ -52,6 +64,20 @@ export function App() {
   const [sim, setSim] = useState<SimState | null>(null);
   const [pace, setPace] = useState<Pace>(storedPace);
   const paceRef = useRef(pace);
+  const [stops, setStops] = useState<StopRules>(storedStops);
+  const stopsRef = useRef(stops);
+  const [stopNote, setStopNote] = useState<StopNote | null>(null);
+
+  const changeStops = (next: StopRules) => {
+    setStops(next);
+    stopsRef.current = next;
+    try {
+      localStorage.setItem(STOPS_KEY, JSON.stringify(next));
+    } catch {
+      // Storage refused: the rules still apply for this session.
+    }
+    void call("setStops", next);
+  };
   const route = useRoute();
 
   const changePace = (p: Pace) => {
@@ -96,9 +122,10 @@ export function App() {
   const runSim = async (days: number | "end") => {
     if (sim) return;
     setSim({ done: 0, total: 1 });
+    setStopNote(null);
     let lastBump = 0;
     try {
-      const st = await call("sim", { days, msPerDay: paceMs(paceRef.current) }, (done, total) => {
+      const st = await call("sim", { days, msPerDay: paceMs(paceRef.current), stops: stopsRef.current }, (done, total) => {
         setSim({ done, total });
         // Watching at a slower speed: every page follows along day by day.
         if (done - lastBump >= (paceRef.current === "fast" ? 5 : 1)) {
@@ -108,6 +135,7 @@ export function App() {
         }
       });
       setStatus(st);
+      if (st.stop) setStopNote(st.stop);
     } catch (err) {
       notify((err as Error).message, true);
     } finally {
@@ -175,9 +203,33 @@ export function App() {
 
   return (
     <div class="app">
-      <Board status={status} sim={sim} onSim={runSim} onPlayoffs={playoffs} onWinter={winterStep} pace={pace} onPace={changePace} />
+      <Board
+        status={status}
+        sim={sim}
+        onSim={runSim}
+        onPlayoffs={playoffs}
+        onWinter={winterStep}
+        pace={pace}
+        onPace={changePace}
+        stops={stops}
+        onStops={changeStops}
+      />
       <Rail status={status} route={route} />
       <main>
+        {stopNote && (
+          <div class={`stop-note ${stopNote.kind}`} role="status">
+            <span class="k">Stopped</span>
+            <span class="t">{stopNote.text}</span>
+            {stopNote.href && (
+              <a class="btn small" href={stopNote.href} onClick={() => setStopNote(null)}>
+                {stopNote.kind === "offer" || stopNote.kind === "deadline" ? "Trade desk" : stopNote.kind === "injury" ? "See him" : "Your club"}
+              </a>
+            )}
+            <button type="button" class="btn ghost small" aria-label="Dismiss" onClick={() => setStopNote(null)}>
+              ×
+            </button>
+          </div>
+        )}
         <Page route={route} status={status} onStatus={setStatus} onWinter={winterStep} />
       </main>
       <Toasts />
@@ -244,6 +296,8 @@ function Board({
   onWinter,
   pace,
   onPace,
+  stops,
+  onStops,
 }: {
   status: Status | null;
   sim: SimState | null;
@@ -252,6 +306,8 @@ function Board({
   onWinter?: (kind: "beginOffseason" | "advance" | "winterWeek") => void;
   pace?: Pace;
   onPace?: (p: Pace) => void;
+  stops?: StopRules;
+  onStops?: (s: StopRules) => void;
 }) {
   const game = status?.hasGame ? status : null;
   const speed = pace && onPace && (
@@ -316,6 +372,7 @@ function Board({
               </div>
               <span class="txt">{sim.total ? `Day ${sim.done} of ${sim.total}` : (sim.label ?? "Working")}</span>
               {sim.total > 1 && speed}
+              {sim.total > 1 && stops && onStops && <StopsMenu stops={stops} onChange={onStops} />}
               {sim.total > 1 && (
                 <button type="button" class="btn" title="Stop after this day (Esc)" onClick={() => void call("stop", undefined)}>
                   Stop
@@ -338,6 +395,7 @@ function Board({
                 To end
               </button>
               {speed}
+              {stops && onStops && <StopsMenu stops={stops} onChange={onStops} />}
             </>
           ) : game.phase === "postseason" ? (
             <button type="button" class="btn primary" onClick={onPlayoffs}>
@@ -381,6 +439,69 @@ function Board({
   );
 }
 
+/** "Stop when...": the sim's own pause points. */
+function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRules) => void }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: Event) => {
+      if (e instanceof KeyboardEvent ? e.key === "Escape" : !ref.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("pointerdown", close);
+    window.addEventListener("keydown", close);
+    return () => {
+      window.removeEventListener("pointerdown", close);
+      window.removeEventListener("keydown", close);
+    };
+  }, [open]);
+  const count = (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer ? 1 : 0) + (stops.deadline ? 1 : 0);
+  const set = (patch: Partial<StopRules>) => onChange({ ...stops, ...patch });
+  return (
+    <div class="stops" ref={ref}>
+      <button type="button" class="btn" aria-expanded={open} aria-haspopup="true" onClick={() => setOpen(!open)} title="Pause points">
+        Stops <span class="count">{count}</span>
+      </button>
+      {open && (
+        <div class="stops-panel" role="group" aria-label="Stop the sim when">
+          <div class="h">Stop the sim when</div>
+          <label>
+            <input type="checkbox" checked={stops.streak > 0} onChange={(e) => set({ streak: (e.target as HTMLInputElement).checked ? 3 : 0 })} />
+            <span>
+              We lose{" "}
+              <select
+                aria-label="Losing streak length"
+                value={stops.streak || 3}
+                disabled={stops.streak === 0}
+                onChange={(e) => set({ streak: Number((e.target as HTMLSelectElement).value) })}
+              >
+                {[2, 3, 4, 5, 6].map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>{" "}
+              in a row
+            </span>
+          </label>
+          <label>
+            <input type="checkbox" checked={stops.injury} onChange={(e) => set({ injury: (e.target as HTMLInputElement).checked })} />
+            <span>A big leaguer of ours gets hurt badly enough for the injured list</span>
+          </label>
+          <label>
+            <input type="checkbox" checked={stops.offer} onChange={(e) => set({ offer: (e.target as HTMLInputElement).checked })} />
+            <span>A club makes us a trade offer</span>
+          </label>
+          <label>
+            <input type="checkbox" checked={stops.deadline} onChange={(e) => set({ deadline: (e.target as HTMLInputElement).checked })} />
+            <span>It's trade deadline day (July 31), with the day still to play</span>
+          </label>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Navigation
 
@@ -399,7 +520,12 @@ function Rail({ status, route }: { status: Status; route: Route }) {
     { to: { page: "moves", mine: false }, label: "Transactions", on: route.page === "moves" },
     ...(userTeam
       ? [
-          { to: { page: "trades", partnerId: null } as Route, label: "Trades", on: route.page === "trades" },
+          {
+            to: { page: "trades", partnerId: null } as Route,
+            label: "Trades",
+            on: route.page === "trades",
+            tag: status.offers ? `${status.offers} offer${status.offers === 1 ? "" : "s"}` : undefined,
+          },
           { to: { page: "scouting" } as Route, label: "Scouting", on: route.page === "scouting" },
           { to: { page: "finances", teamId: null } as Route, label: "Finances", on: route.page === "finances" },
         ]

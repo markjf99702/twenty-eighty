@@ -23,7 +23,9 @@ import {
 } from "../../../src/org/roster";
 import { mood } from "../../../src/finance/owner";
 import { committed, payroll } from "../../../src/org/contracts";
-import { surplusValue } from "../../../src/org/trades";
+import { offerLive } from "../../../src/org/offers";
+import { surplusValue, TRADE_DEADLINE_DAY } from "../../../src/org/trades";
+import { offerClock } from "../../../src/offseason/offseason";
 import { overallGrade } from "../../../src/org/value";
 import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season";
 import type { GameResult } from "../../../src/sim/game";
@@ -73,8 +75,6 @@ export function phaseOf(season: Season): "regular" | "postseason" | "done" | "of
   return season.postseason ? "done" : "postseason";
 }
 
-/** Last day for in-season trades: July 31. */
-export const TRADE_DEADLINE_DAY = 127;
 
 const WINTER_LABELS: Record<string, [string, string]> = {
   review: ["Season in review", "Go to the tender deadline"],
@@ -146,6 +146,11 @@ export function status(league: League | null, season: Season | null, hasSave: bo
     teams: league.teams.map(teamRef),
     record: rec ? { w: rec.w, l: rec.l } : null,
     owner: league.gm ? { confidence: league.gm.confidence, mood: mood(league.gm.confidence), fired: league.gm.fired } : null,
+    offers: user !== null ? league.tradeOffers.filter((o) => offerLive(league, o, offerClock(league, season))).length : 0,
+    deadline:
+      !league.offseason && season.day <= TRADE_DEADLINE_DAY
+        ? { date: dateLabel(season, TRADE_DEADLINE_DAY), daysLeft: TRADE_DEADLINE_DAY - season.day }
+        : null,
   };
 }
 

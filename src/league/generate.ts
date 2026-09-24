@@ -345,6 +345,7 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     offseason: null,
     scouting: { scouting: [], analytics: [], looks: {}, looksLeft: 0, looksWindow: "" },
     gm: null,
+    tradeOffers: [],
   };
   recenterGrades(league);
   for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));

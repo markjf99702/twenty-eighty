@@ -40,6 +40,31 @@ export interface Status {
   record?: { w: number; l: number } | null;
   /** The owner's view of the user, when the user runs a club. */
   owner?: { confidence: number; mood: string; fired: boolean } | null;
+  /** Trade offers waiting on the user. */
+  offers?: number;
+  /** The trade deadline, while it's still ahead (or today). */
+  deadline?: { date: string; daysLeft: number } | null;
+  /** Why the last sim stopped early (a stop trigger), if it did. */
+  stop?: StopNote;
+}
+
+/** When a running sim should stop by itself. */
+export interface StopRules {
+  /** Stop when the user's club has lost this many in a row (0 = never). */
+  streak: number;
+  /** A big leaguer of the user's goes down for injured-list time. */
+  injury: boolean;
+  /** A club makes the user a trade offer. */
+  offer: boolean;
+  /** Stop with deadline day still to play. */
+  deadline: boolean;
+}
+
+export interface StopNote {
+  kind: "streak" | "injury" | "offer" | "deadline";
+  text: string;
+  /** Where to look (a route hash). */
+  href?: string;
 }
 
 export interface NewGameTeam extends TeamRef {
@@ -455,12 +480,27 @@ export interface TradeSide {
   players: (PlayerSummary & { surplus: number })[];
 }
 
+export interface OfferView {
+  id: number;
+  team: TeamRef;
+  kind: "buy" | "sell";
+  pitch: string;
+  /** "Through Jul 14", "Until next week". */
+  expires: string;
+  give: (PlayerSummary & { surplus: number })[];
+  get: (PlayerSummary & { surplus: number })[];
+  /** Surplus you send and receive, as your front office sees it. */
+  value: { give: number; get: number };
+}
+
 export interface TradeCheckView {
   ok: boolean;
   reason?: string;
   give: number;
   get: number;
   done?: boolean;
+  /** After a trade: a roster problem the user needs to fix (or the assistant will). */
+  warning?: string;
 }
 
 export interface HistoryView {
@@ -594,11 +634,12 @@ export interface Api {
   exportSave: { req: void; res: string };
   deleteSave: { req: void; res: Status };
   /** `msPerDay`: at least this long per simulated day, so a page can be watched as it plays (0 = as fast as possible). */
-  sim: { req: { days: number | "end"; msPerDay?: number }; res: Status };
+  sim: { req: { days: number | "end"; msPerDay?: number; stops?: StopRules }; res: Status };
   /** Stop a running sim after the current day. */
   stop: { req: void; res: { ok: boolean } };
   /** Change the pace of a running (or the next) sim. */
   setPace: { req: { msPerDay: number }; res: { ok: boolean } };
+  setStops: { req: StopRules; res: { ok: boolean } };
   playoffs: { req: void; res: Status };
   dashboard: { req: void; res: DashboardView };
   standings: { req: { level: Level }; res: StandingsView };
@@ -624,6 +665,8 @@ export interface Api {
   intlSign: { req: { playerId: number }; res: { ok: boolean; reason?: string } };
   tradeSides: { req: { partnerId: number }; res: { mine: TradeSide; theirs: TradeSide } };
   trade: { req: { partnerId: number; give: number[]; get: number[]; execute: boolean }; res: TradeCheckView };
+  offers: { req: void; res: OfferView[] };
+  answerOffer: { req: { id: number; accept: boolean }; res: { ok: boolean; reason?: string; warning?: string } };
   history: { req: void; res: HistoryView };
   scouting: { req: void; res: ScoutingView };
   setDepartments: { req: { scouting: number; analytics: number }; res: { ok: boolean; reason?: string } };
