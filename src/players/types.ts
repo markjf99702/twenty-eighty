@@ -75,6 +75,27 @@ export interface PitcherTools {
 
 export type PitcherRole = "SP" | "RP";
 
+/** Where a player is assigned within an organization. */
+export const LEVELS = ["MLB", "AAA", "AA", "A+", "A"] as const;
+export type Level = (typeof LEVELS)[number];
+export const MINOR_LEVELS = ["AAA", "AA", "A+", "A"] as const;
+export type MinorLevel = (typeof MINOR_LEVELS)[number];
+
+/** MLB injured list: 10-day for position players, 15-day for pitchers, 60-day for long stints. */
+export type IlType = "IL10" | "IL15" | "IL60";
+
+export interface Injury {
+  name: string;
+  /** Total expected days out, and days remaining. */
+  days: number;
+  daysLeft: number;
+  startDay: number;
+}
+
+/** One MLB service year is 172 days on the active roster or injured list. */
+export const SERVICE_DAYS_PER_YEAR = 172;
+export const MAX_OPTION_YEARS = 3;
+
 export interface Player {
   id: number;
   firstName: string;
@@ -90,6 +111,25 @@ export interface Player {
   traits: HitterTraits;
   pitching?: PitcherTools;
   role?: PitcherRole;
+  /** Hidden injury proneness (z; positive = more fragile). */
+  durability: number;
+
+  // --- Organizational status -------------------------------------------------
+  /** Organization (team id), or null for a free agent. */
+  teamId: number | null;
+  /** Assigned level; MLB players on the injured list keep "MLB". */
+  level: Level;
+  onFortyMan: boolean;
+  /** MLB injured-list placement, if any. */
+  il: IlType | null;
+  /** Current injury (day-to-day or longer), if any. */
+  injury: Injury | null;
+  /** Option years used (max 3) and whether this season already burned one. */
+  options: { used: number; usedThisYear: boolean };
+  /** MLB service time in days. */
+  service: number;
+  /** Day he was last optioned to the minors (enforces the minimum stay). */
+  optionedDay: number | null;
 }
 
 export const playerName = (p: Player): string => `${p.firstName} ${p.lastName}`;

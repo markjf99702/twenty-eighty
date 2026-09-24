@@ -25,7 +25,7 @@ export function defenseGrade(p: Player, pos: FieldPosition): number {
   const h = p.hitting;
   let g = w.field * h.field.present + w.arm * h.arm.present + w.speed * h.speed.present;
   if (!p.positions.includes(pos)) g -= pos === "C" ? NON_CATCHER_BEHIND_PLATE : OUT_OF_POSITION;
-  return g;
+  return Math.max(20, Math.min(80, g));
 }
 
 export const defenseZ = (p: Player, pos: FieldPosition): number => (defenseGrade(p, pos) - 50) / 10;

@@ -57,6 +57,21 @@ export function growthRoom(age: number): number {
   return clamp((27 - age) * 2.6, 0, 18);
 }
 
+/** Organizational fields for a newly generated player; the league generator assigns him. */
+function unassigned(rng: Rng) {
+  return {
+    durability: clamp(rng.normal(), -2.5, 2.5),
+    teamId: null,
+    level: "A" as const,
+    onFortyMan: false,
+    il: null,
+    injury: null,
+    options: { used: 0, usedThisYear: false },
+    service: 0,
+    optionedDay: null,
+  };
+}
+
 function randomBats(rng: Rng, throws: Hand): BatSide {
   const r = rng.next();
   if (throws === "L") return r < 0.8 ? "L" : r < 0.93 ? "R" : "S";
@@ -149,6 +164,7 @@ export function generateHitter(rng: Rng, opts: HitterOptions): Player {
       pull: clamp(0.3 * powZ + 0.95 * rng.normal(), -2.5, 2.5),
       aggression: clamp(0.4 * ((hitting.speed.present - 50) / 10) + 0.9 * rng.normal(), -2.5, 2.5),
     },
+    ...unassigned(rng),
   };
 }
 
@@ -244,6 +260,7 @@ export function generatePitcher(rng: Rng, opts: PitcherOptions): Player {
       stamina: tool(stamina, stamina + Math.max(0, room * 0.3)),
       velocity: Math.round(velocity * 10) / 10,
     },
+    ...unassigned(rng),
   };
 }
 

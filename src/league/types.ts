@@ -1,4 +1,4 @@
-import type { FieldPosition, Player } from "../players/types";
+import type { FieldPosition, Level, MinorLevel, Player } from "../players/types";
 
 export interface Park {
   name: string;
@@ -22,6 +22,12 @@ export interface DepthChart {
   bullpen: number[];
 }
 
+export interface Affiliate {
+  level: MinorLevel;
+  name: string;
+  park: Park;
+}
+
 export interface Team {
   id: number;
   city: string;
@@ -32,16 +38,43 @@ export interface Team {
   park: Park;
   /** Metro population in millions; drives revenue once finances exist. */
   market: number;
-  /** 26-man active roster (player ids). */
-  active: number[];
-  /** Farm system / organizational depth not on the active roster. */
-  reserves: number[];
+  /** Players assigned to each level. MLB is the 26-man active roster (injured-list players excluded). */
+  rosters: Record<Level, number[]>;
+  /** The 40-man reserve list: MLB actives, optioned players, and short-term injured-list players. */
+  fortyMan: number[];
+  /** MLB injured list. */
+  injured: number[];
+  /** MLB depth chart, rebuilt by the manager AI after roster moves (unless the user sets it). */
   depth: DepthChart;
+  affiliates: Record<MinorLevel, Affiliate>;
 }
 
 export interface LeagueStructure {
   leagues: string[];
   divisions: string[];
+}
+
+export type TransactionType =
+  | "call-up"
+  | "option"
+  | "promote"
+  | "demote"
+  | "il-place"
+  | "il-activate"
+  | "il-transfer"
+  | "dfa"
+  | "claim"
+  | "outright"
+  | "release"
+  | "add-40"
+  | "injury";
+
+export interface Transaction {
+  day: number;
+  teamId: number;
+  playerId: number;
+  type: TransactionType;
+  text: string;
 }
 
 export interface League {
@@ -51,6 +84,12 @@ export interface League {
   teams: Team[];
   /** Indexed by player id. */
   players: Player[];
+  /** Roster moves and injuries, newest last. */
+  transactions: Transaction[];
+  /** The club the human manages (null = all clubs run by the AI). */
+  userTeamId: number | null;
 }
 
 export const teamName = (t: Team): string => `${t.city} ${t.nickname}`;
+export const affiliateName = (t: Team, level: Level): string =>
+  level === "MLB" ? teamName(t) : t.affiliates[level].name;

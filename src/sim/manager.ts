@@ -1,8 +1,9 @@
 import type { Rng } from "../core/rng";
 import { hitterQuality } from "../league/generate";
-import type { League, Team } from "../league/types";
+import type { DepthChart, League } from "../league/types";
+import { autoDepthChart } from "../org/depth";
 import { armZ, defenseGrade, defenseZ } from "../players/defense";
-import { FIELD_POSITIONS, type FieldPosition, type LineupPosition } from "../players/types";
+import { FIELD_POSITIONS, type FieldPosition, type Level, type LineupPosition } from "../players/types";
 import type { Defense } from "./battedBall";
 import type { LineupSlot } from "./game";
 
@@ -28,33 +29,44 @@ const REST_RATE: Record<LineupPosition, number> = {
 /** Batting-order slots for hitters ranked best to worst (The Book: best hitters 1-2-4, then 3 and 5). */
 const ORDER_BY_RANK = [1, 0, 3, 2, 4, 5, 6, 7, 8];
 
-export function buildLineup(league: League, team: Team, rng: Rng, allowRest = true): LineupSlot[] {
-  const players = league.players;
-  const d = team.depth;
-  const bench = [...d.bench];
-  const slots: LineupSlot[] = [];
+export interface LineupOptions {
+  allowRest?: boolean;
+  /** Players who can't play today (injured). */
+  unavailable?: (id: number) => boolean;
+}
 
-  const takeBench = (pick: (ids: number[]) => number | undefined): number | undefined => {
-    const id = pick(bench);
-    if (id !== undefined) bench.splice(bench.indexOf(id), 1);
-    return id;
+export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: LineupOptions = {}): LineupSlot[] {
+  const players = league.players;
+  const out = opts.unavailable ?? (() => false);
+  const allowRest = opts.allowRest ?? true;
+  const bench = depth.bench.filter((id) => !out(id));
+  const slots: LineupSlot[] = [];
+  const used = new Set<number>();
+
+  const takeBench = (score: (id: number) => number): number | undefined => {
+    const candidates = bench.filter((id) => !used.has(id));
+    if (candidates.length === 0) return undefined;
+    const best = candidates.reduce((a, b) => (score(b) > score(a) ? b : a));
+    used.add(best);
+    return best;
   };
 
   for (const pos of FIELD_POSITIONS) {
-    let id = d.starters[pos];
-    if (allowRest && rng.chance(REST_RATE[pos])) {
-      const sub = takeBench((ids) =>
-        [...ids].sort((a, b) => defenseGrade(players[b]!, pos) - defenseGrade(players[a]!, pos))[0],
-      );
+    let id = depth.starters[pos];
+    const sits = out(id) || id < 0 || (allowRest && rng.chance(REST_RATE[pos]));
+    if (sits) {
+      const sub = takeBench((b) => defenseGrade(players[b]!, pos) + 3 * hitterQuality(players[b]!));
       if (sub !== undefined) id = sub;
     }
+    used.add(id);
     slots.push({ id, pos });
   }
-  let dh = d.dh;
-  if (allowRest && rng.chance(REST_RATE.DH)) {
-    const sub = takeBench((ids) => [...ids].sort((a, b) => hitterQuality(players[b]!) - hitterQuality(players[a]!))[0]);
+  let dh = depth.dh;
+  if (out(dh) || dh < 0 || (allowRest && rng.chance(REST_RATE.DH))) {
+    const sub = takeBench((b) => hitterQuality(players[b]!));
     if (sub !== undefined) dh = sub;
   }
+  used.add(dh);
   slots.push({ id: dh, pos: "DH" });
 
   const ranked = [...slots].sort((a, b) => hitterQuality(players[b.id]!) - hitterQuality(players[a.id]!));
@@ -66,20 +78,24 @@ export function buildLineup(league: League, team: Team, rng: Rng, allowRest = tr
 }
 
 /**
- * League-average defense at each position among regular starters. This is
- * the baseline "average fielder" for defensive runs and for expected stats.
+ * Average defense at each position among the regular starters at a level.
+ * This is the baseline "average fielder" for defensive runs and for
+ * expected stats.
  */
-export function averageDefense(league: League): Defense {
+export function averageDefense(league: League, level: Level = "MLB"): Defense {
   const sums = {} as Record<FieldPosition, { range: number; arm: number }>;
   for (const pos of FIELD_POSITIONS) sums[pos] = { range: 0, arm: 0 };
+  let n = 0;
   for (const t of league.teams) {
+    const depth = level === "MLB" ? t.depth : autoDepthChart(t.rosters[level].map((id) => league.players[id]!));
     for (const pos of FIELD_POSITIONS) {
-      const p = league.players[t.depth.starters[pos]]!;
+      const p = league.players[depth.starters[pos]];
+      if (!p) continue;
       sums[pos].range += defenseZ(p, pos);
       sums[pos].arm += armZ(p);
     }
+    n++;
   }
-  const n = league.teams.length;
   const out = { P: { range: 0, arm: 0 } } as Defense;
   for (const pos of FIELD_POSITIONS) out[pos] = { range: sums[pos].range / n, arm: sums[pos].arm / n };
   return out;

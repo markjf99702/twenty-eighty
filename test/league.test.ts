@@ -9,8 +9,8 @@ describe("league generation", () => {
   it("builds 30 clubs with 26-man rosters", () => {
     expect(league.teams).toHaveLength(30);
     for (const t of league.teams) {
-      expect(t.active).toHaveLength(26);
-      expect(new Set(t.active).size).toBe(26);
+      expect(t.rosters.MLB).toHaveLength(26);
+      expect(new Set(t.rosters.MLB).size).toBe(26);
       expect(t.depth.rotation).toHaveLength(5);
       expect(t.depth.bullpen).toHaveLength(8);
     }

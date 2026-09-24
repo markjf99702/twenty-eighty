@@ -2,7 +2,7 @@ import { formatPresentFuture, gradeLabel, scoutRound } from "../core/grades";
 import type { League, Team } from "../league/types";
 import { teamName } from "../league/types";
 import { defenseGrade } from "../players/defense";
-import { FIELD_POSITIONS, PITCH_NAMES, type Player, playerName } from "../players/types";
+import { FIELD_POSITIONS, MINOR_LEVELS, PITCH_NAMES, type Player, playerName } from "../players/types";
 import type { PostseasonResult } from "../season/postseason";
 import type { HitterRow, PitcherRow, Season, SeasonStats } from "../season/season";
 import type { GameResult } from "../sim/game";
@@ -226,10 +226,12 @@ export function formatTeamScouting(team: Team, league: League): string {
   for (const id of team.depth.rotation) out.push(formatPitcherCard(P[id]!));
   out.push("", "BULLPEN");
   for (const id of team.depth.bullpen) out.push(formatPitcherCard(P[id]!));
-  out.push("", "FARM SYSTEM");
-  for (const id of team.reserves) {
-    const p = P[id]!;
-    out.push(p.pitching ? formatPitcherCard(p) : formatHitterCard(p));
+  for (const level of MINOR_LEVELS) {
+    out.push("", `${level} - ${team.affiliates[level].name}`);
+    for (const id of team.rosters[level]) {
+      const p = P[id]!;
+      out.push(p.pitching ? formatPitcherCard(p) : formatHitterCard(p));
+    }
   }
   out.push("", `Grade key: 80 ${gradeLabel(80)}, 70 ${gradeLabel(70)}, 60 ${gradeLabel(60)}, 55 ${gradeLabel(55)}, 50 ${gradeLabel(50)}, 45 ${gradeLabel(45)}, 40 ${gradeLabel(40)}, 30 ${gradeLabel(30)}, 20 ${gradeLabel(20)}`);
   return out.join("\n");

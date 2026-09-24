@@ -5,9 +5,14 @@
  * A base-out state is outs * 8 + bases, where bases is a bitmask
  * (1 = runner on first, 2 = second, 4 = third). State 24 means the inning
  * is over.
+ *
+ * Rather than keeping every event, the tracker aggregates transitions
+ * (event type x start state x end state), which is all linear weights need
+ * and keeps the state small enough to save.
  */
 
 export const END_STATE = 24;
+const STATES = 25;
 
 export type EventCode = "BB" | "IBB" | "HBP" | "1B" | "2B" | "3B" | "HR" | "K" | "OUT" | "ROE" | "SB" | "CS" | "WP";
 
@@ -22,15 +27,23 @@ interface PendingEvent {
   code: number;
 }
 
+export interface RunTrackerState {
+  reSum: number[];
+  reCount: number[];
+  transitions: number[][];
+  runs: number[];
+  events: number[];
+}
+
 export class RunTracker {
-  /** Sum of runs scored from each state to the end of the inning, and visit counts. */
-  private readonly reSum = new Float64Array(24);
-  private readonly reCount = new Float64Array(24);
+  /** Runs scored from each state to the end of the inning, and visit counts. */
+  private reSum: number[] = new Array(24).fill(0);
+  private reCount: number[] = new Array(24).fill(0);
+  /** [event code][start * 25 + end] -> count */
+  private transitions: number[][] = EVENT_CODES.map(() => new Array(24 * STATES).fill(0));
+  private runs: number[] = EVENT_CODES.map(() => 0);
+  private events: number[] = EVENT_CODES.map(() => 0);
   private half: PendingEvent[] = [];
-  private readonly starts: number[] = [];
-  private readonly ends: number[] = [];
-  private readonly runs: number[] = [];
-  private readonly codes: number[] = [];
 
   record(start: number, end: number, runs: number, code: EventCode): void {
     this.half.push({ start, end, runs, code: EVENT_CODES.indexOf(code) });
@@ -48,10 +61,9 @@ export class RunTracker {
       }
     }
     for (const e of this.half) {
-      this.starts.push(e.start);
-      this.ends.push(e.end);
-      this.runs.push(e.runs);
-      this.codes.push(e.code);
+      this.transitions[e.code]![e.start * STATES + e.end]!++;
+      this.runs[e.code]! += e.runs;
+      this.events[e.code]!++;
     }
     this.half = [];
   }
@@ -66,16 +78,20 @@ export class RunTracker {
   /** Average run value of each event type: RE(end) - RE(start) + runs on the play. */
   linearWeights(): Record<EventCode, number> {
     const re = this.matrix();
-    const sum = new Float64Array(EVENT_CODES.length);
-    const n = new Float64Array(EVENT_CODES.length);
-    for (let i = 0; i < this.codes.length; i++) {
-      const c = this.codes[i]!;
-      sum[c]! += re[this.ends[i]!]! - re[this.starts[i]!]! + this.runs[i]!;
-      n[c]!++;
-    }
     const out = {} as Record<EventCode, number>;
-    EVENT_CODES.forEach((code, i) => {
-      out[code] = n[i]! > 0 ? sum[i]! / n[i]! : 0;
+    EVENT_CODES.forEach((code, c) => {
+      const n = this.events[c]!;
+      if (n === 0) {
+        out[code] = 0;
+        return;
+      }
+      let sum = this.runs[c]!;
+      const t = this.transitions[c]!;
+      for (let i = 0; i < t.length; i++) {
+        const k = t[i]!;
+        if (k > 0) sum += k * (re[i % STATES]! - re[Math.floor(i / STATES)]!);
+      }
+      out[code] = sum / n;
     });
     return out;
   }
@@ -83,8 +99,7 @@ export class RunTracker {
   /** Number of recorded events of each type. */
   counts(): Record<EventCode, number> {
     const out = {} as Record<EventCode, number>;
-    for (const code of EVENT_CODES) out[code] = 0;
-    for (const c of this.codes) out[EVENT_CODES[c]!]++;
+    EVENT_CODES.forEach((code, c) => (out[code] = this.events[c]!));
     return out;
   }
 
@@ -97,6 +112,20 @@ export class RunTracker {
   }
 
   eventCount(): number {
-    return this.codes.length;
+    return this.events.reduce((s, x) => s + x, 0);
+  }
+
+  toJSON(): RunTrackerState {
+    return { reSum: this.reSum, reCount: this.reCount, transitions: this.transitions, runs: this.runs, events: this.events };
+  }
+
+  static fromJSON(s: RunTrackerState): RunTracker {
+    const t = new RunTracker();
+    t.reSum = [...s.reSum];
+    t.reCount = [...s.reCount];
+    t.transitions = s.transitions.map((x) => [...x]);
+    t.runs = [...s.runs];
+    t.events = [...s.events];
+    return t;
   }
 }

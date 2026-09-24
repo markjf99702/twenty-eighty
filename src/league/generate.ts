@@ -1,11 +1,13 @@
 import { clampGrade } from "../core/grades";
 import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
-import { generateHitter, generatePitcher, randomAge } from "../players/generate";
-import type { FieldPosition, Player, ToolGrade } from "../players/types";
-import { FIELD_POSITIONS } from "../players/types";
+import { autoDepthChart } from "../org/depth";
+import { playerValue } from "../org/value";
+import { generateHitter, generatePitcher } from "../players/generate";
+import type { FieldPosition, Level, MinorLevel, Player, ToolGrade } from "../players/types";
+import { FIELD_POSITIONS, MAX_OPTION_YEARS, MINOR_LEVELS, SERVICE_DAYS_PER_YEAR } from "../players/types";
 import { DEFAULT_STRUCTURE, FRANCHISES, type FranchiseSeed } from "./franchises";
-import type { DepthChart, League, Team } from "./types";
+import type { Affiliate, League, Park, Team } from "./types";
 
 export interface GenerateLeagueOptions {
   seed: string;
@@ -28,7 +30,7 @@ export function pitcherQuality(p: Player): number {
   return (g - 50) / 10;
 }
 
-/** Composite offensive quality in z units, used for lineups and benches. */
+/** Composite offensive quality in z units, used for batting orders. */
 export function hitterQuality(p: Player): number {
   const h = p.hitting;
   const g = 0.4 * h.hit.present + 0.35 * h.power.present + 0.17 * h.eye.present + 0.08 * h.speed.present;
@@ -45,85 +47,148 @@ const BENCH_SLOTS: ReadonlyArray<FieldPosition> = ["C", "SS", "CF", "3B"];
 const STARTER_BAT: Record<FieldPosition | "DH", number> = {
   C: -1, "1B": 11, "2B": 3, "3B": 6, SS: 2, LF: 7, CF: 3, RF: 8, DH: 12,
 };
-const STARTER_BAT_SD = 11;
-const BENCH_BAT: [number, number] = [-18, 7];
+const BENCH_BAT = -18;
 const ROTATION_TIERS = [14, 8, 3, -1, -5];
 const BULLPEN_TIERS = [14, 10, 7, 4, 1, -2, -5, -8];
-const PITCHER_SD = 6;
-/** Runs per 600 of team-wide talent per unit of organizational strength. */
+/** Runs per 600 of talent per unit of organizational strength. */
 const ORG_BAT = 8;
 const ORG_ARM = 6;
 
-function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[], teamSpread: number): Team {
-  const org = rng.normal(0, teamSpread);
-  const add = (p: Player): number => {
-    players.push(p);
-    return p.id;
-  };
-  const nextId = () => players.length;
+interface LevelPlan {
+  /** Talent relative to the MLB slot targets (runs per 600). */
+  offset: number;
+  batSd: number;
+  armSd: number;
+  age: [mean: number, sd: number, min: number, max: number];
+}
 
-  const starters = {} as Record<FieldPosition, number>;
-  for (const pos of FIELD_POSITIONS) {
-    const value = STARTER_BAT[pos] + ORG_BAT * org + rng.normal(0, STARTER_BAT_SD);
-    starters[pos] = add(generateHitter(rng, { id: nextId(), position: pos, value, age: randomAge(rng) }));
-  }
-  const dhValue = STARTER_BAT.DH + ORG_BAT * org + rng.normal(0, STARTER_BAT_SD);
-  const dh = add(generateHitter(rng, { id: nextId(), position: "DH", value: dhValue, age: randomAge(rng, 30) }));
-  const bench = BENCH_SLOTS.map((pos) =>
+const LEVEL_PLANS: Record<Level, LevelPlan> = {
+  MLB: { offset: 0, batSd: 11, armSd: 6, age: [28.5, 3.4, 21, 40] },
+  AAA: { offset: -17, batSd: 10, armSd: 7, age: [26.5, 2.8, 21, 34] },
+  AA: { offset: -27, batSd: 10, armSd: 7, age: [23.4, 1.6, 20, 29] },
+  "A+": { offset: -35, batSd: 10, armSd: 7, age: [22, 1.3, 19, 26] },
+  A: { offset: -43, batSd: 10, armSd: 7, age: [20.4, 1.2, 18, 23] },
+};
+
+/** 40-man slots beyond the 26 big leaguers: a few prospects plus upper-minors depth. */
+const PROSPECTS_ON_40 = 8;
+const DEPTH_ON_40 = 6;
+
+function ageFor(rng: Rng, plan: LevelPlan): number {
+  const [mean, sd, min, max] = plan.age;
+  return Math.round(clamp(rng.normal(mean, sd), min, max));
+}
+
+function levelRoster(rng: Rng, level: Level, strength: number, players: Player[]): number[] {
+  const plan = LEVEL_PLANS[level];
+  const ids: number[] = [];
+  const add = (p: Player) => {
+    players.push(p);
+    ids.push(p.id);
+  };
+  const bat = (pos: FieldPosition | "DH", base: number) =>
     add(
       generateHitter(rng, {
-        id: nextId(),
+        id: players.length,
         position: pos,
-        value: BENCH_BAT[0] + ORG_BAT * org + rng.normal(0, BENCH_BAT[1]),
-        age: randomAge(rng, 29.5, 4),
+        value: base + plan.offset + ORG_BAT * strength + rng.normal(0, level === "MLB" && pos !== "DH" ? plan.batSd : plan.batSd * 0.9),
+        age: level === "MLB" && pos === "DH" ? Math.round(clamp(rng.normal(30, 3.4), 23, 40)) : ageFor(rng, plan),
       }),
-    ),
-  );
-
-  const rotation = ROTATION_TIERS.map((tier) =>
+    );
+  for (const pos of FIELD_POSITIONS) bat(pos, STARTER_BAT[pos]);
+  bat("DH", STARTER_BAT.DH);
+  for (const pos of BENCH_SLOTS) {
+    add(
+      generateHitter(rng, {
+        id: players.length,
+        position: pos,
+        value: BENCH_BAT + plan.offset + ORG_BAT * strength + rng.normal(0, 7),
+        age: level === "MLB" ? Math.round(clamp(rng.normal(29.5, 4), 22, 40)) : ageFor(rng, plan),
+      }),
+    );
+  }
+  for (const tier of ROTATION_TIERS) {
     add(
       generatePitcher(rng, {
-        id: nextId(),
+        id: players.length,
         role: "SP",
-        value: tier + ORG_ARM * org + rng.normal(0, PITCHER_SD),
-        age: randomAge(rng),
+        value: tier + plan.offset + ORG_ARM * strength + rng.normal(0, plan.armSd),
+        age: ageFor(rng, plan),
       }),
-    ),
-  );
-  const bullpen = BULLPEN_TIERS.map((tier) =>
+    );
+  }
+  for (const tier of BULLPEN_TIERS) {
     add(
       generatePitcher(rng, {
-        id: nextId(),
+        id: players.length,
         role: "RP",
-        value: tier + ORG_ARM * org + rng.normal(0, PITCHER_SD),
-        age: randomAge(rng, 29, 3.5),
+        value: tier + plan.offset + ORG_ARM * strength + rng.normal(0, plan.armSd),
+        age: level === "MLB" ? Math.round(clamp(rng.normal(29, 3.5), 22, 40)) : ageFor(rng, plan),
       }),
-    ),
-  );
+    );
+  }
+  for (const id of ids) players[id]!.level = level;
+  return ids;
+}
 
-  // Farm system: young players with modest present grades and real projection.
-  const reserves: number[] = [];
-  for (let i = 0; i < 12; i++) {
-    const age = Math.round(clamp(rng.normal(21, 1.8), 18, 25));
-    // Young and raw today; the growth in their future grades is the projection.
-    const value = rng.normal(-30 + 2.5 * (age - 21), 10);
-    if (i % 2 === 0) {
-      const pos = rng.pick(FIELD_POSITIONS);
-      reserves.push(add(generateHitter(rng, { id: nextId(), position: pos, value, age })));
-    } else {
-      const role = rng.chance(0.6) ? "SP" : "RP";
-      reserves.push(add(generatePitcher(rng, { id: nextId(), role, value: value * 0.8, age })));
-    }
+function affiliatePark(rng: Rng, name: string, level: MinorLevel): Park {
+  // A handful of upper-minors parks sit at altitude, like the real Pacific Coast League.
+  const high = level === "AAA" ? rng.chance(0.2) : rng.chance(0.05);
+  return {
+    name,
+    dims: [rng.int(318, 340), rng.int(360, 392), rng.int(395, 412), rng.int(360, 392), rng.int(318, 340)],
+    walls: [rng.int(8, 16), rng.int(8, 12), rng.int(8, 12), rng.int(8, 12), rng.int(8, 16)],
+    altitude: high ? rng.int(3500, 5300) : rng.int(0, 1500),
+  };
+}
+
+function assignServiceAndOptions(rng: Rng, p: Player, level: Level): void {
+  if (level === "MLB") {
+    const years = clamp(p.age - 23.5 + rng.normal(0, 1.5), 0, 16);
+    p.service = Math.round(years * SERVICE_DAYS_PER_YEAR);
+    p.options.used = years >= 5 ? MAX_OPTION_YEARS : Math.min(MAX_OPTION_YEARS, Math.floor(years * 0.7 + rng.next() * 1.5));
+  } else if (p.onFortyMan) {
+    p.options.used = Math.min(2, Math.max(0, Math.floor((p.age - 21) / 1.5 + rng.next())));
+    p.service = level === "AAA" ? Math.round(rng.next() * 0.6 * SERVICE_DAYS_PER_YEAR) : 0;
+  } else if (level === "AAA" && p.age >= 27) {
+    // Veteran minor leaguers with a cup of coffee or two.
+    p.service = Math.round(rng.next() * 2.5 * SERVICE_DAYS_PER_YEAR);
+  }
+}
+
+function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[], teamSpread: number): Team {
+  const org = rng.normal(0, teamSpread);
+  const farm = rng.normal(0, teamSpread * 1.2);
+
+  const rosters = { MLB: levelRoster(rng, "MLB", org, players) } as Record<Level, number[]>;
+  const affiliates = {} as Record<MinorLevel, Affiliate>;
+  for (const level of MINOR_LEVELS) {
+    rosters[level] = levelRoster(rng, level, farm, players);
+    const name = `${seed.nickname} ${level}`;
+    affiliates[level] = { level, name, park: affiliatePark(rng, `${name} Ballpark`, level) };
   }
 
-  const byPitching = (a: number, b: number) => pitcherQuality(players[b]!) - pitcherQuality(players[a]!);
-  const depth: DepthChart = {
-    starters,
-    dh,
-    bench,
-    rotation: [...rotation].sort(byPitching),
-    bullpen: [...bullpen].sort(byPitching),
-  };
+  // 40-man: the big leaguers, the best prospects (who must be protected), and
+  // upper-minors depth ready for a call-up.
+  const minors = MINOR_LEVELS.flatMap((l) => rosters[l]).map((pid) => players[pid]!);
+  const prospects = [...minors]
+    .filter((p) => p.age >= 20)
+    .sort((a, b) => playerValue(b, true) - playerValue(a, true))
+    .slice(0, PROSPECTS_ON_40);
+  const depth = minors
+    .filter((p) => p.level === "AAA" && !prospects.includes(p))
+    .sort((a, b) => playerValue(b) - playerValue(a))
+    .slice(0, DEPTH_ON_40);
+  const fortyMan = [...rosters.MLB, ...prospects.map((p) => p.id), ...depth.map((p) => p.id)];
+
+  for (const level of ["MLB", ...MINOR_LEVELS] as Level[]) {
+    for (const pid of rosters[level]) {
+      const p = players[pid]!;
+      p.teamId = id;
+      p.onFortyMan = fortyMan.includes(pid);
+      assignServiceAndOptions(rng, p, level);
+    }
+  }
 
   return {
     id,
@@ -134,9 +199,11 @@ function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[],
     division: seed.division,
     park: seed.park,
     market: seed.market,
-    active: [...Object.values(starters), dh, ...bench, ...rotation, ...bullpen],
-    reserves,
-    depth,
+    rosters,
+    fortyMan,
+    injured: [],
+    depth: autoDepthChart(rosters.MLB.map((pid) => players[pid]!)),
+    affiliates,
   };
 }
 
@@ -148,24 +215,25 @@ function shiftTool(t: ToolGrade, delta: number): void {
 /**
  * Re-center grades so that 50 is the playing-time-weighted MLB average.
  * This is what makes the scale honest: a 50 hitter is a league-average bat
- * in this universe, not just in the generator's imagination.
+ * in this universe, not just in the generator's imagination. Minor leaguers
+ * shift with everyone else, so their grades stay major-league relative.
  */
 export function recenterGrades(league: League): void {
   const { players, teams } = league;
   const hitterWeights = new Map<number, number>();
   const pitcherWeights = new Map<number, number>();
   for (const t of teams) {
-    for (const id of [...Object.values(t.depth.starters), t.depth.dh]) hitterWeights.set(id, 1);
-    for (const id of t.depth.bench) hitterWeights.set(id, 0.3);
-    for (const id of t.depth.rotation) pitcherWeights.set(id, 1);
-    for (const id of t.depth.bullpen) pitcherWeights.set(id, 0.4);
+    for (const pid of [...Object.values(t.depth.starters), t.depth.dh]) hitterWeights.set(pid, 1);
+    for (const pid of t.depth.bench) hitterWeights.set(pid, 0.3);
+    for (const pid of t.depth.rotation) pitcherWeights.set(pid, 1);
+    for (const pid of t.depth.bullpen) pitcherWeights.set(pid, 0.4);
   }
 
   for (const key of ["hit", "power", "eye", "speed"] as const) {
     let sum = 0;
     let w = 0;
-    for (const [id, weight] of hitterWeights) {
-      sum += players[id]!.hitting[key].present * weight;
+    for (const [pid, weight] of hitterWeights) {
+      sum += players[pid]!.hitting[key].present * weight;
       w += weight;
     }
     const delta = 50 - sum / w;
@@ -175,8 +243,8 @@ export function recenterGrades(league: League): void {
   let stuffSum = 0;
   let stuffW = 0;
   const ctl = { control: [0, 0], command: [0, 0] };
-  for (const [id, weight] of pitcherWeights) {
-    const pit = players[id]!.pitching!;
+  for (const [pid, weight] of pitcherWeights) {
+    const pit = players[pid]!.pitching!;
     const total = pit.pitches.reduce((s, x) => s + x.usage, 0);
     for (const pitch of pit.pitches) {
       stuffSum += pitch.grade.present * weight * (pitch.usage / total);
@@ -208,7 +276,10 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     structure: DEFAULT_STRUCTURE,
     teams,
     players,
+    transactions: [],
+    userTeamId: null,
   };
   recenterGrades(league);
+  for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));
   return league;
 }

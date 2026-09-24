@@ -52,7 +52,7 @@ export const FIELD = {
   ground: {
     /** Angular reach (degrees) of an average infielder on an average-speed grounder. */
     reach: 14.5,
-    rangePerZ: 0.09,
+    rangePerZ: 0.05,
     /** Reach scales with (speedRef - ev) / speedScale: harder grounders are harder to reach. */
     speedRef: 120,
     speedScale: 32,

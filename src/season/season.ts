@@ -145,7 +145,7 @@ export class Season {
       last10: [],
     }));
     this.parkRuns = league.teams.map(() => ({ home: 0, homeG: 0, road: 0, roadG: 0 }));
-    for (const t of league.teams) for (const id of [...t.active, ...t.reserves]) this.teamOf.set(id, t.id);
+    for (const p of league.players) if (p.teamId !== null) this.teamOf.set(p.id, p.teamId);
   }
 
   get totalDays(): number {
@@ -168,7 +168,7 @@ export class Season {
   gameSetup(team: Team, rng: Rng, day = this.day): TeamGameSetup {
     return {
       team,
-      lineup: buildLineup(this.league, team, rng),
+      lineup: buildLineup(this.league, team.depth, rng),
       starter: this.staff.nextStarter(team, day),
       bullpen: team.depth.bullpen,
       unavailable: this.staff.unavailableRelievers(team, day),
