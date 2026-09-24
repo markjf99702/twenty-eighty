@@ -13,15 +13,16 @@ Two things are different from the late-90s version:
   them (wOBA weights, FIP constant, runs per win, park factors) are re-derived every
   season from the simulated league's own run environment.
 
-> Status: **phases 1-3 of the roadmap are done**: the engine, player generation, full
+> Status: **phases 1-4 of the roadmap are done**: the engine, player generation, full
 > organizations with four minor league affiliates, roster rules, injuries, in-game
-> substitutions, AI front offices, postseason, advanced stats and calibration. A browser
-> UI is next, then contracts, trades and finances.
+> substitutions, AI front offices, postseason, advanced stats, calibration, and a browser
+> UI to play it all in. The offseason (aging, contracts, the draft, trades) is next.
 
 ## Quick start
 
 ```bash
 npm install
+npm run dev                        # the game in your browser (http://localhost:5173)
 npm run sim:season                 # a full season (majors + 4 affiliate levels): standings, playoffs, awards, leaders
 npm run sim:season -- --team BOS   # ...plus one club's transaction log and end-of-season organization
 npm run sim:game -- DEN BOS        # one game, with a box score
@@ -33,6 +34,34 @@ npm test                           # vitest suite
 
 Every universe is generated from a seed (`--seed my-league`), so the same seed always
 produces the same players and the same season.
+
+## Playing in the browser
+
+`npm run dev` starts the game; `npm run build:web` builds a static site into `web/dist`
+that any web server can host. Pick a seed and a club, and you're the GM:
+
+- **Scoreboard sims**: play a day, a week, a month or the rest of the season, then the
+  postseason. A full season with all four affiliates takes about 15-20 seconds, running in
+  a Web Worker so the page stays responsive.
+- **Front office**: record, division race, recent games, club leaders, injuries, your top
+  prospects, and the transaction wire.
+- **My club**: the active roster, injured list and every affiliate, with each player's
+  present grades, overall and future value (FV), season line, 40-man status, options left
+  and service time. Every legal roster move (call up, select a contract, option, DFA,
+  injured list, promote or demote within the farm, release) is a click away, and moves
+  that aren't allowed say why.
+- **Depth chart**: set the lineup, rotation and bullpen order yourself, or leave it to
+  the manager. An assistant GM can handle injuries and call-ups until you turn him off.
+- **Player pages**: the scouting report as present/future 20-80 bars, pitch mix, defense
+  by position, and stats by level.
+- **Stats**: sortable leaderboards for every level, with qualified/club/position filters
+  and the season's own run environment (wOBA weights, FIP constant, runs per win).
+- **Scores and box scores**, **standings** with the wild-card race, and the **postseason**
+  bracket.
+
+The game autosaves to the browser (IndexedDB) after every sim and roster move, and a save
+can be exported to a file and imported again from the League office page. Saves resume
+exactly: the same seed and the same moves play out the same way.
 
 ## The 20-80 scale
 
@@ -177,6 +206,8 @@ src/
   stats/        stat lines, run expectancy / linear weights, advanced stats and WAR
   calibration/  MLB targets, league and spread reports, the grade chart
   report/       text renderers for the CLI
+  save/         save games (exact resume)
+web/            browser UI: Preact pages, a simulation Web Worker, IndexedDB saves
 scripts/        sim:season, sim:game, scout, grade-chart, calibrate, probe
 test/           vitest suite
 ```
@@ -190,7 +221,8 @@ contact, running) or at the top of `src/sim/battedBall.ts` (fielding and physics
 2. ~~Player generator with 20-80 grades, full schedule, standings, stats~~
 3. ~~Minor leagues, 40-man roster, call-ups and options, injuries, in-game substitutions,
    AI front offices~~
-4. A browser UI: sortable stat pages, player cards, roster management, league history
+4. ~~A browser UI: sortable stat pages, player cards, roster management~~ (league
+   history arrives with multi-season play)
 5. Offseason loop: aging and development toward future grades, contracts (pre-arb,
    arbitration, free agency), the draft, international signings, AI trades valued by
    surplus WAR

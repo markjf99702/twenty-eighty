@@ -299,6 +299,8 @@ export class Season {
   staff = new StaffTracker();
   /** Set once the playoffs have been played. */
   postseason: PostseasonResult | null = null;
+  /** Called with every finished game (the UI keeps recent box scores). */
+  onGame?: (level: Level, result: GameResult, day: number) => void;
   readonly levels: Record<Level, LevelSeason>;
   readonly simulateMinors: boolean;
   readonly aiRosters: boolean;
@@ -576,6 +578,7 @@ export class Season {
         this.staff.record(result.pitchCounts, day);
         this.applyInjuries(result, level);
         const summary = ls.absorb(result, day);
+        this.onGame?.(level, result, day);
         if (level === "MLB") out.push(summary);
       }
     }

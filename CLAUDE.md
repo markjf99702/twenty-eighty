@@ -1,11 +1,12 @@
 # twenty-eighty: notes for working in this repo
 
-Baseball GM simulation (TypeScript, Node 20+, ESM, no runtime dependencies). See
-README.md for the design.
+Baseball GM simulation (TypeScript, Node 20+, ESM). The engine in src/ has no runtime
+dependencies; the browser UI in web/ uses Preact and Vite. See README.md for the design.
 
 ## Commands
 
-- `npm run check`: typecheck + tests. Run before every commit.
+- `npm run check`: typecheck (engine and web) + tests. Run before every commit.
+- `npm run dev` / `npm run build:web`: the browser UI (Vite, root `web/`).
 - `npm run calibrate [-- --seasons 3]`: full-season league metrics vs. MLB targets,
   plus player/team spread. Aim for "0 metric(s) outside 2x tolerance".
 - `npm run grade-chart [-- --pa 30000]`: what each 20-80 grade produces, per tool.
@@ -22,6 +23,12 @@ the rule-checked functions in src/org/roster.ts, never by editing arrays directl
 the transaction log and 40-man/IL bookkeeping stay consistent. `new Season(league,
 { minors: false })` skips affiliate games (calibration and most tests use this).
 
+The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
+owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with
+plain view models built in `web/src/worker/views.ts`. Pages call it through `useApi`
+(`web/src/api/client.ts`), which refetches whenever `bump()` signals a change. Adding a
+screen means: a request/response pair in protocol.ts, a handler in the worker, a page.
+
 ## Conventions
 
 - All randomness goes through `Rng` (`src/core/rng.ts`). Never use `Math.random`.
@@ -31,8 +38,9 @@ the transaction log and 40-man/IL bookkeeping stay consistent. `new Season(leagu
   UI; convert once in `src/sim/profiles.ts`.
 - Engine tunables live in `src/sim/constants.ts` (`ENGINE`) and in `FIELD` at the top
   of `src/sim/battedBall.ts`. Don't scatter magic numbers through the game loop.
-- Stat lines (`src/stats/lines.ts`) are flat number records so they sum generically.
-  Add a counting stat by adding a key to the interface and the key list.
+- Stat lines (`src/stats/lines.ts`) are flat number records. Add a counting stat to the
+  interface, its literal factory (`emptyBatting` etc.) and its explicit adder
+  (`addBatting` etc.); saves pick the key up automatically.
 - Advanced-stat constants come from the simulated season itself
   (`Season.context()`), never hard-coded MLB values.
 - Hot paths matter (a full organizational season is ~130k games of pitches): stat lines

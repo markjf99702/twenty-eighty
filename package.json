@@ -5,7 +5,7 @@
   "description": "A baseball GM / front-office simulation with modern 20-80 scouting grades and modern stats.",
   "type": "module",
   "scripts": {
-    "typecheck": "tsc --noEmit",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p web",
     "test": "vitest run",
     "test:watch": "vitest",
     "calibrate": "tsx scripts/calibrate.ts",
@@ -14,7 +14,10 @@
     "check": "npm run typecheck && npm test",
     "grade-chart": "tsx scripts/grade-chart.ts",
     "probe": "tsx scripts/probe.ts",
-    "scout": "tsx scripts/scout.ts"
+    "scout": "tsx scripts/scout.ts",
+    "dev": "vite web",
+    "build:web": "vite build web",
+    "preview": "vite preview web"
   },
   "engines": {
     "node": ">=20"
@@ -23,6 +26,10 @@
     "@types/node": "^26.6.2",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
-    "vitest": "^5.0.1"
+    "vitest": "^5.0.1",
+    "vite": "^8.3.1"
+  },
+  "dependencies": {
+    "preact": "^10.29.8"
   }
 }

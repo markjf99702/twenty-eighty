@@ -1,0 +1,554 @@
+/**
+ * Turn the live League/Season into the view models the UI renders.
+ */
+import { MAX_OPTION_YEARS, MINOR_LEVELS, PITCH_NAMES, playerName, SERVICE_DAYS_PER_YEAR } from "../../../src/players/types";
+import type { FieldPosition, Level, MinorLevel, Player } from "../../../src/players/types";
+import { FIELD_POSITIONS, LEVELS } from "../../../src/players/types";
+import type { League, Team } from "../../../src/league/types";
+import { teamName } from "../../../src/league/types";
+import { defenseGrade } from "../../../src/players/defense";
+import {
+  activeLimit,
+  activePitchers,
+  canActivate,
+  canBeOptioned,
+  canCallUp,
+  canOption,
+  FORTY_MAN_LIMIT,
+  pitcherLimit,
+  positionLabel,
+  rosterProblems,
+} from "../../../src/org/roster";
+import { overallGrade } from "../../../src/org/value";
+import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season";
+import type { GameResult } from "../../../src/sim/game";
+import { inningsPitched } from "../../../src/stats/lines";
+import type {
+  BoxScoreView,
+  DashboardView,
+  GameItem,
+  PlayerSummary,
+  PlayerView,
+  PostseasonView,
+  RosterActionOption,
+  StandingRow,
+  StandingsView,
+  Status,
+  TeamRef,
+  TeamView,
+  TransactionItem,
+} from "../api/protocol";
+
+// ---------------------------------------------------------------------------
+// Shared helpers
+
+export const teamRef = (t: Team): TeamRef => ({
+  id: t.id,
+  abbrev: t.abbrev,
+  city: t.city,
+  nickname: t.nickname,
+  league: t.league,
+  division: t.division,
+});
+
+export function dateLabel(season: Season, day: number): string {
+  return season.dateOf(day).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+}
+
+export function phaseOf(season: Season): "regular" | "postseason" | "done" {
+  if (!season.done) return "regular";
+  return season.postseason ? "done" : "postseason";
+}
+
+const f3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3).replace(/^(-?)0\./, "$1.") : "---");
+
+/** Per-level season stats, cached until the next simulated day. */
+export class StatsCache {
+  private cache = new Map<Level, { day: number; stats: SeasonStats; hit: Map<number, number>; pit: Map<number, number> }>();
+
+  constructor(private season: () => Season) {}
+
+  clear(): void {
+    this.cache.clear();
+  }
+
+  get(level: Level) {
+    const season = this.season();
+    const hit = this.cache.get(level);
+    if (hit && hit.day === season.day) return hit;
+    const stats = season.levels[level].stats();
+    const entry = {
+      day: season.day,
+      stats,
+      hit: new Map(stats.hitters.map((h, i) => [h.id, i])),
+      pit: new Map(stats.pitchers.map((p, i) => [p.id, i])),
+    };
+    this.cache.set(level, entry);
+    return entry;
+  }
+
+  hitter(level: Level, id: number) {
+    const c = this.get(level);
+    const i = c.hit.get(id);
+    return i === undefined ? undefined : c.stats.hitters[i];
+  }
+
+  pitcher(level: Level, id: number) {
+    const c = this.get(level);
+    const i = c.pit.get(id);
+    return i === undefined ? undefined : c.stats.pitchers[i];
+  }
+}
+
+export function status(league: League | null, season: Season | null, hasSave: boolean): Status {
+  if (!league || !season) return { hasGame: false, hasSave };
+  const user = league.userTeamId;
+  const rec = user !== null ? season.records[user] : null;
+  return {
+    hasGame: true,
+    hasSave,
+    seed: league.seed,
+    year: league.year,
+    day: season.day,
+    totalDays: season.totalDays,
+    date: dateLabel(season, Math.min(season.day, season.totalDays - 1)),
+    phase: phaseOf(season),
+    userTeamId: user,
+    minors: season.simulateMinors,
+    leagues: league.structure.leagues,
+    divisions: league.structure.divisions,
+    teams: league.teams.map(teamRef),
+    record: rec ? { w: rec.w, l: rec.l } : null,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Players
+
+function serviceLabel(days: number): string {
+  const years = Math.floor(days / SERVICE_DAYS_PER_YEAR);
+  return `${years}.${String(days % SERVICE_DAYS_PER_YEAR).padStart(3, "0")}`;
+}
+
+function stuffGrade(p: Player): number {
+  const pit = p.pitching!;
+  const usage = pit.pitches.reduce((s, x) => s + x.usage, 0);
+  return pit.pitches.reduce((s, x) => s + x.grade.present * x.usage, 0) / usage;
+}
+
+function statLine(p: Player, stats: StatsCache): string {
+  if (p.pitching) {
+    const s = stats.pitcher(p.level, p.id);
+    if (!s) return "";
+    const ip = inningsPitched(s.line.outs).toFixed(1);
+    const base = `${s.line.G} G${s.line.GS ? `, ${s.line.GS} GS` : ""}, ${ip} IP, ${s.ERA.toFixed(2)} ERA`;
+    return `${base}, ${(100 * s.Kpct).toFixed(1)} K%${s.line.SV ? `, ${s.line.SV} SV` : ""}`;
+  }
+  const s = stats.hitter(p.level, p.id);
+  if (!s) return "";
+  return `${s.PA} PA, ${f3(s.AVG)}/${f3(s.OBP)}/${f3(s.SLG)}, ${s.line.HR} HR, ${Math.round(s.wRCplus)} wRC+`;
+}
+
+export function playerSummary(
+  p: Player,
+  season: Season,
+  stats: StatsCache,
+  actions?: RosterActionOption[],
+): PlayerSummary {
+  const h = p.hitting;
+  const grades: [string, number][] = p.pitching
+    ? [
+        ["Stuff", stuffGrade(p)],
+        ["Ctl", p.pitching.control.present],
+        ["Cmd", p.pitching.command.present],
+        ["Stam", p.pitching.stamina.present],
+      ]
+    : [
+        ["Hit", h.hit.present],
+        ["Pow", h.power.present],
+        ["Eye", h.eye.present],
+        ["Run", h.speed.present],
+        ["Fld", h.field.present],
+        ["Arm", h.arm.present],
+      ];
+  return {
+    id: p.id,
+    name: playerName(p),
+    pos: p.pitching ? (p.role === "SP" ? "SP" : "RP") : p.position,
+    age: p.age,
+    bats: p.bats,
+    throws: p.throws,
+    level: p.level,
+    teamId: p.teamId,
+    ovr: overallGrade(p),
+    fv: overallGrade(p, true),
+    pitcher: Boolean(p.pitching),
+    grades,
+    status: {
+      fortyMan: p.onFortyMan || p.il === "IL60",
+      optionsLeft: MAX_OPTION_YEARS - p.options.used,
+      optionedThisYear: p.options.usedThisYear,
+      canBeOptioned: canBeOptioned(p),
+      service: serviceLabel(p.service),
+      il: p.il,
+      injury: p.injury && p.injury.daysLeft > 0 ? { name: p.injury.name, daysLeft: p.injury.daysLeft } : null,
+    },
+    line: statLine(p, stats),
+    actions,
+  };
+}
+
+/** Roster moves the user's club could make with this player right now. */
+export function rosterActions(p: Player, team: Team, season: Season): RosterActionOption[] {
+  const ctx = season.rosterContext();
+  const out: RosterActionOption[] = [];
+  const add = (kind: RosterActionOption["kind"], label: string, check: { ok: boolean; reason?: string }, level?: MinorLevel) =>
+    out.push({ kind, label, ok: check.ok, ...(check.ok ? {} : { reason: check.reason }), ...(level ? { level } : {}) });
+
+  if (p.il) {
+    add("activate", "Activate", canActivate(ctx, team, p, "MLB"));
+    add("activateToMinors", "Activate to AAA", canActivate(ctx, team, p, "AAA"));
+    return out;
+  }
+  if (p.level === "MLB") {
+    add("option", "Option to AAA", canOption(ctx, team, p));
+    if (p.injury && p.injury.daysLeft > 0) add("placeIl", "Place on IL", { ok: true });
+    add("dfa", "Designate for assignment", p.onFortyMan ? { ok: true } : { ok: false, reason: "Not on the 40-man." });
+    return out;
+  }
+  add("callUp", p.onFortyMan ? "Call up" : "Select contract", canCallUp(ctx, team, p));
+  const idx = MINOR_LEVELS.indexOf(p.level as MinorLevel);
+  if (idx > 0) add("assign", `Promote to ${MINOR_LEVELS[idx - 1]}`, { ok: true }, MINOR_LEVELS[idx - 1]);
+  if (idx < MINOR_LEVELS.length - 1) add("assign", `Send to ${MINOR_LEVELS[idx + 1]}`, { ok: true }, MINOR_LEVELS[idx + 1]);
+  if (!p.onFortyMan) {
+    add("add40", "Add to 40-man", team.fortyMan.length < FORTY_MAN_LIMIT ? { ok: true } : { ok: false, reason: "The 40-man roster is full." });
+    add("release", "Release", { ok: true });
+  } else {
+    add("dfa", "Designate for assignment", { ok: true });
+  }
+  return out;
+}
+
+// ---------------------------------------------------------------------------
+// Standings
+
+function standingRow(season: Season, r: TeamRecord, leader: TeamRecord): StandingRow {
+  const t = season.team(r.teamId);
+  const l10w = r.last10.filter(Boolean).length;
+  return {
+    teamId: r.teamId,
+    name: teamName(t),
+    abbrev: t.abbrev,
+    w: r.w,
+    l: r.l,
+    pct: r.w + r.l > 0 ? r.w / (r.w + r.l) : 0,
+    gb: season.gamesBehind(leader, r),
+    rs: r.rs,
+    ra: r.ra,
+    streak: r.streak,
+    last10: `${l10w}-${r.last10.length - l10w}`,
+    home: `${r.homeW}-${r.homeL}`,
+    away: `${r.awayW}-${r.awayL}`,
+  };
+}
+
+export function standingsView(season: Season, level: Level): StandingsView {
+  const ls = season.levels[level];
+  const table = ls.standings().map((lg) => lg.map((div) => div.map((r) => standingRow(season, r, div[0]!))));
+  const wildCard = ls.standings().map((lg) => {
+    const rest = lg.flatMap((div) => div.slice(1)).sort((a, b) => ls.compare(a, b));
+    const line = rest[2];
+    return rest.map((r) => {
+      const t = season.team(r.teamId);
+      return {
+        teamId: r.teamId,
+        name: teamName(t),
+        abbrev: t.abbrev,
+        w: r.w,
+        l: r.l,
+        gb: line ? season.gamesBehind(line, r) : 0,
+      };
+    });
+  });
+  return { level, leagues: season.league.structure.leagues, divisions: season.league.structure.divisions, table, wildCard };
+}
+
+// ---------------------------------------------------------------------------
+// Teams
+
+export function teamView(season: Season, stats: StatsCache, teamId: number): TeamView {
+  const league = season.league;
+  const team = season.team(teamId);
+  const isUser = league.userTeamId === teamId;
+  const ctx = season.rosterContext();
+  const P = (id: number) => league.players[id]!;
+  const summarize = (id: number) => playerSummary(P(id), season, stats, isUser ? rosterActions(P(id), team, season) : undefined);
+  const rec = season.records[teamId]!;
+  const minors = {} as Record<MinorLevel, PlayerSummary[]>;
+  for (const level of MINOR_LEVELS) minors[level] = team.rosters[level].map(summarize);
+  return {
+    team: {
+      ...teamRef(team),
+      park: team.park.name,
+      altitude: team.park.altitude,
+      market: team.market,
+      affiliates: Object.fromEntries(MINOR_LEVELS.map((l) => [l, team.affiliates[l].name])) as Record<MinorLevel, string>,
+    },
+    isUser,
+    manualRoster: Boolean(team.manualRoster),
+    manualDepth: Boolean(team.manualDepth),
+    record: { w: rec.w, l: rec.l, rs: rec.rs, ra: rec.ra },
+    counts: {
+      active: team.rosters.MLB.length,
+      activeLimit: activeLimit(ctx),
+      pitchers: activePitchers(league, team),
+      pitcherLimit: pitcherLimit(ctx),
+      fortyMan: team.fortyMan.length,
+    },
+    problems: rosterProblems(ctx, team),
+    depth: team.depth,
+    active: team.rosters.MLB.map(summarize),
+    injured: team.injured.map(summarize),
+    minors,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Player page
+
+export function playerView(season: Season, stats: StatsCache, playerId: number): PlayerView {
+  const league = season.league;
+  const p = league.players[playerId]!;
+  const team = p.teamId !== null ? season.team(p.teamId) : null;
+  const isUser = team !== null && league.userTeamId === team.id;
+  const h = p.hitting;
+  const tools = p.pitching
+    ? [
+        { label: "Control", present: p.pitching.control.present, future: p.pitching.control.future, note: "throwing strikes" },
+        { label: "Command", present: p.pitching.command.present, future: p.pitching.command.future, note: "hitting spots" },
+        { label: "Stamina", present: p.pitching.stamina.present, future: p.pitching.stamina.future, note: "how deep he goes" },
+      ]
+    : [
+        { label: "Hit", present: h.hit.present, future: h.hit.future, note: "bat-to-ball" },
+        { label: "Power", present: h.power.present, future: h.power.future, note: "raw exit velocity" },
+        { label: "Eye", present: h.eye.present, future: h.eye.future, note: "plate discipline" },
+        { label: "Run", present: h.speed.present, future: h.speed.future, note: "sprint speed" },
+        { label: "Field", present: h.field.present, future: h.field.future, note: "range and hands" },
+        { label: "Arm", present: h.arm.present, future: h.arm.future, note: "strength and accuracy" },
+      ];
+  const statsRows = LEVELS.flatMap((level) => {
+    const hit = p.pitching ? undefined : stats.hitter(level, p.id);
+    const pit = p.pitching ? stats.pitcher(level, p.id) : undefined;
+    if (!hit && !pit) return [];
+    return [{ level, team: team?.abbrev ?? "FA", ...(hit ? { hitting: hit } : {}), ...(pit ? { pitching: pit } : {}) }];
+  });
+  const traits: string[] = [];
+  if (!p.pitching) {
+    const t = p.traits;
+    traits.push(t.launch > 0.5 ? "Fly-ball swing" : t.launch < -0.5 ? "Ground-ball swing" : "Balanced swing path");
+    traits.push(t.pull > 0.5 ? "Pull hitter" : t.pull < -0.5 ? "Uses the whole field" : "Neutral spray");
+    if (t.aggression > 0.8) traits.push("Aggressive baserunner");
+  }
+  traits.push(p.durability > 0.8 ? "Injury-prone" : p.durability < -0.8 ? "Durable" : "Average durability");
+  return {
+    summary: playerSummary(p, season, stats, isUser ? rosterActions(p, team!, season) : undefined),
+    team: team ? teamRef(team) : null,
+    born: `${league.year - p.age}`,
+    tools,
+    pitches: (p.pitching?.pitches ?? []).map((x) => ({
+      type: x.type,
+      name: PITCH_NAMES[x.type],
+      present: x.grade.present,
+      future: x.grade.future,
+      usage: x.usage,
+    })),
+    velocity: p.pitching?.velocity ?? null,
+    defense: p.pitching
+      ? []
+      : FIELD_POSITIONS.map((pos: FieldPosition) => ({ pos, grade: defenseGrade(p, pos), natural: p.positions.includes(pos) }))
+          .filter((d) => d.natural || d.grade >= 40)
+          .sort((a, b) => b.grade - a.grade),
+    traits,
+    stats: statsRows,
+    transactions: league.transactions
+      .filter((t) => t.playerId === p.id)
+      .slice(-30)
+      .reverse()
+      .map((t) => ({ date: dateLabel(season, t.day), text: t.text })),
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Transactions, scores, box scores
+
+const MAJOR_TYPES = new Set(["call-up", "option", "il-place", "il-activate", "il-transfer", "dfa", "claim", "outright", "release", "add-40", "injury"]);
+
+export function transactions(season: Season, opts: { teamId?: number; majorOnly?: boolean; limit?: number }): TransactionItem[] {
+  const league = season.league;
+  const out: TransactionItem[] = [];
+  for (let i = league.transactions.length - 1; i >= 0 && out.length < (opts.limit ?? 200); i--) {
+    const t = league.transactions[i]!;
+    if (opts.teamId !== undefined && t.teamId !== opts.teamId) continue;
+    if (opts.majorOnly && !MAJOR_TYPES.has(t.type)) continue;
+    out.push({ date: dateLabel(season, t.day), teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
+  }
+  return out;
+}
+
+export const gameKey = (day: number, homeId: number) => `${day}-${homeId}`;
+
+export function gameItems(season: Season, day: number, boxes: Map<string, BoxScoreView>): GameItem[] {
+  const P = season.league.players;
+  const name = (id: number | null) => (id === null ? null : P[id]!.lastName);
+  return season.games
+    .filter((g) => g.day === day)
+    .map((g) => ({
+      key: gameKey(g.day, g.homeId),
+      day: g.day,
+      awayId: g.awayId,
+      homeId: g.homeId,
+      away: season.team(g.awayId).abbrev,
+      home: season.team(g.homeId).abbrev,
+      score: g.score,
+      innings: g.innings,
+      hasBox: boxes.has(gameKey(g.day, g.homeId)),
+      wp: name(g.winningPitcher),
+      lp: name(g.losingPitcher),
+      sv: name(g.savePitcher),
+    }));
+}
+
+export function boxScoreView(season: Season, r: GameResult, day: number): BoxScoreView {
+  const P = season.league.players;
+  const teams: [Team, Team] = [season.team(r.awayId), season.team(r.homeId)];
+  const batting = [0, 1].map((i) =>
+    r.battingOrder[i]!.flat().map((slot) => {
+      const b = r.batting.get(slot.id);
+      return {
+        id: slot.id,
+        name: playerName(P[slot.id]!),
+        pos: slot.pos,
+        ...(slot.sub ? { sub: slot.sub } : {}),
+        ab: b.AB,
+        r: b.R,
+        h: b.H,
+        rbi: b.RBI,
+        bb: b.BB,
+        so: b.SO,
+        hr: b.HR,
+        avgEv: b.BBE > 0 ? Math.round((10 * b.evSum) / b.BBE) / 10 : null,
+      };
+    }),
+  ) as BoxScoreView["batting"];
+  const pitching = [0, 1].map((i) =>
+    r.pitchersUsed[i]!.map((id) => {
+      const p = r.pitching.get(id);
+      const note = r.winningPitcher === id ? "W" : r.losingPitcher === id ? "L" : r.savePitcher === id ? "S" : p.HLD ? "H" : p.BS ? "BS" : "";
+      return { id, name: playerName(P[id]!), note, ip: inningsPitched(p.outs).toFixed(1), h: p.H, r: p.R, er: p.ER, bb: p.BB, so: p.SO, hr: p.HR, pitches: p.pitches };
+    }),
+  ) as BoxScoreView["pitching"];
+  const notes: string[] = [];
+  for (const i of [0, 1]) {
+    const hrs = batting[i]!.filter((b) => b.hr > 0).map((b) => `${P[b.id]!.lastName}${b.hr > 1 ? ` ${b.hr}` : ""}`);
+    if (hrs.length) notes.push(`HR (${teams[i]!.abbrev}): ${hrs.join(", ")}`);
+  }
+  for (const inj of r.injuries) notes.push(`Injury: ${playerName(P[inj.playerId]!)}, ${inj.injury.name.toLowerCase()} (~${inj.injury.days} days)`);
+  return {
+    key: gameKey(day, r.homeId),
+    date: dateLabel(season, day),
+    park: teams[1].park.name,
+    teams: [teamRef(teams[0]), teamRef(teams[1])],
+    lineScore: r.lineScore,
+    totals: [
+      { r: r.score[0], h: r.hits[0], e: r.errors[0] },
+      { r: r.score[1], h: r.hits[1], e: r.errors[1] },
+    ],
+    batting,
+    pitching,
+    notes,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Dashboard and postseason
+
+export function dashboardView(season: Season, stats: StatsCache, boxes: Map<string, BoxScoreView>, st: Status): DashboardView {
+  const league = season.league;
+  const team = season.team(league.userTeamId!);
+  const rec = season.records[team.id]!;
+  const standings = season.standings();
+  const div = standings[team.league]![team.division]!;
+  const leader = div[0]!;
+  const l10w = rec.last10.filter(Boolean).length;
+  const recentDays = [...new Set(season.games.filter((g) => g.awayId === team.id || g.homeId === team.id).map((g) => g.day))].slice(-8);
+  const recent = recentDays.flatMap((d) => gameItems(season, d, boxes).filter((g) => g.awayId === team.id || g.homeId === team.id)).reverse();
+
+  const s = stats.get("MLB").stats;
+  const mine = (id: number) => league.players[id]?.teamId === team.id;
+  const hitters = s.hitters.filter((h) => mine(h.id));
+  const pitchers = s.pitchers.filter((p) => mine(p.id));
+  const leaders: DashboardView["leaders"] = [];
+  const top = <T,>(rows: T[], by: (r: T) => number) => [...rows].sort((a, b) => by(b) - by(a))[0];
+  const wh = top(hitters, (h) => h.WAR);
+  if (wh) leaders.push({ label: "WAR (bat)", name: wh.name, playerId: wh.id, value: wh.WAR.toFixed(1) });
+  const hr = top(hitters, (h) => h.line.HR);
+  if (hr) leaders.push({ label: "Home runs", name: hr.name, playerId: hr.id, value: String(hr.line.HR) });
+  const avg = top(hitters.filter((h) => h.PA >= 100), (h) => h.OBP + h.SLG);
+  if (avg) leaders.push({ label: "OPS", name: avg.name, playerId: avg.id, value: f3(avg.OBP + avg.SLG) });
+  const wp = top(pitchers, (p) => p.WAR);
+  if (wp) leaders.push({ label: "WAR (arm)", name: wp.name, playerId: wp.id, value: wp.WAR.toFixed(1) });
+  const era = top(pitchers.filter((p) => p.IP >= 20), (p) => -p.ERA);
+  if (era) leaders.push({ label: "ERA", name: era.name, playerId: era.id, value: era.ERA.toFixed(2) });
+  const sv = top(pitchers, (p) => p.line.SV);
+  if (sv && sv.line.SV > 0) leaders.push({ label: "Saves", name: sv.name, playerId: sv.id, value: String(sv.line.SV) });
+
+  const hurt = [...team.injured, ...team.rosters.MLB.filter((id) => (league.players[id]!.injury?.daysLeft ?? 0) > 0)];
+  const prospects = MINOR_LEVELS.flatMap((l) => team.rosters[l])
+    .map((id) => league.players[id]!)
+    .filter((p) => p.age <= 25)
+    .sort((a, b) => overallGrade(b, true) - overallGrade(a, true) || a.age - b.age)
+    .slice(0, 8);
+
+  return {
+    status: st,
+    team: teamRef(team),
+    record: {
+      w: rec.w,
+      l: rec.l,
+      rs: rec.rs,
+      ra: rec.ra,
+      streak: rec.streak,
+      last10: `${l10w}-${rec.last10.length - l10w}`,
+      divRank: div.indexOf(rec) + 1,
+      gb: season.gamesBehind(leader, rec),
+    },
+    division: div.map((r) => standingRow(season, r, leader)),
+    recent,
+    leaders,
+    injured: hurt.map((id) => playerSummary(league.players[id]!, season, stats)),
+    prospects: prospects.map((p) => playerSummary(p, season, stats)),
+    news: transactions(season, { majorOnly: true, limit: 14 }),
+    userNews: transactions(season, { teamId: team.id, majorOnly: true, limit: 14 }),
+  };
+}
+
+export function postseasonView(season: Season): PostseasonView | null {
+  const post = season.postseason;
+  if (!post) return null;
+  const ab = (id: number) => season.team(id).abbrev;
+  return {
+    seeds: post.seeds.map((lg) => lg.map((id) => ({ teamId: id, abbrev: ab(id), name: teamName(season.team(id)) }))),
+    series: post.series.map((s) => ({
+      round: s.round,
+      league: s.league === null ? "" : season.league.structure.leagues[s.league]!,
+      higher: ab(s.higher),
+      lower: ab(s.lower),
+      winner: ab(s.winner),
+      wins: s.wins,
+      games: s.games.map((g) => `${ab(g.awayId)} ${g.score[0]}, ${ab(g.homeId)} ${g.score[1]}${g.innings > 9 ? ` (${g.innings})` : ""}`),
+    })),
+    champion: ab(post.champion),
+  };
+}
+
+export { positionLabel };
