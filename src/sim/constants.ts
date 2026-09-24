@@ -103,7 +103,7 @@ export const ENGINE = {
     /** Probability a taken pitch is called a strike, by region. */
     calledStrike: { heart: 0.985, shadow: 0.47, chase: 0.035, waste: 0 },
     /** Log-odds per z of catcher receiving on shadow pitches. */
-    framing: 0.15,
+    framing: 0.06,
     /** Log-odds per z of pitcher command on shadow pitches (painting the corners). */
     commandPaint: 0.08,
     /** Chance a taken waste pitch hits the batter. */
@@ -209,13 +209,13 @@ export const ENGINE = {
 
   steal: {
     /** Attempts per pitch for an average runner with the next base open. */
-    attempt: 0.0112,
-    speed: 1.0,
-    aggression: 0.35,
+    attempt: 0.0175,
+    speed: 0.65,
+    aggression: 0.2,
     minSpeed: -0.8,
     thirdMult: 0.12,
-    success: 0.75,
-    successSpeed: 0.75,
+    success: 0.9,
+    successSpeed: 0.55,
     catcherArm: 0.45,
     thirdPenalty: 0.3,
   },

@@ -151,6 +151,7 @@ export function batterRates(
       batterBoost: side === pitcher.throws ? P.same : P.opposite,
       pullSign: side === "R" ? -1 : 1,
       catcherFraming: def.C.range,
+      avgCatcherFraming: def.C.range,
       runnersOn: false,
     };
     simulatePA(ctx, park, def, rng, t);
@@ -180,6 +181,7 @@ export function pitcherRates(
       batterBoost: side === pitcher.throws ? P.same : P.opposite,
       pullSign: side === "R" ? -1 : 1,
       catcherFraming: def.C.range,
+      avgCatcherFraming: def.C.range,
       runnersOn: false,
     };
     simulatePA(ctx, park, def, rng, t);

@@ -39,8 +39,12 @@ export class Rng {
   private spareNormal: number | null = null;
 
   constructor(seed: number | string | RngState) {
-    const s = Array.isArray(seed) ? seed : hashSeed(String(seed));
-    [this.a, this.b, this.c, this.d] = s;
+    if (Array.isArray(seed)) {
+      // Resuming a saved stream: take the state as-is.
+      [this.a, this.b, this.c, this.d] = seed;
+      return;
+    }
+    [this.a, this.b, this.c, this.d] = hashSeed(String(seed));
     // Warm up so similar seeds diverge quickly.
     for (let i = 0; i < 15; i++) this.nextUint32();
   }
@@ -50,8 +54,9 @@ export class Rng {
     return new Rng(`${this.nextUint32()}:${label}`);
   }
 
+  /** Raw generator state (a cached spare normal is not included). */
   getState(): RngState {
-    return [this.a, this.b, this.c, this.d];
+    return [this.a >>> 0, this.b >>> 0, this.c >>> 0, this.d >>> 0];
   }
 
   private nextUint32(): number {

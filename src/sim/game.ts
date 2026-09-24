@@ -18,6 +18,7 @@ import {
   battedBallOdds,
   isBarrel,
   type BattedBall,
+  type BattedBallType,
   type BipOdds,
   type Defense,
   type Fielder,
@@ -132,6 +133,9 @@ export interface GameResult {
   losingPitcher: number | null;
   savePitcher: number | null;
   starters: [number, number];
+  /** Batting orders and pitchers used, in order, [away, home]. */
+  lineups: [LineupSlot[], LineupSlot[]];
+  pitchersUsed: [number[], number[]];
   /** Pitches thrown by each pitcher who appeared. */
   pitchCounts: Map<number, number>;
   batting: LineBook<BattingLine>;
@@ -379,6 +383,7 @@ export class GameSim {
       batterBoost: boost,
       pullSign: side === "R" ? -1 : 1,
       catcherFraming: field.catcherFraming,
+      avgCatcherFraming: this.env.avgDefense.C.range,
       runnersOn: false,
     };
 
@@ -634,16 +639,16 @@ export class GameSim {
       const inPlay = 1 - avg.hr;
       if (inPlay > 0.01) {
         fl = this.fielding.get(fielderId);
-        fl.exp1B += avg.single / inPlay;
+        // An average fielder would also boot some of the outs; errors count like singles.
+        const avgErr = errorRate(avg.type, this.env.avgDefense[odds.fielder].range);
+        fl.exp1B += (avg.single + avg.out * avgErr) / inPlay;
         fl.exp2B += avg.double / inPlay;
         fl.exp3B += avg.triple / inPlay;
       }
     }
 
     if (outcome === "out") {
-      const skill = field.defSkill[odds.fielder].range;
-      const E = ENGINE.errors;
-      const pErr = (odds.type === "GB" ? E.ground : E.air) * Math.exp(E.skill * skill);
+      const pErr = errorRate(odds.type, field.defSkill[odds.fielder].range);
       this.fielding.get(fielderId).chances++;
       if (this.rng.chance(pErr)) {
         this.fielding.get(fielderId).errors++;
@@ -1032,12 +1037,19 @@ export class GameSim {
       losingPitcher: lp,
       savePitcher: sv,
       starters: [away.stints[0]!.id, home.stints[0]!.id],
+      lineups: [away.order, home.order],
+      pitchersUsed: [away.stints.map((s) => s.id), home.stints.map((s) => s.id)],
       pitchCounts,
       batting: this.batting,
       pitching: this.pitching,
       fielding: this.fielding,
     };
   }
+}
+
+function errorRate(type: BattedBallType, skill: number): number {
+  const E = ENGINE.errors;
+  return (type === "GB" ? E.ground : E.air) * Math.exp(E.skill * skill);
 }
 
 /** Heart pitches are in the zone, shadow pitches straddle it (count half), chase/waste are out. */

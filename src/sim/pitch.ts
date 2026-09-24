@@ -19,8 +19,9 @@ export interface PitchContext {
   batterBoost: number;
   /** -1 when the batter hits right-handed (pulls to left field), +1 left-handed. */
   pullSign: number;
-  /** Catcher receiving z (framing) and whether anyone is on base (wild pitches). */
+  /** Catcher receiving z (framing), the league-average receiver's, and whether anyone is on base. */
   catcherFraming: number;
+  avgCatcherFraming: number;
   runnersOn: boolean;
 }
 
@@ -152,8 +153,8 @@ export function simulatePitch(ctx: PitchContext, balls: number, strikes: number,
     let pStrike: number;
     let framing: PitchOutcome["framing"];
     if (region === "shadow") {
-      const average = sigmoid(CALLED.shadow + ENGINE.take.commandPaint * command);
       const paint = ENGINE.take.commandPaint * command;
+      const average = sigmoid(CALLED.shadow + paint + ENGINE.take.framing * ctx.avgCatcherFraming);
       pStrike = sigmoid(CALLED.shadow + paint + ENGINE.take.framing * ctx.catcherFraming);
       framing = { actual: pStrike, average };
     } else {

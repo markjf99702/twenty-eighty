@@ -13,7 +13,8 @@
     "sim:game": "tsx scripts/sim-game.ts",
     "check": "npm run typecheck && npm test",
     "grade-chart": "tsx scripts/grade-chart.ts",
-    "probe": "tsx scripts/probe.ts"
+    "probe": "tsx scripts/probe.ts",
+    "scout": "tsx scripts/scout.ts"
   },
   "engines": {
     "node": ">=20"

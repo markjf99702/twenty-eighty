@@ -52,7 +52,7 @@ export const FIELD = {
   ground: {
     /** Angular reach (degrees) of an average infielder on an average-speed grounder. */
     reach: 14.5,
-    rangePerZ: 0.12,
+    rangePerZ: 0.09,
     /** Reach scales with (speedRef - ev) / speedScale: harder grounders are harder to reach. */
     speedRef: 120,
     speedScale: 32,
@@ -60,7 +60,7 @@ export const FIELD = {
     pitcherReach: 3.5,
     /** Infield-hit log-odds once a grounder is fielded. */
     ifhBase: -2.75,
-    ifhSpeed: 0.4,
+    ifhSpeed: 0.28,
     ifhSlow: 0.8,
     ifhEdge: 0.7,
     ifhLongThrow: 0.35,
@@ -95,7 +95,7 @@ export const FIELD = {
     /** Top running speeds (ft/s), acceleration (ft/s^2) and read/reaction time (s). */
     ofSpeed: 28,
     ifSpeed: 25,
-    speedPerZ: 1.5,
+    speedPerZ: 1.2,
     ofAccel: 15,
     ifAccel: 16,
     ofReact: 0.45,
@@ -111,9 +111,9 @@ export const FIELD = {
   },
   race: {
     home2second: 8.2,
-    perZ2: 0.22,
+    perZ2: 0.18,
     home2third: 11.9,
-    perZ3: 0.35,
+    perZ3: 0.28,
     sigma: 0.55,
     transfer: 1.1,
     armSpeed: 115,
