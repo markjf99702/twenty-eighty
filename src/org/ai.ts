@@ -14,7 +14,9 @@ import {
   canOption,
   designateForAssignment,
   FORTY_MAN_LIMIT,
+  ilDaysServed,
   logTransaction,
+  MIN_IL_DAYS,
   optionPlayer,
   pitcherLimit,
   placeOnIl,
@@ -89,7 +91,8 @@ function catchersActive(ctx: RosterContext, team: Team): number {
 /** Best call-up candidate of a type from the upper minors. */
 function bestCandidate(ctx: RosterContext, team: Team, wantPitcher: boolean, opts: AiOptions, preferPos?: FieldPosition): Player | undefined {
   const pool = [...players(ctx, team.rosters.AAA), ...players(ctx, team.rosters.AA)].filter(
-    (p) => isPitcher(p) === wantPitcher && healthy(p) && p.optionedDay !== ctx.day && canCallUp(ctx, team, p, true).ok,
+    // callUpBest makes room on the 40-man if the choice needs it.
+    (p) => isPitcher(p) === wantPitcher && healthy(p) && p.optionedDay !== ctx.day && canCallUp(ctx, team, p, true, true).ok,
   );
   if (pool.length === 0) return undefined;
   const score = (p: Player) =>
@@ -135,6 +138,8 @@ function handleActivations(ctx: RosterContext, team: Team, opts: AiOptions): voi
       activateFromIl(ctx, team, p, "MLB");
       continue;
     }
+    // A minimum stay not yet served: nothing to clear space for yet.
+    if (ilDaysServed(ctx, p) < MIN_IL_DAYS[p.il!]) continue;
     // A pitcher can't come back while the staff is at the pitcher limit, even with an open spot.
     if (p.pitching && team.rosters.MLB.length < activeLimit(ctx) && activePitchers(ctx.league, team) >= pitcherLimit(ctx)) {
       const hitter = players(ctx, team.rosters.MLB).find((x) => !x.pitching && canOption(ctx, team, x).ok);

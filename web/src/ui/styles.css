@@ -1067,3 +1067,82 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 @media (max-width: 560px) { .tier-pick { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
 .miss-bar { display: block; height: 8px; border-radius: 2px; background: var(--g40); min-width: 4px; }
+
+/* ------------------------------------------------------------------ owner and finances */
+
+.meter-wrap { display: grid; gap: 4px; }
+.meter-head { display: flex; align-items: baseline; gap: 10px; }
+.meter-v { font-family: var(--display); font-weight: 700; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.meter-mood { font-family: var(--display); font-weight: 600; font-size: 15px; letter-spacing: 0.08em; text-transform: uppercase; }
+.meter-mood.ok { color: var(--accent-text); }
+.meter-mood.warn { color: var(--warn); }
+.meter-mood.bad { color: var(--alert); }
+.meter { position: relative; height: 12px; background: var(--surface-2); border-radius: 3px; }
+.meter .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 3px; background: var(--accent); }
+.meter .fill.warn { background: var(--warn); }
+.meter .fill.bad { background: var(--alert); }
+.meter i { position: absolute; top: -4px; bottom: -4px; width: 2px; background: var(--ink); }
+.meter-scale { position: relative; display: flex; justify-content: space-between; font-size: 11.5px; color: var(--ink-3); height: 16px; }
+.meter-scale span:nth-child(2) { position: absolute; transform: translateX(-50%); white-space: nowrap; }
+
+.goals { display: grid; gap: 8px; }
+.goal { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-bottom: 1px solid var(--line); }
+.goal:last-child { border-bottom: 0; }
+.goal-label { font-weight: 600; }
+.goal-status {
+  flex: none;
+  font-family: var(--display);
+  font-weight: 600;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 1px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--line-strong);
+  color: var(--ink-2);
+  white-space: nowrap;
+}
+.goal-status.met, .goal-status.on-track { background: var(--accent-soft); border-color: var(--accent); color: var(--accent-text); }
+.goal-status.behind { background: var(--warn-soft); border-color: var(--warn); color: var(--warn); }
+.goal-status.missed { background: var(--alert-soft); border-color: var(--alert); color: var(--alert); }
+
+.letters { display: grid; gap: 10px; }
+.letter { border-left: 3px solid var(--line-strong); padding: 2px 0 2px 12px; max-width: 70ch; }
+.letter.tone-good { border-left-color: var(--accent); }
+.letter.tone-bad { border-left-color: var(--alert); }
+.review { display: grid; gap: 4px; margin-bottom: 12px; }
+.review-head { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
+
+.offers { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.offer {
+  display: grid;
+  gap: 6px;
+  align-content: start;
+  padding: 12px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.offer-name { font-family: var(--display); font-weight: 700; font-size: 20px; line-height: 1.05; }
+.offer .btn { justify-self: start; }
+
+.price-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 20px; }
+.price-input { display: flex; align-items: center; gap: 10px; flex: 1 1 280px; }
+.price-input .k { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); white-space: nowrap; }
+.price-input input { flex: 1; min-width: 0; accent-color: var(--accent); }
+.price-input .v { font-family: var(--display); font-weight: 700; font-size: 26px; line-height: 1; min-width: 3ch; font-variant-numeric: tabular-nums; }
+.price-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.price-chart { width: 100%; height: auto; max-width: 760px; display: block; }
+.price-chart text { fill: var(--ink-3); font-size: 11px; font-family: var(--ui); }
+.price-chart .grid { stroke: var(--line); stroke-width: 1; }
+.price-chart .curve { fill: none; stroke: var(--accent); stroke-width: 2.5; }
+.price-chart .now { stroke: var(--ink); stroke-width: 2; }
+.price-chart .best { stroke: var(--ink-3); stroke-width: 1.5; stroke-dasharray: 4 3; }
+.price-chart .gouge { fill: var(--warn-soft); }
+.swatch { display: inline-block; width: 14px; height: 10px; border-radius: 2px; vertical-align: 0; margin: 0 3px 0 8px; }
+.swatch.now { background: var(--ink); height: 3px; vertical-align: 3px; }
+.swatch.best { border-top: 2px dashed var(--ink-3); height: 0; vertical-align: 3px; }
+.swatch.gouge { background: var(--warn-soft); border: 1px solid var(--warn); }
+.ledger { gap: 14px 22px; }
+.tbl tr.total td { font-weight: 700; border-top: 2px solid var(--line-strong); }
+.profit-line { font-size: 15px; }

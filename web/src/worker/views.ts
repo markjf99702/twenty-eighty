@@ -21,6 +21,7 @@ import {
   type RosterContext,
   rosterProblems,
 } from "../../../src/org/roster";
+import { mood } from "../../../src/finance/owner";
 import { committed, payroll } from "../../../src/org/contracts";
 import { surplusValue } from "../../../src/org/trades";
 import { overallGrade } from "../../../src/org/value";
@@ -144,6 +145,7 @@ export function status(league: League | null, season: Season | null, hasSave: bo
     divisions: league.structure.divisions,
     teams: league.teams.map(teamRef),
     record: rec ? { w: rec.w, l: rec.l } : null,
+    owner: league.gm ? { confidence: league.gm.confidence, mood: mood(league.gm.confidence), fired: league.gm.fired } : null,
   };
 }
 

@@ -1,4 +1,6 @@
 import { clamp } from "../core/math";
+import { closeBooks, priceTickets } from "../finance/finance";
+import { acceptJob, reviewSeason, setGoals } from "../finance/owner";
 import { Rng } from "../core/rng";
 import { WINTER_TARGETS, recenterGrades } from "../league/generate";
 import type { League, Team } from "../league/types";
@@ -191,6 +193,9 @@ export function beginOffseason(league: League, season: Season): OffseasonState {
   clearAmateurLooks(league);
   recordCareers(league, season);
   recordHistory(league, season, seasonAwards(league, season));
+  // The owner reviews the season, then the books close and next year's budgets are set.
+  reviewSeason(league, season);
+  closeBooks(league, season);
   reinstateInjured(league);
 
   // Development and aging for everyone still in the game.
@@ -271,6 +276,7 @@ function startSeason(league: League, minors: boolean): Season {
   league.year += 1;
   league.offseason = null;
   for (const p of league.players) p.optionedDay = null;
+  priceTickets(league);
   return new Season(league, { minors });
 }
 
@@ -284,6 +290,8 @@ export function advanceOffseason(league: League, season: Season): Season | null 
   const waivers = waiverOrder(league, season);
   switch (s.phase) {
     case "review":
+      // A fired GM has to pick a new club first (the CLI and tests take the first offer).
+      if (league.gm?.fired) acceptJob(league, league.gm.offers[0]!);
       s.phase = "tenders";
       return null;
     case "tenders":
@@ -307,6 +315,7 @@ export function advanceOffseason(league: League, season: Season): Season | null 
     case "international":
       finishInternational(league, s.international!, WINTER_DAYS.international, null);
       springTraining(winterContext(league, "spring"), waivers);
+      setGoals(league, WINTER_DAYS.spring);
       s.phase = "spring";
       return null;
     case "spring":

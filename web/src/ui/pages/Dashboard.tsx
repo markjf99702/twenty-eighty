@@ -5,6 +5,53 @@ import { Grade } from "../components/Grade";
 import { StatusBadges } from "../components/PlayerTable";
 import { LEVEL_NAMES, gamesBack, ordinal, signed, streak } from "../format";
 import { href, playerHref, teamHref } from "../router";
+import { ConfidenceMeter, GoalList } from "./Owner";
+
+const $m = (x: number) => `${x < 0 ? "-" : ""}$${Math.abs(x).toFixed(1)}M`;
+
+/** The owner's mood and goals beside the club's books. */
+function Boardroom() {
+  const owner = useApi("owner", undefined);
+  const money = useApi("finances", {});
+  const o = owner.data;
+  const f = money.data;
+  if (!o || !f) return null;
+  const l = f.current;
+  return (
+    <div class="grid-2">
+      <Section title={`The owner · ${o.owner.name}`} aside={<a href={href({ page: "owner" })}>Owner's office</a>}>
+        <ConfidenceMeter value={o.confidence} mood={o.mood} />
+        <GoalList goals={o.goals} />
+      </Section>
+      <Section title={`Business · ${l.year}`} aside={<a href={href({ page: "finances", teamId: null })}>Finances</a>}>
+        <div class="read-row">
+          <div>
+            <span class="k">Fans a game</span>
+            <b>{l.perGame ? l.perGame.toLocaleString("en-US") : "—"}</b>
+          </div>
+          <div>
+            <span class="k">Revenue</span>
+            <b>{$m(l.revenue.total)}</b>
+          </div>
+          <div>
+            <span class="k">Profit</span>
+            <b class={l.profit < 0 ? "bad" : ""}>{$m(l.profit)}</b>
+          </div>
+          <div>
+            <span class="k">Tickets</span>
+            <b>${f.ticket.price}</b>
+          </div>
+          <div>
+            <span class="k">Payroll and staff</span>
+            <b class={f.payroll + f.staff > f.budget ? "bad" : ""}>
+              {$m(f.payroll + f.staff)} of ${f.budget}M
+            </b>
+          </div>
+        </div>
+      </Section>
+    </div>
+  );
+}
 
 export function GameList({ games, teamId }: { games: GameItem[]; teamId: number }) {
   if (games.length === 0) return <div class="empty">No games yet. Opening Day is March 26.</div>;
@@ -106,6 +153,11 @@ export function Dashboard({ status }: { status: Status }) {
         </div>
       )}
       {status.phase === "done" && <div class="note">The {status.year} season is in the books. Start the offseason from the scoreboard.</div>}
+      {status.owner?.fired && (
+        <div class="note alert">
+          You've been let go. <a href={href({ page: "owner" })}>See which clubs called</a>.
+        </div>
+      )}
 
       {status.day === 0 && status.phase === "regular" && (
         <div class="note">
@@ -165,6 +217,8 @@ export function Dashboard({ status }: { status: Status }) {
           )}
         </Section>
       </div>
+
+      {status.owner && <Boardroom />}
 
       <div class="grid-2">
         <Section title="Injuries" aside={`${d.injured.length} player${d.injured.length === 1 ? "" : "s"}`}>

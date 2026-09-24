@@ -20,6 +20,7 @@ export function BoxScorePage({ gameKey }: { gameKey: string; status: Status }) {
         <div>
           <div class="eyebrow">
             {b.date} · {b.park}
+            {b.attendance ? ` · ${b.attendance.toLocaleString("en-US")} fans` : ""}
           </div>
           <h1>
             {winner.nickname} {Math.max(b.totals[0].r, b.totals[1].r)}, {loser.nickname} {Math.min(b.totals[0].r, b.totals[1].r)}

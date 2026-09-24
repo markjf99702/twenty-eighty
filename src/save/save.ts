@@ -9,6 +9,7 @@ import type { Defense } from "../sim/battedBall";
 import type { BattedBallCounters, RunningCounters } from "../sim/game";
 import { emptyBatting, emptyFielding, emptyPitching, type LineBook } from "../stats/lines";
 import { RunTracker, type RunTrackerState } from "../stats/runExpectancy";
+import { backfillBooks } from "../finance/finance";
 import { migrateLeague } from "./migrate";
 
 /**
@@ -18,7 +19,7 @@ import { migrateLeague } from "./migrate";
  */
 
 export const SAVE_FORMAT = "twenty-eighty-save";
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 
 interface PackedBook {
   keys: string[];
@@ -169,6 +170,7 @@ export function loadGame(save: SaveGame): { league: League; season: Season | nul
       ls.recentPit.load(st.recent.pit);
     }
   }
+  if (save.version < 4) backfillBooks(season);
   return { league, season };
 }
 

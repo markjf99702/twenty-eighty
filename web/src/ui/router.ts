@@ -20,6 +20,8 @@ export type Route =
   | { page: "trades"; partnerId: number | null }
   | { page: "history" }
   | { page: "scouting" }
+  | { page: "finances"; teamId: number | null }
+  | { page: "owner" }
   | { page: "office" };
 
 export function parse(hash: string): Route {
@@ -53,6 +55,10 @@ export function parse(hash: string): Route {
       return { page: "history" };
     case "scouting":
       return { page: "scouting" };
+    case "finances":
+      return { page: "finances", teamId: n(a) };
+    case "owner":
+      return { page: "owner" };
     default:
       return { page: "home" };
   }
@@ -88,6 +94,10 @@ export function href(r: Route): string {
       return "#history";
     case "scouting":
       return "#scouting";
+    case "finances":
+      return r.teamId === null ? "#finances" : `#finances-${r.teamId}`;
+    case "owner":
+      return "#owner";
   }
 }
 

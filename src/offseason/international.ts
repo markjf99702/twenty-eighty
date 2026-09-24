@@ -1,4 +1,5 @@
 import type { Rng } from "../core/rng";
+import { bookBonus } from "../finance/finance";
 import type { League } from "../league/types";
 import { logTransaction } from "../org/roster";
 import { overallGrade } from "../org/value";
@@ -68,6 +69,7 @@ export function signInternational(league: League, s: InternationalState, teamId:
   const team = league.teams[teamId]!;
   signAmateur(league, team, p!);
   s.signings.push({ playerId: p!.id, teamId, bonus: ask.bonus });
+  bookBonus(league, teamId, ask.bonus);
   const pos = p!.pitching ? (p!.throws === "L" ? "LHP" : "RHP") : p!.position;
   logTransaction(league, day, team, p!, "sign", `Signed international free agent ${pos} ${playerName(p!)} ($${ask.bonus.toFixed(2)}M bonus)`);
   return { ok: true };

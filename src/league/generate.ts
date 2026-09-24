@@ -1,6 +1,9 @@
 import { clampGrade } from "../core/grades";
 import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
+import { createFinance } from "../finance/finance";
+import { createOwner } from "../finance/owner";
+import type { TeamFinance } from "../finance/types";
 import { assignInitialContracts, budgetFor } from "../org/contracts";
 import { autoDepthChart } from "../org/depth";
 import { defaultScouting } from "../scouting/scouting";
@@ -183,7 +186,7 @@ function assignServiceAndOptions(rng: Rng, p: Player, level: Level): void {
   }
 }
 
-function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[], teamSpread: number): Team {
+function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[], teamSpread: number, year: number): Team {
   const org = rng.normal(0, teamSpread);
   const farm = rng.normal(0, teamSpread * 1.2);
 
@@ -217,7 +220,7 @@ function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[],
     }
   }
 
-  return {
+  const team: Team = {
     id,
     city: seed.city,
     nickname: seed.nickname,
@@ -233,7 +236,12 @@ function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[],
     affiliates,
     budget: budgetFor(seed.market),
     deadMoney: [],
+    owner: createOwner(rng.fork("owner")),
+    // Filled in just below: the books depend on the rest of the club.
+    finance: null as unknown as TeamFinance,
   };
+  createFinance(team, rng.fork("finance"), year);
+  return team;
 }
 
 const r1 = (x: number) => Math.round(x * 10) / 10;
@@ -322,10 +330,11 @@ export function recenterGrades(league: League, targets?: typeof WINTER_TARGETS):
 export function generateLeague(opts: GenerateLeagueOptions): League {
   const rng = new Rng(opts.seed);
   const players: Player[] = [];
-  const teams = FRANCHISES.map((f, i) => buildTeam(rng.fork(f.abbrev), i, f, players, opts.teamSpread ?? 0.3));
+  const year = opts.year ?? 2026;
+  const teams = FRANCHISES.map((f, i) => buildTeam(rng.fork(f.abbrev), i, f, players, opts.teamSpread ?? 0.3, year));
   const league: League = {
     seed: opts.seed,
-    year: opts.year ?? 2026,
+    year,
     structure: DEFAULT_STRUCTURE,
     teams,
     players,
@@ -335,6 +344,7 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     freeAgents: [],
     offseason: null,
     scouting: { scouting: [], analytics: [], looks: {}, looksLeft: 0, looksWindow: "" },
+    gm: null,
   };
   recenterGrades(league);
   for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));

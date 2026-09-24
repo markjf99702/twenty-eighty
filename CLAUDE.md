@@ -42,6 +42,16 @@ day-to-day roster moves and depth charts still use true grades (a club knows its
 players well). The UI always shows the user's view. Errors are deterministic hashes, so
 nothing about beliefs is saved except department levels and the user's looks.
 
+Money (src/finance/): each `Team` has an `owner` and `finance` (capacity, ticket price,
+fan interest, cash, the open `ledger` and closed years). `Season.simDay` books each MLB
+home crowd (`crowdFor`, computed before the game from the record going in) and a day's
+share of annual items (`accrueDay`); `runPostseason` books playoff gates; the draft and
+international signings book bonuses. `beginOffseason` runs `reviewSeason` (the owner's
+verdict on the user, from `league.gm`) and then `closeBooks` (cash, the owner's
+distribution, interest, next budgets) before contracts roll. `league.gm` is null unless
+the user runs a club; `hireGm` creates it, spring goals come from `setGoals`, and a
+firing leaves `gm.fired` with `offers` until `acceptJob`.
+
 The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
 owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with
 plain view models built in `web/src/worker/views.ts`. Pages call it through `useApi`
@@ -73,6 +83,9 @@ screen means: a request/response pair in protocol.ts, a handler in the worker, a
   save exactly (the winter-resume test catches it); caches must key on state that changes
   when the answer would (the day stands still all winter; `levelShift` keys on the
   transaction count too).
+- Night-to-night noise that must not disturb the season's `Rng` stream (crowds,
+  forecasters' misses, scouting errors) comes from `hashNormal`/`hashUniform` in
+  src/core/hash.ts, keyed on the seed and the things it depends on.
 
 ## Calibration workflow
 

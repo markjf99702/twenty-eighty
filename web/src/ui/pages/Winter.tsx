@@ -5,7 +5,8 @@ import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeChips } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
 import { fixed, LEVEL_NAMES } from "../format";
-import { playerHref } from "../router";
+import { href, playerHref } from "../router";
+import { ConfidenceMeter, GoalList, JobOffers } from "./Owner";
 
 type WinterAction = "beginOffseason" | "advance" | "winterWeek";
 
@@ -20,7 +21,37 @@ const STEPS: { phase: OffseasonPhase; label: string; date: string }[] = [
 
 const $ = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
 
-export function Winter({ status, onWinter }: { status: Status; onWinter: (kind: WinterAction) => void }) {
+/** The owner's verdict on the season (or, after a firing, the clubs that called) and next season's goals. */
+function OwnerDesk({ phase, onStatus }: { phase: OffseasonPhase; onStatus: (s: Status) => void }) {
+  const view = useApi("owner", undefined);
+  const o = view.data;
+  if (!o) return null;
+  if (o.fired) return <JobOffers view={o} onStatus={onStatus} />;
+  if (phase === "spring") {
+    return (
+      <Section title={`The owner's goals for ${o.goalYear}`} aside={o.expectedWins !== null ? `Projected ${o.expectedWins} wins` : undefined}>
+        <GoalList goals={o.goals} />
+      </Section>
+    );
+  }
+  const r = o.reviews[0];
+  if (phase !== "review" || !r) return null;
+  return (
+    <Section title="The owner's review" aside={<a href={href({ page: "owner" })}>Details</a>}>
+      <div class="grid-2">
+        <ConfidenceMeter value={o.confidence} mood={o.mood} />
+        <div class="small">
+          <div>
+            {r.goals.filter((g) => g.met).length} of {r.goals.length} goals met; confidence {r.before} → <b>{r.after}</b>.
+          </div>
+          {o.messages[0] && <div class="dim">"{o.messages[0].text}"</div>}
+        </div>
+      </div>
+    </Section>
+  );
+}
+
+export function Winter({ status, onWinter, onStatus }: { status: Status; onWinter: (kind: WinterAction) => void; onStatus: (s: Status) => void }) {
   const view = useApi("offseason", undefined);
   if (status.phase !== "offseason") {
     return (
@@ -65,8 +96,9 @@ export function Winter({ status, onWinter }: { status: Status; onWinter: (kind: 
         ))}
       </ol>
 
-      {v.phase === "review" && <Review v={v} />}
-      {(v.phase === "review" || v.phase === "tenders") && <Tenders v={v} />}
+      {status.owner && <OwnerDesk phase={v.phase} onStatus={onStatus} />}
+      {v.phase === "review" && !status.owner?.fired && <Review v={v} />}
+      {(v.phase === "review" || v.phase === "tenders") && !status.owner?.fired && <Tenders v={v} />}
       {v.phase === "draft" && <Draft v={v} />}
       {v.phase === "freeAgency" && <FreeAgency v={v} onWinter={onWinter} />}
       {v.phase === "international" && <International v={v} />}
@@ -74,7 +106,7 @@ export function Winter({ status, onWinter }: { status: Status; onWinter: (kind: 
 
       <div class="start-bar">
         <span class="dim">{NEXT[v.phase]}</span>
-        <button type="button" class="btn primary" onClick={() => onWinter("advance")}>
+        <button type="button" class="btn primary" disabled={status.owner?.fired} onClick={() => onWinter("advance")}>
           {status.winter?.action}
         </button>
       </div>

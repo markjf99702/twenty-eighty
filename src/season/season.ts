@@ -1,4 +1,6 @@
 import { Rng } from "../core/rng";
+import { accrueDay, bookGate, crowdFor } from "../finance/finance";
+import { ownerCheckIn } from "../finance/owner";
 import { NEUTRAL_PARK } from "../league/parks";
 import type { DepthChart, League, Team } from "../league/types";
 import { manageOrganization, type PerformanceLookup } from "../org/ai";
@@ -55,6 +57,8 @@ export interface GameSummary {
   winningPitcher: number | null;
   losingPitcher: number | null;
   savePitcher: number | null;
+  /** Paid attendance (major league games). */
+  attendance?: number;
 }
 
 export interface TeamRecord {
@@ -615,15 +619,23 @@ export class Season {
         const rng = this.rng.fork(`g${day}:${level}:${g.home}`);
         const away = this.team(g.away);
         const home = this.team(g.home);
+        // The crowd comes out on the club's record going into the game.
+        const fans = level === "MLB" ? crowdFor(this, home.id, day) : 0;
         const result = simulateGame(ls.env, this.gameSetup(away, rng, day, level), this.gameSetup(home, rng, day, level), rng, day);
         this.staff.record(result.pitchCounts, day);
         this.applyInjuries(result, level);
         const summary = ls.absorb(result, day);
         this.onGame?.(level, result, day);
-        if (level === "MLB") out.push(summary);
+        if (level === "MLB") {
+          bookGate(home, fans);
+          summary.attendance = fans;
+          out.push(summary);
+        }
       }
     }
     this.accrueService();
+    accrueDay(this);
+    ownerCheckIn(this);
     this.day++;
     return out;
   }

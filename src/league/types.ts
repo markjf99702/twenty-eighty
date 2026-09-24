@@ -1,3 +1,4 @@
+import type { GmState, Owner, TeamFinance } from "../finance/types";
 import type { OffseasonState } from "../offseason/types";
 import type { ScoutingState } from "../scouting/types";
 import type { FieldPosition, Level, MinorLevel, Player } from "../players/types";
@@ -38,7 +39,7 @@ export interface Team {
   league: number;
   division: number;
   park: Park;
-  /** Metro population in millions; drives revenue once finances exist. */
+  /** Metro population in millions; drives revenue. */
   market: number;
   /** Players assigned to each level. MLB is the 26-man active roster (injured-list players excluded). */
   rosters: Record<Level, number[]>;
@@ -53,10 +54,12 @@ export interface Team {
   /** The user makes this club's roster moves; the AI stays out. */
   manualRoster?: boolean;
   affiliates: Record<MinorLevel, Affiliate>;
-  /** Payroll budget in millions of dollars, set by the market. */
+  /** Baseball budget in millions of dollars (payroll, dead money and front-office departments), set by the owner each winter. */
   budget: number;
   /** Money still owed to released players: this season's amount and seasons left. */
   deadMoney: { playerId: number; amount: number; years: number }[];
+  owner: Owner;
+  finance: TeamFinance;
 }
 
 export interface LeagueStructure {
@@ -116,6 +119,8 @@ export interface League {
   offseason: OffseasonState | null;
   /** Front-office departments: how well each club sees players. */
   scouting: ScoutingState;
+  /** The user's job: the owner's goals and confidence (null when no club is the user's). */
+  gm: GmState | null;
 }
 
 export interface Award {

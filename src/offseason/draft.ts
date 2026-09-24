@@ -1,4 +1,5 @@
 import type { Rng } from "../core/rng";
+import { bookBonus, slotBonus } from "../finance/finance";
 import { rawness } from "../league/generate";
 import type { League, Team } from "../league/types";
 import { minorContract } from "../org/contracts";
@@ -123,10 +124,19 @@ export function makePick(league: League, d: DraftState, teamId: number, poolId: 
   const pickInRound = ((clock.pick - 1) % d.order.length) + 1;
   signAmateur(league, team, p!);
   p!.draft = { year: league.year, round, pick: clock.pick, teamId };
-  d.picks.push({ round, pick: clock.pick, teamId, playerId: p!.id });
+  const bonus = slotBonus(clock.pick);
+  bookBonus(league, teamId, bonus);
+  d.picks.push({ round, pick: clock.pick, teamId, playerId: p!.id, bonus });
   const hand = p!.pitching ? (p!.throws === "L" ? "LHP" : "RHP") : p!.position;
   const school = p!.age >= 21 ? "college" : "high school";
-  logTransaction(league, day, team, p!, "draft", `Drafted ${hand} ${playerName(p!)} (${school}) in round ${round}, pick ${pickInRound} (#${clock.pick} overall)`);
+  logTransaction(
+    league,
+    day,
+    team,
+    p!,
+    "draft",
+    `Drafted ${hand} ${playerName(p!)} (${school}) in round ${round}, pick ${pickInRound} (#${clock.pick} overall; $${bonus.toFixed(2)}M bonus)`,
+  );
   return p!;
 }
 

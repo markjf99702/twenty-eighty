@@ -37,6 +37,8 @@ export interface DraftPick {
   pick: number;
   teamId: number;
   playerId: number;
+  /** Signing bonus, $M (slot value for the pick). */
+  bonus?: number;
 }
 
 export interface DraftState {

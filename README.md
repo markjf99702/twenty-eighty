@@ -13,13 +13,13 @@ Two things are different from the late-90s version:
   them (wOBA weights, FIP constant, runs per win, park factors) are re-derived every
   season from the simulated league's own run environment.
 
-> Status: **phases 1-5 and the first half of phase 6 are done**: the engine, player
-> generation, full organizations with four minor league affiliates, roster rules,
-> injuries, in-game substitutions, AI front offices, postseason, advanced stats,
-> calibration, a browser UI, the offseason (development and aging, contracts and payroll,
-> the draft, free agency, international signings and trades), and scouting uncertainty
-> with scouting and analytics departments. Seasons roll on indefinitely. Finances and
-> owner goals are next.
+> Status: **phases 1-6 are done**: the engine, player generation, full organizations
+> with four minor league affiliates, roster rules, injuries, in-game substitutions, AI
+> front offices, postseason, advanced stats, calibration, a browser UI, the offseason
+> (development and aging, contracts and payroll, the draft, free agency, international
+> signings and trades), scouting uncertainty with scouting and analytics departments,
+> and club finances with owners who set goals and can fire you. Seasons roll on
+> indefinitely.
 
 ## Quick start
 
@@ -75,6 +75,13 @@ that any web server can host. Pick a seed and a club, and you're the GM:
   both sides and the other club tells you whether it would say yes (and roughly how much
   more it wants if not). **Payroll** shows every contract, your budget and future
   commitments; **History** keeps champions and award winners.
+- **Finances**: this season's books (gate, concessions, media, sponsorship, national
+  money, postseason gates; payroll, dead money, departments, operations, bonuses),
+  ticket pricing with a projection of crowds and gate at every price, fan interest,
+  year-by-year history and a league-wide table.
+- **The owner**: goals for the season with live progress, the owner's confidence in
+  you, letters from the owner's office and each winter's review. Get fired and three
+  clubs call.
 
 The game autosaves to the browser (IndexedDB) after every sim and roster move, and a save
 can be exported to a file and imported again from the League office page. Saves resume
@@ -216,6 +223,47 @@ The simulation itself always runs on the true grades.
 Department costs come out of the same budget as payroll, and budgets are set in the
 winter (or before your first Opening Day).
 
+## Finances and owners
+
+Every club keeps books (all money in millions):
+
+- **The gate**: every home game draws a crowd from the size of the market, fan
+  interest, how the club is playing (its record, regressed toward .500 early on), the
+  night of the week and the month, and the ticket price, capped by the ballpark
+  (36,000-47,000 seats). Home openers and postseason games sell out; postseason tickets
+  go for 2.2 times the usual price. Each fan also spends $22 on concessions and parking.
+- **Media and sponsorship** scale with the market and, a little, with interest; the
+  **national contracts** pay every club $130M.
+- **Expenses**: payroll and dead money (paid through the season), the scouting and
+  analytics departments, operations (the farm system, the ballpark, travel: about
+  $150-190M, more in bigger markets), and draft and international signing bonuses (a first overall pick gets
+  about $10M; late picks $150K).
+
+Big markets take in about twice what small ones do ($260M against $500M a season).
+Ticket prices trade crowds for dollars: the business office charges the going rate for
+the market when the park has room, a bit more when it sells out, and never more than
+10% over. Charge more than that and fans notice. **Fan interest** (1.00 is typical)
+moves each winter with the season: winning, the postseason and full houses build it;
+losing and gouging wear it down.
+
+Each winter the owner sets next season's **budget** (payroll, dead money and the
+departments): a share of what the club expects to take in after operations and
+bonuses, eased in from this year's. How big a share depends on the owner: **win now**
+(spends it all), **balanced**, **patient builder** and **frugal**. Profit builds a cash
+reserve; the owner takes anything above $100M, and a club deep in the red gets its
+budget cut. Nothing stops you from spending past the budget in free agency, but the
+owner notices.
+
+Your owner sets two or three **goals** each spring, measured against a preseason
+projection of your club so a rebuilding team isn't asked for a pennant: win so many
+games, reach the postseason, turn a profit, draw so many fans, give young players
+regular big-league work, or stay within budget, depending on the owner's style. After
+the World Series the owner reviews the season (the goals, wins against the projection,
+the postseason, spending and big losses) and moves their **confidence** in you
+(0-100, starting at 60; high confidence loosens the budget a little, low tightens it).
+Fall below 20 and you're fired (a first-year GM gets more rope). Three clubs with
+openings will call, and you pick up the winter with the new one.
+
 ## How a game is simulated
 
 Every pitch is simulated:
@@ -288,6 +336,7 @@ src/
   league/       fictional 30-team universe, parks, organization generation and re-centering
   org/          roster rules, AI front office, depth charts, valuation, contracts, trades
   scouting/     each club's view of players: scouting error, analytics reads, beliefs
+  finance/      club books, attendance and ticket prices, owners, goals and the GM's job
   sim/          the engine: pitch model, batted-ball physics, game state machine, substitutions
   season/       schedule, multi-level season runner, standings, pitcher workload, postseason
   stats/        stat lines, run expectancy / linear weights, advanced stats and WAR
@@ -313,9 +362,9 @@ contact, running) or at the top of `src/sim/battedBall.ts` (fielding and physics
 5. ~~Offseason loop: aging and development toward future grades, contracts (pre-arb,
    arbitration, free agency), the draft, international signings, AI trades valued by
    surplus WAR~~
-6. The GM's-eye view: ~~noisy scouting reports whose accuracy depends on your scouting
-   staff, an analytics department~~, finances and owner goals (attendance, ticket
-   prices, revenue-driven budgets)
+6. ~~The GM's-eye view: noisy scouting reports whose accuracy depends on your scouting
+   staff, an analytics department, finances and owner goals (attendance, ticket
+   prices, revenue-driven budgets)~~
 
 ## A note on the universe
 

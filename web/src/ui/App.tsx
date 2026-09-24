@@ -15,6 +15,8 @@ import { StatsPage } from "./pages/Stats";
 import { TeamPage } from "./pages/Team";
 import { History } from "./pages/History";
 import { Scouting } from "./pages/Scouting";
+import { Finances } from "./pages/Finances";
+import { Owner } from "./pages/Owner";
 import { Trades } from "./pages/Trades";
 import { Transactions } from "./pages/Transactions";
 import { Winter } from "./pages/Winter";
@@ -174,13 +176,17 @@ function Page({
     case "office":
       return <Office status={status} onStatus={onStatus} />;
     case "winter":
-      return <Winter status={status} onWinter={onWinter} />;
+      return <Winter status={status} onWinter={onWinter} onStatus={onStatus} />;
     case "trades":
       return <Trades partnerId={route.partnerId} status={status} />;
     case "history":
       return <History status={status} />;
     case "scouting":
       return <Scouting status={status} />;
+    case "finances":
+      return <Finances teamId={route.teamId} status={status} />;
+    case "owner":
+      return <Owner onStatus={onStatus} />;
   }
 }
 
@@ -292,9 +298,15 @@ function Board({
                   Next week
                 </button>
               )}
-              <button type="button" class="btn primary" onClick={() => onWinter?.("advance")}>
-                {game.winter.action}
-              </button>
+              {game.owner?.fired ? (
+                <a class="btn primary" href="#owner">
+                  Find a new job
+                </a>
+              ) : (
+                <button type="button" class="btn primary" onClick={() => onWinter?.("advance")}>
+                  {game.winter.action}
+                </button>
+              )}
             </>
           ) : null}
         </div>
@@ -323,6 +335,17 @@ function Rail({ status, route }: { status: Status; route: Route }) {
       ? [
           { to: { page: "trades", partnerId: null } as Route, label: "Trades", on: route.page === "trades" },
           { to: { page: "scouting" } as Route, label: "Scouting", on: route.page === "scouting" },
+          { to: { page: "finances", teamId: null } as Route, label: "Finances", on: route.page === "finances" },
+        ]
+      : []),
+    ...(status.owner
+      ? [
+          {
+            to: { page: "owner" } as Route,
+            label: "Owner",
+            on: route.page === "owner",
+            tag: status.owner.fired ? "Fired" : String(status.owner.confidence),
+          },
         ]
       : []),
     { to: { page: "history" }, label: "History", on: route.page === "history" },

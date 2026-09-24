@@ -152,13 +152,14 @@ export function addToFortyMan(ctx: RosterContext, team: Team, p: Player, log = t
 // ---------------------------------------------------------------------------
 // Call-ups and options
 
-export function canCallUp(ctx: RosterContext, team: Team, p: Player, replacingInjury = false): RosterResult {
+/** `roomComing`: the caller will open a 40-man spot first if the player needs one. */
+export function canCallUp(ctx: RosterContext, team: Team, p: Player, replacingInjury = false, roomComing = false): RosterResult {
   if (p.teamId !== team.id) return fail(`${playerName(p)} isn't in the organization.`);
   if (p.level === "MLB") return fail(`${playerName(p)} is already in the majors.`);
   if (p.injury && p.injury.daysLeft > 0) return fail(`${playerName(p)} is injured.`);
   if (team.rosters.MLB.length >= activeLimit(ctx)) return fail(`The active roster is full (${activeLimit(ctx)}).`);
   if (p.pitching && activePitchers(ctx.league, team) >= pitcherLimit(ctx)) return fail(`Already carrying ${pitcherLimit(ctx)} pitchers.`);
-  if (!p.onFortyMan && team.fortyMan.length >= FORTY_MAN_LIMIT) return fail("He isn't on the 40-man roster and it's full.");
+  if (!p.onFortyMan && !roomComing && team.fortyMan.length >= FORTY_MAN_LIMIT) return fail("He isn't on the 40-man roster and it's full.");
   if (p.optionedDay !== null && !replacingInjury) {
     const minDays = p.pitching ? MIN_OPTION_DAYS.pitcher : MIN_OPTION_DAYS.hitter;
     const waited = ctx.day - p.optionedDay;

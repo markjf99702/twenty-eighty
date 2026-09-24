@@ -1,3 +1,4 @@
+import { hashNormal, seedHash } from "../core/hash";
 import { clamp } from "../core/math";
 import type { Rng } from "../core/rng";
 import type { League, Team } from "../league/types";
@@ -95,38 +96,6 @@ export const staffCost = (league: League, team: Team) =>
   SCOUTING_TIERS[league.scouting.scouting[team.id]! - 1]!.cost + ANALYTICS_TIERS[league.scouting.analytics[team.id]! - 1]!.cost;
 
 // ---------------------------------------------------------------------------
-// Deterministic noise
-
-function mix(...xs: number[]): number {
-  let h = 0x9e3779b9;
-  for (const x of xs) {
-    h = Math.imul(h ^ (x | 0), 0x85ebca6b);
-    h ^= h >>> 13;
-    h = Math.imul(h, 0xc2b2ae35);
-    h ^= h >>> 16;
-  }
-  return h >>> 0;
-}
-
-const seedCache = new Map<string, number>();
-function seedOf(league: League): number {
-  let s = seedCache.get(league.seed);
-  if (s === undefined) {
-    s = 0;
-    for (let i = 0; i < league.seed.length; i++) s = Math.imul(s ^ league.seed.charCodeAt(i), 16777619) >>> 0;
-    seedCache.set(league.seed, s);
-  }
-  return s;
-}
-
-/** A standard normal draw fixed by its inputs. */
-function hashNormal(...xs: number[]): number {
-  const u1 = (mix(...xs, 1) + 1) / 4294967297;
-  const u2 = mix(...xs, 2) / 4294967296;
-  return Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2);
-}
-
-// ---------------------------------------------------------------------------
 // Errors
 
 /**
@@ -169,7 +138,7 @@ type ToolKey = keyof typeof TOOL_DIFFICULTY;
 
 /** Present and future errors (grade points) for one tool. `slot` distinguishes pitches. */
 function toolError(league: League, viewer: Viewer, p: Player, key: ToolKey, slot: number, sigma: number) {
-  const seed = seedOf(league);
+  const seed = seedHash(league.seed);
   const who = viewer === null ? 97 : viewer;
   const pid = scoutKey(league, p);
   const keyId = Object.keys(TOOL_DIFFICULTY).indexOf(key) * 16 + slot;

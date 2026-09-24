@@ -38,6 +38,8 @@ export interface Status {
   divisions?: string[];
   teams?: TeamRef[];
   record?: { w: number; l: number } | null;
+  /** The owner's view of the user, when the user runs a club. */
+  owner?: { confidence: number; mood: string; fired: boolean } | null;
 }
 
 export interface NewGameTeam extends TeamRef {
@@ -363,6 +365,7 @@ export interface BoxScoreView {
   batting: [BoxBatter[], BoxBatter[]];
   pitching: [BoxPitcher[], BoxPitcher[]];
   notes: string[];
+  attendance?: number;
 }
 
 export interface DashboardView {
@@ -470,6 +473,117 @@ export interface HistoryView {
   }[];
 }
 
+// ---------------------------------------------------------------------------
+// The business side
+
+export interface LedgerView {
+  year: number;
+  revenue: { gate: number; concessions: number; media: number; sponsorship: number; national: number; postseason: number; total: number };
+  expenses: { payroll: number; deadMoney: number; staff: number; operations: number; bonuses: number; total: number };
+  profit: number;
+  homeGames: number;
+  attendance: number;
+  perGame: number;
+}
+
+export interface FinanceYearView extends LedgerView {
+  wins: number;
+  losses: number;
+  budget: number;
+  interest: number;
+  distribution: number;
+  cash: number;
+}
+
+export interface OwnerCard {
+  name: string;
+  style: string;
+  styleLabel: string;
+  pitch: string;
+}
+
+export interface FinanceView {
+  team: TeamRef;
+  mine: boolean;
+  owner: OwnerCard;
+  market: number;
+  capacity: number;
+  interest: number;
+  cash: number;
+  budget: number;
+  /** Current annual commitments. */
+  payroll: number;
+  staff: number;
+  /** "This season so far", or next season's books during the winter. */
+  current: LedgerView;
+  /** Fraction of the regular season played (0 in the winter). */
+  played: number;
+  /** A full season's revenue at today's interest and price (no postseason). */
+  projectedRevenue: number;
+  operations: number;
+  ticket: {
+    price: number;
+    auto: boolean;
+    reference: number;
+    /** What the business office would charge. */
+    best: number;
+    /** Above this price, fans start to resent it. */
+    gouge: number;
+    /** Expected fans per game and a full season's gate plus concessions at each price. */
+    curve: { price: number; perGame: number; money: number }[];
+    editable: boolean;
+  };
+  history: FinanceYearView[];
+  league: {
+    team: TeamRef;
+    market: number;
+    perGame: number;
+    revenue: number;
+    payroll: number;
+    budget: number;
+    interest: number;
+    mine: boolean;
+  }[];
+}
+
+export type GoalStatus = "met" | "missed" | "on track" | "behind" | "not started";
+
+export interface GoalView {
+  kind: string;
+  label: string;
+  weight: number;
+  status: GoalStatus;
+  /** "84 wins (pace 91)", "1.62M so far". */
+  progress: string;
+}
+
+export interface ReviewView {
+  year: number;
+  wins: number;
+  expectedWins: number | null;
+  goals: { label: string; met: boolean; delta: number; actual: string }[];
+  notes: { text: string; delta: number }[];
+  before: number;
+  after: number;
+}
+
+export interface OwnerView {
+  team: TeamRef;
+  owner: OwnerCard;
+  patience: string;
+  confidence: number;
+  mood: string;
+  hired: number;
+  seasons: number;
+  expectedWins: number | null;
+  goalYear: number;
+  goals: GoalView[];
+  messages: { date: string; tone: "good" | "bad" | "neutral"; text: string }[];
+  reviews: ReviewView[];
+  fired: boolean;
+  offers: { team: TeamRef; record: string; market: number; budget: number; owner: OwnerCard; farm: number }[];
+}
+
 /** Request -> response map. */
 export interface Api {
   status: { req: void; res: Status };
@@ -511,6 +625,10 @@ export interface Api {
   scouting: { req: void; res: ScoutingView };
   setDepartments: { req: { scouting: number; analytics: number }; res: { ok: boolean; reason?: string } };
   scoutPlayer: { req: { playerId: number }; res: { ok: boolean; reason?: string } };
+  finances: { req: { teamId?: number }; res: FinanceView };
+  setTicketPrice: { req: { price: number | "auto" }; res: { ok: boolean; reason?: string } };
+  owner: { req: void; res: OwnerView | null };
+  acceptJob: { req: { teamId: number }; res: Status };
 }
 
 export type ApiName = keyof Api;

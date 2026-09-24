@@ -1,4 +1,5 @@
 import { Rng } from "../core/rng";
+import { bookPostseason } from "../finance/finance";
 import { simulateGame } from "../sim/game";
 import type { GameSummary, Season, TeamRecord } from "./season";
 
@@ -115,5 +116,6 @@ export function runPostseason(season: Season): PostseasonResult {
   const ws = playSeries(season, "World Series", null, h, l, 7, lastDay(...series) + 2);
   series.push(ws);
   season.postseason = { seeds, series, champion: ws.winner };
+  bookPostseason(season);
   return season.postseason;
 }

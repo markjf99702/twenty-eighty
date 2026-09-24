@@ -51,6 +51,12 @@ export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: L
     return best;
   };
 
+  // With nobody left on the bench, a hole goes to the last man in the bullpen.
+  const emergency = (): number => {
+    const arm = [...depth.bullpen].reverse().find((id) => !used.has(id) && !out(id)) ?? depth.bullpen.find((id) => !used.has(id));
+    return arm ?? -1;
+  };
+
   for (const pos of FIELD_POSITIONS) {
     let id = depth.starters[pos];
     // (A player listed at two spots plays the first; the second goes to the bench.)
@@ -59,6 +65,7 @@ export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: L
       const sub = takeBench((b) => defenseGrade(players[b]!, pos) + 3 * hitterQuality(players[b]!));
       if (sub !== undefined) id = sub;
     }
+    if (id < 0 || used.has(id)) id = emergency();
     used.add(id);
     slots.push({ id, pos });
   }
@@ -67,6 +74,7 @@ export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: L
     const sub = takeBench((b) => hitterQuality(players[b]!));
     if (sub !== undefined) dh = sub;
   }
+  if (dh < 0 || used.has(dh)) dh = emergency();
   used.add(dh);
   slots.push({ id: dh, pos: "DH" });
 

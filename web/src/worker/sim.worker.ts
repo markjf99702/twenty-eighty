@@ -3,6 +3,8 @@
  * (see api/protocol.ts); this worker owns the League and Season, answers with
  * view models, and autosaves to IndexedDB.
  */
+import { bestTicketPrice } from "../../../src/finance/finance";
+import { acceptJob, hireGm } from "../../../src/finance/owner";
 import { generateLeague } from "../../../src/league/generate";
 import type { DepthChart, League, Team } from "../../../src/league/types";
 import {
@@ -51,6 +53,7 @@ import type {
   StatsView,
 } from "../api/protocol";
 import { clearSave, hasSave, readSave, writeSave } from "./storage";
+import { financeView, ownerView } from "./business";
 import { historyView, offseasonView, tradeSide } from "./winter";
 import {
   boxScoreView,
@@ -261,7 +264,7 @@ const handlers: Handlers = {
   async newGame({ seed, teamId, minors }) {
     const l = leagueFor(seed);
     preview = null;
-    l.userTeamId = teamId;
+    hireGm(l, teamId);
     league = l;
     season = new Season(l, { minors });
     attach(season);
@@ -388,7 +391,11 @@ const handlers: Handlers = {
   },
 
   boxScore({ key }) {
-    return boxes.get(key) ?? null;
+    const box = boxes.get(key);
+    if (!box) return null;
+    const [day, home] = key.split("-").map(Number);
+    const game = requireSeason().games.find((g) => g.day === day && g.homeId === home);
+    return game?.attendance ? { ...box, attendance: game.attendance } : box;
   },
 
   rosterAction(req) {
@@ -440,6 +447,7 @@ const handlers: Handlers = {
   async advance() {
     const s = requireSeason();
     winter();
+    if (s.league.gm?.fired) throw new Error("You need a new job first: pick one of the clubs that called.");
     const next = advanceOffseason(s.league, s);
     if (next) {
       season = next;
@@ -556,6 +564,42 @@ const handlers: Handlers = {
     stats.clear();
     persistSoon();
     return { ok: true };
+  },
+
+  // --- The business side ----------------------------------------------------
+
+  finances({ teamId }) {
+    const s = requireSeason();
+    const id = teamId ?? s.league.userTeamId;
+    if (id === null || id === undefined || !s.league.teams[id]) throw new Error("Pick a club.");
+    return financeView(s, s.team(id));
+  },
+
+  setTicketPrice({ price }) {
+    const team = userTeam();
+    const f = team.finance;
+    if (price === "auto") {
+      f.autoPrice = true;
+      f.ticketPrice = bestTicketPrice(team);
+    } else {
+      if (!Number.isFinite(price) || price < 5 || price > 250) return { ok: false, reason: "Pick a price between $5 and $250." };
+      f.autoPrice = false;
+      f.ticketPrice = Math.round(price);
+    }
+    persistSoon();
+    return { ok: true };
+  },
+
+  owner() {
+    return ownerView(requireSeason());
+  },
+
+  async acceptJob({ teamId }) {
+    const s = requireSeason();
+    acceptJob(s.league, teamId);
+    stats.clear();
+    await persist();
+    return currentStatus();
   },
 
   scoutPlayer({ playerId }) {

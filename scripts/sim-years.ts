@@ -8,8 +8,11 @@
  *   npm run sim:years -- --years 10
  *   npm run sim:years -- --minors           # play the affiliates too
  *   npm run sim:years -- --seed my-universe
+ *   npm run sim:years -- --user 12          # run club 12's owner reviews (the AI still makes the moves)
  */
 import { leagueMetrics } from "../src/calibration/report";
+import { profitOf, revenueOf } from "../src/finance/finance";
+import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { payroll, seasonWar } from "../src/org/contracts";
 import { overallGrade } from "../src/org/value";
@@ -29,6 +32,8 @@ const years = Number(arg("years") ?? 5);
 const minors = args.includes("--minors");
 
 const league = generateLeague({ seed });
+const user = arg("user");
+if (user !== undefined) hireGm(league, Number(user));
 let season = new Season(league, { minors });
 const f = (x: number, d = 1) => x.toFixed(d);
 const mean = (xs: number[]) => (xs.length ? xs.reduce((a, b) => a + b, 0) / xs.length : 0);
@@ -74,6 +79,18 @@ for (let y = 0; y < years; y++) {
   const year = league.year;
 
   const winter = beginOffseason(league, season);
+  const books = league.teams.map((t) => t.finance.history.at(-1)!);
+  const range = (xs: number[], d = 0) => `${f(mean(xs), d)} (${f(Math.min(...xs), d)}-${f(Math.max(...xs), d)})`;
+  const business = [
+    `revenue ${range(books.map(revenueOf))}`,
+    `profit ${range(books.map(profitOf))}`,
+    `att/g ${range(books.map((b) => b.attendance / Math.max(1, b.homeGames) / 1000), 1)}k`,
+    `interest ${range(league.teams.map((t) => t.finance.interest), 2)}`,
+    `next budget ${range(league.teams.map((t) => t.budget))}`,
+    `cash ${range(league.teams.map((t) => t.finance.cash))}`,
+  ];
+  const review = league.gm?.reviews.at(-1);
+  if (review) business.push(`owner ${review.before}->${review.after}${league.gm!.fired ? " FIRED" : ""} (goals ${review.goals.filter((g) => g.met).length}/${review.goals.length})`);
   let next: Season | null = null;
   while (!next) next = advanceOffseason(league, season);
   const retired = league.players.filter((p) => p.retired === year).length;
@@ -141,5 +158,6 @@ for (let y = 0; y < years; y++) {
       `(${((Date.now() - t0) / 1000).toFixed(0)}s)`,
     ].join(" | "),
   );
+  console.log(`    $ ${business.join(" | ")}`);
   season = next;
 }
