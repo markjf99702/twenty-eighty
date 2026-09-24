@@ -36,8 +36,23 @@ export function hitterQuality(p: Player): number {
 }
 
 const BENCH_SLOTS: ReadonlyArray<FieldPosition> = ["C", "SS", "CF", "3B"];
-const ROTATION_TIERS = [0.9, 0.5, 0.15, -0.15, -0.45];
-const BULLPEN_TIERS = [0.75, 0.45, 0.25, 0.05, -0.15, -0.35, -0.55, -0.7];
+
+/**
+ * Talent targets by roster slot. Hitters: runs per 600 PA vs. an all-50 bat
+ * (positions differ because a shortstop's glove buys him a lighter bat).
+ * Pitchers: runs saved per 600 batters faced vs. an all-50 arm.
+ */
+const STARTER_BAT: Record<FieldPosition | "DH", number> = {
+  C: -1, "1B": 11, "2B": 3, "3B": 6, SS: 2, LF: 7, CF: 3, RF: 8, DH: 12,
+};
+const STARTER_BAT_SD = 11;
+const BENCH_BAT: [number, number] = [-18, 7];
+const ROTATION_TIERS = [14, 8, 3, -1, -5];
+const BULLPEN_TIERS = [14, 10, 7, 4, 1, -2, -5, -8];
+const PITCHER_SD = 6;
+/** Runs per 600 of team-wide talent per unit of organizational strength. */
+const ORG_BAT = 8;
+const ORG_ARM = 6;
 
 function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[], teamSpread: number): Team {
   const org = rng.normal(0, teamSpread);
@@ -49,32 +64,55 @@ function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[],
 
   const starters = {} as Record<FieldPosition, number>;
   for (const pos of FIELD_POSITIONS) {
-    starters[pos] = add(
-      generateHitter(rng, { id: nextId(), position: pos, overall: org + rng.normal(0.15, 0.8), age: randomAge(rng) }),
-    );
+    const value = STARTER_BAT[pos] + ORG_BAT * org + rng.normal(0, STARTER_BAT_SD);
+    starters[pos] = add(generateHitter(rng, { id: nextId(), position: pos, value, age: randomAge(rng) }));
   }
-  const dh = add(generateHitter(rng, { id: nextId(), position: "DH", overall: org + rng.normal(0.2, 0.7), age: randomAge(rng, 30) }));
+  const dhValue = STARTER_BAT.DH + ORG_BAT * org + rng.normal(0, STARTER_BAT_SD);
+  const dh = add(generateHitter(rng, { id: nextId(), position: "DH", value: dhValue, age: randomAge(rng, 30) }));
   const bench = BENCH_SLOTS.map((pos) =>
-    add(generateHitter(rng, { id: nextId(), position: pos, overall: org + rng.normal(-0.8, 0.55), age: randomAge(rng, 29.5, 4) })),
+    add(
+      generateHitter(rng, {
+        id: nextId(),
+        position: pos,
+        value: BENCH_BAT[0] + ORG_BAT * org + rng.normal(0, BENCH_BAT[1]),
+        age: randomAge(rng, 29.5, 4),
+      }),
+    ),
   );
 
   const rotation = ROTATION_TIERS.map((tier) =>
-    add(generatePitcher(rng, { id: nextId(), role: "SP", overall: org + tier + rng.normal(0, 0.45), age: randomAge(rng) })),
+    add(
+      generatePitcher(rng, {
+        id: nextId(),
+        role: "SP",
+        value: tier + ORG_ARM * org + rng.normal(0, PITCHER_SD),
+        age: randomAge(rng),
+      }),
+    ),
   );
   const bullpen = BULLPEN_TIERS.map((tier) =>
-    add(generatePitcher(rng, { id: nextId(), role: "RP", overall: org + tier + rng.normal(0, 0.45), age: randomAge(rng, 29, 3.5) })),
+    add(
+      generatePitcher(rng, {
+        id: nextId(),
+        role: "RP",
+        value: tier + ORG_ARM * org + rng.normal(0, PITCHER_SD),
+        age: randomAge(rng, 29, 3.5),
+      }),
+    ),
   );
 
   // Farm system: young players with modest present grades and real projection.
   const reserves: number[] = [];
   for (let i = 0; i < 12; i++) {
     const age = Math.round(clamp(rng.normal(21, 1.8), 18, 25));
-    const overall = rng.normal(-1.6, 0.6);
+    // Young and raw today; the growth in their future grades is the projection.
+    const value = rng.normal(-30 + 2.5 * (age - 21), 10);
     if (i % 2 === 0) {
       const pos = rng.pick(FIELD_POSITIONS);
-      reserves.push(add(generateHitter(rng, { id: nextId(), position: pos, overall, age })));
+      reserves.push(add(generateHitter(rng, { id: nextId(), position: pos, value, age })));
     } else {
-      reserves.push(add(generatePitcher(rng, { id: nextId(), role: rng.chance(0.6) ? "SP" : "RP", overall, age })));
+      const role = rng.chance(0.6) ? "SP" : "RP";
+      reserves.push(add(generatePitcher(rng, { id: nextId(), role, value: value * 0.8, age })));
     }
   }
 

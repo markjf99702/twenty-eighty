@@ -51,7 +51,7 @@ export interface BipOdds {
 export const FIELD = {
   ground: {
     /** Angular reach (degrees) of an average infielder on an average-speed grounder. */
-    reach: 14.0,
+    reach: 14.5,
     rangePerZ: 0.12,
     /** Reach scales with (speedRef - ev) / speedScale: harder grounders are harder to reach. */
     speedRef: 120,
@@ -60,9 +60,9 @@ export const FIELD = {
     pitcherReach: 3.5,
     /** Infield-hit log-odds once a grounder is fielded. */
     ifhBase: -2.75,
-    ifhSpeed: 0.75,
+    ifhSpeed: 0.4,
     ifhSlow: 0.8,
-    ifhEdge: 1.0,
+    ifhEdge: 0.7,
     ifhLongThrow: 0.35,
     ifhShortThrow: -0.55,
     ifhPitcher: -1.4,
@@ -111,9 +111,9 @@ export const FIELD = {
   },
   race: {
     home2second: 8.2,
-    perZ2: 0.3,
+    perZ2: 0.22,
     home2third: 11.9,
-    perZ3: 0.45,
+    perZ3: 0.35,
     sigma: 0.55,
     transfer: 1.1,
     armSpeed: 115,

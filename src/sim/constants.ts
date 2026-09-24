@@ -19,12 +19,13 @@ export const REGIONS: readonly Region[] = ["heart", "shadow", "chase", "waste"];
 export const ENGINE = {
   location: {
     /** Share of pitches in each region for an average pitcher in a neutral count. */
-    base: { heart: 0.27, shadow: 0.445, chase: 0.215, waste: 0.07 },
+    base: { heart: 0.27, shadow: 0.45, chase: 0.21, waste: 0.065 },
     /** Log-weight shifts per z of control / command. */
     controlInZone: 0.1,
     controlWaste: -0.42,
-    commandHeart: -0.2,
-    commandShadow: 0.05,
+    commandHeart: -0.18,
+    commandShadow: 0.08,
+    commandWaste: -0.15,
     /** Fastballs live in the zone; secondaries get chased. */
     fastballInZone: 0.12,
     secondaryInZone: -0.14,
@@ -53,11 +54,11 @@ export const ENGINE = {
 
   swing: {
     /** Swing probability by region for an average hitter in a neutral count. */
-    base: { heart: 0.72, shadow: 0.48, chase: 0.26, waste: 0.06 },
+    base: { heart: 0.72, shadow: 0.48, chase: 0.235, waste: 0.055 },
     /** Log-odds shift per z of the hitter's eye, by region. */
     eye: { heart: 0.05, shadow: -0.08, chase: -0.34, waste: -0.4 },
     /** Better stuff induces more chases. */
-    stuffChase: 0.14,
+    stuffChase: 0.12,
     /** With two strikes hitters protect: much more likely to swing at anything close. */
     twoStrike: { heart: 1.8, shadow: 1.0, chase: 0.15, waste: 0 },
   },
@@ -80,12 +81,12 @@ export const ENGINE = {
 
   whiff: {
     /** Whiff probability per swing by region, average hitter vs average pitch. */
-    base: { heart: 0.155, shadow: 0.265, chase: 0.44, waste: 0.59 },
+    base: { heart: 0.165, shadow: 0.28, chase: 0.45, waste: 0.6 },
     /** Log-odds per z. */
     contact: -0.37,
-    stuff: 0.37,
+    stuff: 0.31,
     /** Two-strike swings are shorter: more contact, weaker contact. */
-    twoStrike: -0.45,
+    twoStrike: -0.6,
     /** Log-odds adjustment by pitch type. */
     pitchType: { FF: -0.12, SI: -0.45, FC: -0.02, SL: 0.33, ST: 0.28, CU: 0.22, CH: 0.26, FS: 0.38 } as Record<PitchType, number>,
   },
@@ -93,9 +94,9 @@ export const ENGINE = {
   /** Probability a contacted pitch is put in play (vs fouled off). */
   fair: {
     base: { heart: 0.52, shadow: 0.43, chase: 0.35, waste: 0.3 },
-    twoStrike: -0.35,
+    twoStrike: -0.25,
     /** Share of fouls that are catchable pop-ups (foul outs). */
-    foulOut: 0.035,
+    foulOut: 0.03,
   },
 
   take: {
@@ -103,8 +104,10 @@ export const ENGINE = {
     calledStrike: { heart: 0.985, shadow: 0.47, chase: 0.035, waste: 0 },
     /** Log-odds per z of catcher receiving on shadow pitches. */
     framing: 0.15,
+    /** Log-odds per z of pitcher command on shadow pitches (painting the corners). */
+    commandPaint: 0.08,
     /** Chance a taken waste pitch hits the batter. */
-    hbpPerWaste: 0.028,
+    hbpPerWaste: 0.038,
   },
 
   /** Wild pitch / passed ball chance on a taken chase-or-waste pitch with runners on. */
@@ -113,24 +116,24 @@ export const ENGINE = {
   contact: {
     /** Probability contact is "weak" (topped, jammed, under it). */
     weakBase: 0.24,
-    weakRegion: { heart: -0.55, shadow: 0, chase: 0.55, waste: 0.9 },
-    weakContact: -0.3,
-    weakStuff: 0.25,
+    weakRegion: { heart: -0.7, shadow: 0, chase: 0.55, waste: 0.9 },
+    weakContact: -0.4,
+    weakStuff: 0.15,
     weakTwoStrike: 0.2,
-    weakEV: 75,
+    weakEV: 71,
     weakEVsd: 10,
     /** Weak contact splits into topped grounders, pop-ups (under it), and bloops. */
     weakTopped: 0.55,
-    weakUnder: 0.26,
-    solidEV: 95.5,
+    weakUnder: 0.21,
+    solidEV: 95.8,
     solidEVsd: 7.5,
-    /** mph per z of raw power. */
-    powerEV: 3.3,
-    /** mph per z of pitch grade. */
-    stuffEV: -1.1,
-    regionEV: { heart: 1.5, shadow: 0, chase: -2.5, waste: -4 },
+    /** mph per z of raw power, of bat-to-ball skill (squaring it up), and of pitch grade. */
+    powerEV: 2.3,
+    contactEV: 0.3,
+    stuffEV: -0.6,
+    regionEV: { heart: 2.5, shadow: 0, chase: -2.5, waste: -4 },
     /** Mean launch angle and spread for solid contact. */
-    laMean: 13,
+    laMean: 14.5,
     laSd: 19,
     /** Degrees per z of the hitter's launch trait. */
     launchLA: 5.5,
@@ -174,21 +177,21 @@ export const ENGINE = {
    * send threshold, then succeeds with that probability.
    */
   running: {
-    secondHomeOnSingle: 0.85,
-    firstThirdOnSingle: -0.25,
-    firstHomeOnDouble: 0.35,
+    secondHomeOnSingle: 1.2,
+    firstThirdOnSingle: 0.35,
+    firstHomeOnDouble: -0.4,
     speed: 0.9,
     arm: 0.5,
     aggression: 0.25,
     twoOuts: 1.3,
     sendThreshold: 0.72,
     sendThresholdTwoOuts: 0.58,
-    firstThirdThreshold: 0.78,
+    firstThirdThreshold: 0.72,
     /** Balls hit to right field make first-to-third easier (long throw). */
     rightField: 0.8,
     leftField: -0.6,
     // Ground-ball outs
-    dpBase: -0.1,
+    dpBase: -0.35,
     dpEV: 0.05,
     dpSpeed: 0.55,
     dpFielder: 0.3,
@@ -206,20 +209,20 @@ export const ENGINE = {
 
   steal: {
     /** Attempts per pitch for an average runner with the next base open. */
-    attempt: 0.017,
+    attempt: 0.0112,
     speed: 1.0,
     aggression: 0.35,
     minSpeed: -0.8,
     thirdMult: 0.12,
-    success: 1.45,
+    success: 0.75,
     successSpeed: 0.75,
     catcherArm: 0.45,
     thirdPenalty: 0.3,
   },
 
   errors: {
-    ground: 0.022,
-    air: 0.004,
+    ground: 0.06,
+    air: 0.012,
     /** Log multiplier per z of the fielder's defense at the position. */
     skill: -0.35,
   },

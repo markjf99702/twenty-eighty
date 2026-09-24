@@ -921,9 +921,9 @@ export class GameSim {
     else if (s.starter) {
       if (s.runs >= 6 && s.pitches >= 40) pull = true;
       else if (s.runs >= 5 && this.inning <= 5 && s.pitches >= 60) pull = true;
-      else if (inningStart && s.pitches >= s.limit - 12) pull = true;
-      else if (!inningStart && runners >= 2 && this.inning >= 5 && s.pitches >= s.limit - 20) pull = true;
-      else if (inningStart && this.inning >= 7 && s.battersFaced >= 24 && Math.abs(lead) <= 2) pull = true;
+      else if (inningStart && s.pitches >= s.limit - 7) pull = true;
+      else if (!inningStart && runners >= 2 && this.inning >= 5 && s.pitches >= s.limit - 12) pull = true;
+      else if (inningStart && this.inning >= 7 && s.battersFaced >= 27 && Math.abs(lead) <= 2) pull = true;
     } else {
       const longMan = field.setup.bullpen.indexOf(s.id) >= field.setup.bullpen.length - 2;
       const blowout = lead >= 5 || lead <= -4;

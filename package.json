@@ -11,7 +11,9 @@
     "calibrate": "tsx scripts/calibrate.ts",
     "sim:season": "tsx scripts/sim-season.ts",
     "sim:game": "tsx scripts/sim-game.ts",
-    "check": "npm run typecheck && npm test"
+    "check": "npm run typecheck && npm test",
+    "grade-chart": "tsx scripts/grade-chart.ts",
+    "probe": "tsx scripts/probe.ts"
   },
   "engines": {
     "node": ">=20"

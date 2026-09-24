@@ -80,6 +80,22 @@ export class RunTracker {
     return out;
   }
 
+  /** Number of recorded events of each type. */
+  counts(): Record<EventCode, number> {
+    const out = {} as Record<EventCode, number>;
+    for (const code of EVENT_CODES) out[code] = 0;
+    for (const c of this.codes) out[EVENT_CODES[c]!]++;
+    return out;
+  }
+
+  /** Average value of a batting out (strikeouts and batted-ball outs together). */
+  outValue(): number {
+    const lw = this.linearWeights();
+    const n = this.counts();
+    const total = n.K + n.OUT;
+    return total > 0 ? (n.K * lw.K + n.OUT * lw.OUT) / total : 0;
+  }
+
   eventCount(): number {
     return this.codes.length;
   }

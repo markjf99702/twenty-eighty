@@ -77,7 +77,7 @@ export function battingSide(bats: BatSide, pitcherThrows: Hand): "L" | "R" {
 
 const LIMIT_TABLE: ReadonlyArray<[number, number]> = [
   [20, 15], [25, 20], [30, 25], [35, 31], [40, 40], [45, 55], [50, 75],
-  [55, 90], [60, 97], [65, 104], [70, 110], [75, 116], [80, 121],
+  [55, 96], [60, 103], [65, 108], [70, 113], [75, 118], [80, 122],
 ];
 
 /** Typical pitch-count ceiling for a stamina grade. */

@@ -72,7 +72,7 @@ function chooseRegion(pitch: PitchProfile, control: number, command: number, cou
     L.base.heart * Math.exp(inZone + L.commandHeart * command),
     L.base.shadow * Math.exp(0.6 * inZone + L.commandShadow * command),
     L.base.chase * Math.exp(c[1] + (pitch.fastball ? 0 : L.secondaryChase)),
-    L.base.waste * Math.exp(L.controlWaste * control + c[2]),
+    L.base.waste * Math.exp(L.controlWaste * control + L.commandWaste * command + c[2]),
   ];
   return REGIONS[rng.weightedIndex(weights)]!;
 }
@@ -103,7 +103,11 @@ export function generateBattedBall(
     la = r < C.weakTopped ? rng.normal(-12 + 0.5 * C.pitchLA[pitch.type], 12) : r < C.weakTopped + C.weakUnder ? rng.normal(52, 12) : rng.normal(18, 10);
   } else {
     ev = rng.normal(
-      C.solidEV + C.powerEV * (b.power + ctx.batterBoost) + C.stuffEV * stuff + C.regionEV[region],
+      C.solidEV +
+        C.powerEV * (b.power + ctx.batterBoost) +
+        C.contactEV * b.contact +
+        C.stuffEV * stuff +
+        C.regionEV[region],
       C.solidEVsd,
     );
     la = rng.normal(C.laMean + C.launchLA * b.launch + C.pitchLA[pitch.type], C.laSd);
@@ -129,7 +133,8 @@ export function simulatePitch(ctx: PitchContext, balls: number, strikes: number,
   const b = ctx.batter;
   const pitch = choosePitch(p, balls, strikes, rng);
   const stuff = pitch.z - ctx.fatigue;
-  const region = chooseRegion(pitch, p.control - ctx.fatigue, p.command - ctx.fatigue, count, rng);
+  const command = p.command - ctx.fatigue;
+  const region = chooseRegion(pitch, p.control - ctx.fatigue, command, count, rng);
   const base = { pitchType: pitch.type, region, wildPitch: false };
 
   // Swing decision
@@ -147,8 +152,9 @@ export function simulatePitch(ctx: PitchContext, balls: number, strikes: number,
     let pStrike: number;
     let framing: PitchOutcome["framing"];
     if (region === "shadow") {
-      const average = sigmoid(CALLED.shadow);
-      pStrike = sigmoid(CALLED.shadow + ENGINE.take.framing * ctx.catcherFraming);
+      const average = sigmoid(CALLED.shadow + ENGINE.take.commandPaint * command);
+      const paint = ENGINE.take.commandPaint * command;
+      pStrike = sigmoid(CALLED.shadow + paint + ENGINE.take.framing * ctx.catcherFraming);
       framing = { actual: pStrike, average };
     } else {
       pStrike = region === "waste" ? 0 : sigmoid(CALLED[region]);
