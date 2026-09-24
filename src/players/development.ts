@@ -31,32 +31,39 @@ interface Curve {
 }
 
 export const AGING: Record<ToolKind, Curve> = {
-  hit: { peak: 27, plateau: 3, early: 1.4, late: 2.2, lateAge: 34 },
-  power: { peak: 27, plateau: 3, early: 1.4, late: 2.0, lateAge: 34 },
-  eye: { peak: 29, plateau: 4, early: 0.8, late: 1.4, lateAge: 35 },
-  speed: { peak: 24, plateau: 1, early: 0.9, late: 1.4, lateAge: 30 },
-  field: { peak: 26, plateau: 3, early: 1.0, late: 1.6, lateAge: 33 },
-  arm: { peak: 27, plateau: 4, early: 0.9, late: 1.5, lateAge: 34 },
-  stuff: { peak: 26, plateau: 3, early: 1.3, late: 2.0, lateAge: 33 },
-  control: { peak: 28, plateau: 5, early: 0.6, late: 1.0, lateAge: 36 },
-  command: { peak: 28, plateau: 5, early: 0.6, late: 1.0, lateAge: 36 },
-  stamina: { peak: 27, plateau: 5, early: 1.0, late: 1.6, lateAge: 35 },
+  hit: { peak: 27, plateau: 3, early: 0.9, late: 1.42, lateAge: 34 },
+  power: { peak: 27, plateau: 3, early: 0.9, late: 1.28, lateAge: 34 },
+  eye: { peak: 29, plateau: 4, early: 0.52, late: 0.9, lateAge: 35 },
+  speed: { peak: 24, plateau: 1, early: 0.58, late: 0.9, lateAge: 30 },
+  field: { peak: 26, plateau: 3, early: 0.65, late: 1.03, lateAge: 33 },
+  arm: { peak: 27, plateau: 4, early: 0.58, late: 0.97, lateAge: 34 },
+  stuff: { peak: 26, plateau: 3, early: 0.83, late: 1.28, lateAge: 33 },
+  control: { peak: 28, plateau: 5, early: 0.38, late: 0.65, lateAge: 36 },
+  command: { peak: 28, plateau: 5, early: 0.38, late: 0.65, lateAge: 36 },
+  stamina: { peak: 27, plateau: 5, early: 0.65, late: 1.03, lateAge: 35 },
 };
 
 export const DEVELOPMENT = {
   /**
-   * Mean yearly drift of a still-growing player's projection (grade points):
-   * slightly down on average, and more so for extreme projections, which are
-   * more often overestimates (regression toward a typical 55).
+   * Mean yearly drift of a projection until the tool's peak age (grade
+   * points): down on average (most prospects fall short of their upside),
+   * and more so for extreme projections. Front offices' projections
+   * (`projectPlayer`, FV) include it, so FV is an honest forecast.
    */
-  futureDrift: (future: number) => -0.6 - 0.06 * (future - 55),
+  futureDrift: (future: number) => -0.8 - 0.015 * (future - 55),
   /** Spread of that drift by age: breakouts and busts are a young player's game. */
-  futureSd: (age: number) => (age <= 21 ? 2.6 : age <= 24 ? 2.0 : 1.2),
+  futureSd: (age: number) => (age <= 21 ? 1.3 : age <= 24 ? 1.0 : 0.6),
   /** Year-to-year noise in each tool, and a shared shock to a player's core skills. */
-  toolSd: 0.8,
-  shockSd: 0.7,
+  toolSd: 0.68,
+  shockSd: 0.6,
   /** Slowest and fastest share of the remaining gap closed in a year. */
   minRate: 0.12,
+  /**
+   * How front-loaded growth is: each year closes `pace / (years to peak)` of
+   * the remaining gap to the projection, so most of it comes between 19 and
+   * 24 and young players reach the majors on time.
+   */
+  pace: 2.1,
 };
 
 const r1 = (x: number) => Math.round(x * 10) / 10;
@@ -68,7 +75,7 @@ function step(t: ToolGrade, kind: ToolKind, age: number, noise: number, futureNo
   let present = t.present;
   let future = t.future;
   if (next <= c.peak) {
-    const rate = clamp(1 / (c.peak - age), DEVELOPMENT.minRate, 1);
+    const rate = clamp(DEVELOPMENT.pace / (c.peak - age), DEVELOPMENT.minRate, 1);
     present += rate * (future - present) + noise;
     future += DEVELOPMENT.futureDrift(future) + futureNoise;
   } else if (next <= c.peak + c.plateau) {

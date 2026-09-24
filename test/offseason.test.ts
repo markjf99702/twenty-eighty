@@ -3,7 +3,10 @@ import { generateLeague } from "../src/league/generate";
 import { orgPlayers, payroll } from "../src/org/contracts";
 import { rosterProblems } from "../src/org/roster";
 import { evaluateTrade, executeTrade, surplusValue } from "../src/org/trades";
-import { onTheClock } from "../src/offseason/draft";
+import { Rng } from "../src/core/rng";
+import { boardValue, draftClass, onTheClock } from "../src/offseason/draft";
+import { playerValue } from "../src/org/value";
+import { projectPlayer } from "../src/players/development";
 import { advanceOffseason, beginOffseason, winterContext, winterWeek } from "../src/offseason/offseason";
 import { LEVELS } from "../src/players/types";
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
@@ -153,5 +156,29 @@ describe("old saves", () => {
     const regular = migrated.players.find((p) => p.onFortyMan)!;
     expect(regular.contract).not.toBeNull();
     expect(migrated.teams[0]!.budget).toBeGreaterThan(80);
+  });
+});
+
+describe("development", () => {
+  const cls = draftClass(new Rng("development-test"), 450)
+    .sort((a, b) => boardValue(b) - boardValue(a))
+    .slice(0, 300);
+
+  it("gets draftees most of the way to their projection in their early twenties", () => {
+    // College hitters (21-22): after three winters little of the hit tool's projected growth is left.
+    const college = cls.filter((p) => p.age >= 21 && !p.pitching && p.hitting.hit.future - p.hitting.hit.present >= 5);
+    const left = college.map((p) => {
+      const q = projectPlayer(p, 3);
+      return (q.hitting.hit.future - q.hitting.hit.present) / (p.hitting.hit.future - p.hitting.hit.present);
+    });
+    expect(college.length).toBeGreaterThan(30);
+    expect(left.reduce((a, b) => a + b, 0) / left.length).toBeLessThan(0.25);
+  });
+
+  it("turns a draft class into big leaguers on time", () => {
+    const atLine = (years: number) => cls.filter((p) => playerValue(projectPlayer(p, years)) >= -5).length;
+    expect(atLine(5)).toBeGreaterThan(30);
+    // Nearly everyone who'll make it is there within five years of the draft.
+    expect(atLine(5)).toBeGreaterThanOrEqual(0.9 * atLine(7));
   });
 });

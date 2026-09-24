@@ -58,11 +58,12 @@ function tool(present: number, future: number): ToolGrade {
 }
 
 /**
- * Expected remaining growth (in grade points) for a player of this age. Sized
- * so that each generation of prospects replaces the one before it: tuned with
- * `npm run sim:years`, which plays many seasons and watches for drift.
+ * Expected remaining growth (in grade points) for a player of this age. Sized,
+ * with the development model and amateur talent, so that each generation of
+ * prospects replaces the one before it: see `npm run pipeline` and
+ * `npm run sim:years`.
  */
-export const GROWTH = { perYear: 1.6, max: 11 };
+export const GROWTH = { perYear: 1.3, max: 13 };
 
 export function growthRoom(age: number): number {
   return clamp((27 - age) * GROWTH.perYear, 0, GROWTH.max);

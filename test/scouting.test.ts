@@ -75,7 +75,11 @@ describe("analytics", () => {
     const best = analyticsRead(season, 2, regular)!;
     expect(basic.sample).toBeGreaterThan(120);
     expect(best.reliability).toBeGreaterThan(basic.reliability);
-    expect(Math.abs(best.value - playerValue(regular))).toBeLessThan(40);
+    // Forty days is a small sample: any one read can miss, but on average they land near the truth.
+    const regulars = l.players.filter((p) => p.level === "MLB" && !p.pitching && (season.batting.lines.get(p.id)?.PA ?? 0) > 120);
+    const miss = regulars.reduce((s, p) => s + Math.abs(analyticsRead(season, 2, p)!.value - playerValue(p)), 0) / regulars.length;
+    expect(regulars.length).toBeGreaterThan(100);
+    expect(miss).toBeLessThan(20);
   });
 
   it("blends into the club's belief, leaning on analytics as the sample grows", () => {

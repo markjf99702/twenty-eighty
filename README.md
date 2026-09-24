@@ -33,6 +33,7 @@ npm run scout -- NYE               # an organization's scouting report on the 20
 npm run grade-chart                # what each grade means in stats (see below)
 npm run calibrate                  # compare a simulated season to real MLB
 npm run sim:years -- --years 10    # many seasons, offseasons included, watching for drift
+npm run pipeline                   # what one year's draft and international class becomes, vs. a league's age profile
 npm test                           # vitest suite
 ```
 
@@ -160,16 +161,19 @@ Every winter the whole universe moves forward a year:
 
 - **Development and aging.** Each tool has its own aging curve: speed peaks around 24
   and fades first, contact and power peak around 27 and hold for a few years, plate
-  discipline and command keep improving into the 30s. Young players close part of the
-  gap to their future grades every year while the projection itself drifts, so some
+  discipline and command keep improving into the 30s. Growth is front-loaded: young
+  players close most of the gap to their future grades between 19 and 24, so good
+  prospects reach the majors in their early twenties, as real ones do. Projections
+  drift (down on average, since most prospects fall short of their upside), so some
   prospects break out and more of them stall. Future Value (FV) is the grade of a
-  player's projected peak under that model.
+  player's projected peak under that model, an honest forecast rather than a ceiling.
 - **Contracts.** Players with under three years of service make near the minimum;
   three to six years go to arbitration each winter (about 22%, 38% and 58% of their
   market value); six or more can become free agents. A win costs about $8M on the
   open market, and projected WAR comes from the grades through coefficients measured
-  from the engine. Each club has a payroll budget set by its market, from about $95M
-  to $250M; released players' guaranteed money stays on the books as dead money.
+  from the engine. Each club's budget is set by its owner from what the club takes in
+  (see Finances and owners below); released players' guaranteed money stays on the
+  books as dead money.
 - **The draft**: ten rounds in reverse order of the standings, high schoolers (18,
   raw, the most room to grow) and college players (21-22, closer to ready).
 - **Free agency**: every free agent asks for years and salary from his projected
@@ -181,13 +185,20 @@ Every winter the whole universe moves forward a year:
   a player, priced at $8M a win and discounted 10% a year, minus salary. A cheap young
   star is worth a fortune; an aging star on a big deal can be worth less than nothing.
   AI contenders buy veterans from rebuilding clubs with prospects, too.
-- **Spring training** heals most injuries, trims every 40-man roster, sets an Opening
-  Day 26 and sorts each farm system by ability (with age floors).
+- **Spring training** heals most injuries, trims every 40-man roster and adds each
+  club's best prospects to it, sets an Opening Day 26 and sorts each farm system by
+  ability (with age floors).
 
 A universe has to look the same in year 10 as in year 1, so each winter re-centers the
 grades (50 stays major-league average) and `npm run sim:years` plays many seasons to
-check. Over ten-year runs the run environment stays at 4.3-4.5 runs a game, home runs
-near 3% of plate appearances, home run leaders in the 50s, and payrolls near budget.
+check. The talent pipeline is tuned so that one year's intake (the draft plus an
+international class), followed through its career, looks like one generated league's
+cross-section: as many players above the big-league line, in the same age mix, with as
+many stars (`npm run pipeline` shows the comparison). Over twelve-year runs the run
+environment stays at 4.2-4.4 runs a game, home runs near 3% of plate appearances,
+players 25 and under keep 100-280 big-league jobs (the low point comes in years 6-8,
+as the generated universe's young players give way to drafted ones), there are 5-10
+stars (70+) at a time, and the winter re-centering stays near zero.
 
 ## Scouting and analytics
 

@@ -48,6 +48,7 @@ const header = [
   "HR ldr",
   "WAR ldr",
   "MLB age",
+  "<=25",
   "70+",
   "FV60+",
   "org size",
@@ -70,6 +71,10 @@ for (let y = 0; y < years; y++) {
   const hrLeader = Math.max(...stats.hitters.map((h) => h.line.HR));
   const warLeader = Math.max(...stats.hitters.map((h) => h.WAR), ...stats.pitchers.map((p) => p.WAR));
   const mlb = league.teams.flatMap((t) => t.rosters.MLB).map((id) => league.players[id]!);
+  // Young players with real big-league time: the pipeline's health.
+  const youngRegulars = league.players.filter(
+    (p) => p.age <= 25 && ((season.batting.lines.get(p.id)?.PA ?? 0) >= 100 || (season.pitching.lines.get(p.id)?.outs ?? 0) >= 90),
+  ).length;
   const stars = mlb.filter((p) => overallGrade(p) >= 70).length;
   const farm = league.teams.flatMap((t) => LEVELS.slice(1).flatMap((l) => t.rosters[l])).map((id) => league.players[id]!);
   const prospects = farm.filter((p) => overallGrade(p, true) >= 60).length;
@@ -146,6 +151,7 @@ for (let y = 0; y < years; y++) {
       hrLeader,
       f(warLeader),
       f(mean(mlb.map((p) => p.age))),
+      youngRegulars,
       stars,
       prospects,
       f(orgSize, 0),

@@ -25,8 +25,8 @@ const HITTER_WEIGHTS = [12, 9, 9, 11, 18, 10, 17, 14];
 
 /** Talent of an amateur class, in runs per 600 vs. an average big leaguer. */
 export const AMATEUR_TALENT = {
-  highSchool: { share: 0.4, age: 18, hitter: [-60, 11], pitcher: [-58, 9] },
-  college: { share: 0.6, age: 21, hitter: [-46, 9], pitcher: [-44, 8] },
+  highSchool: { share: 0.4, age: 18, hitter: [-62, 13.5], pitcher: [-60, 11] },
+  college: { share: 0.6, age: 21, hitter: [-48, 11], pitcher: [-46, 10] },
 } as const;
 
 /** Build an amateur (not yet in the league; negative id until he signs). */

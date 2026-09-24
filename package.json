@@ -18,7 +18,8 @@
     "dev": "vite web",
     "build:web": "vite build web",
     "preview": "vite preview web",
-    "sim:years": "tsx scripts/sim-years.ts"
+    "sim:years": "tsx scripts/sim-years.ts",
+    "pipeline": "tsx scripts/pipeline.ts"
   },
   "engines": {
     "node": ">=20"

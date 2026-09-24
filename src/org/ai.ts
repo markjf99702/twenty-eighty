@@ -185,17 +185,19 @@ function performanceMoves(ctx: RosterContext, team: Team, opts: AiOptions): void
     const active = players(ctx, team.rosters.MLB)
       .filter((p) => isPitcher(p) === wantPitcher && healthy(p))
       .sort((a, b) => estimate(a, opts.performance) - estimate(b, opts.performance));
-    const incumbent = active[0];
     const candidate = bestCandidate(ctx, team, wantPitcher, opts);
-    if (!incumbent || !candidate) continue;
-    // Keep a second catcher around.
-    if (incumbent.position === "C" && catchersActive(ctx, team) <= 2 && candidate.position !== "C") continue;
+    if (!candidate) continue;
+    // The weakest big leaguer who can go, keeping a second catcher around.
+    const protectCatchers = candidate.position !== "C" && catchersActive(ctx, team) <= 2;
+    const incumbent = active.find((p) => !(protectCatchers && p.position === "C"));
+    if (!incumbent) continue;
     const gain = estimate(candidate, opts.performance) - estimate(incumbent, opts.performance);
     const optionable = canOption(ctx, team, incumbent).ok;
     if (gain < (optionable ? 8 : 18)) continue;
-    if (!candidate.onFortyMan && !openFortyManSpot(ctx, team, opts)) continue;
+    // Designating the incumbent frees his 40-man spot; an option doesn't.
+    if (!candidate.onFortyMan && optionable && !openFortyManSpot(ctx, team, opts)) continue;
     if (optionable) optionPlayer(ctx, team, incumbent);
-    else designateForAssignment(ctx, team, incumbent, opts.waiverOrder);
+    else if (!designateForAssignment(ctx, team, incumbent, opts.waiverOrder).ok) continue;
     callUp(ctx, team, candidate, true);
   }
 }

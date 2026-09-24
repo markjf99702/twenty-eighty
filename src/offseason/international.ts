@@ -23,9 +23,10 @@ export const MAX_INTERNATIONAL_SIGNINGS = 5;
 const SPOTS: FieldPosition[] = ["C", "2B", "3B", "SS", "CF", "RF", "LF", "1B"];
 const SPOT_WEIGHTS = [10, 10, 10, 26, 18, 12, 8, 6];
 
-export const INTERNATIONAL_TALENT = { age: 17, hitter: [-66, 12], pitcher: [-62, 10] } as const;
+export const INTERNATIONAL_TALENT = { age: 17, hitter: [-68, 14.5], pitcher: [-64, 12] } as const;
 
-function prospect(rng: Rng, id: number): Player {
+/** One 17-year-old in the international pool (negative id until he signs). */
+export function prospect(rng: Rng, id: number): Player {
   const T = INTERNATIONAL_TALENT;
   const pitcher = rng.chance(0.4);
   const [mean, sd] = pitcher ? T.pitcher : T.hitter;

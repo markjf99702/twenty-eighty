@@ -7,7 +7,8 @@ import { LEVELS, type MinorLevel, MINOR_LEVELS, type Player } from "../players/t
 
 /**
  * Spring training: the winter heals most injuries, every club trims its 40-man
- * roster, picks an Opening Day 26 and sorts the rest of the organization into
+ * roster and protects its best prospects on it, picks an Opening Day 26 and
+ * sorts the rest of the organization into
  * its four affiliates by ability (with age floors, so teenagers start low).
  * Players who don't fit anywhere are released.
  */
@@ -44,6 +45,39 @@ function trimFortyMan(ctx: RosterContext, team: Team, waiverOrder: Team[]): void
       .filter((p) => !p.il && (p.injury?.daysLeft ?? 0) <= 60)
       .sort((a, b) => keepScore(a) - keepScore(b))[0];
     if (!cut || !designateForAssignment(ctx, team, cut, waiverOrder).ok) break;
+  }
+}
+
+/** How much better (runs) a minor leaguer has to be than the weakest 40-man player to take his spot. */
+const PROTECT_MARGIN = 6;
+const MAX_PROTECTED = 5;
+
+/**
+ * Protect the organization's best players who aren't on the 40-man yet (young
+ * players who've outgrown the minors, prospects with big futures) by
+ * designating its weakest 40-man players to make room, a few a winter.
+ */
+function protectProspects(ctx: RosterContext, team: Team, waiverOrder: Team[]): void {
+  const league = ctx.league;
+  const org = () => [...new Set(MINOR_LEVELS.flatMap((l) => team.rosters[l]))].map((id) => league.players[id]!);
+  for (let n = 0; n < MAX_PROTECTED; n++) {
+    const best = org()
+      .filter((p) => !p.onFortyMan && !hurt(p) && !p.il)
+      .sort((a, b) => keepScore(b) - keepScore(a))[0];
+    if (!best) return;
+    const weakest = team.fortyMan
+      .map((id) => league.players[id]!)
+      .filter((p) => !p.il && !hurt(p) && Boolean(p.pitching) === Boolean(best.pitching))
+      .sort((a, b) => keepScore(a) - keepScore(b))[0];
+    if (team.fortyMan.length >= FORTY_MAN_LIMIT) {
+      if (!weakest || keepScore(best) < keepScore(weakest) + PROTECT_MARGIN) return;
+      if (!designateForAssignment(ctx, team, weakest, waiverOrder).ok) return;
+    } else if (weakest && keepScore(best) < keepScore(weakest)) {
+      return;
+    }
+    best.onFortyMan = true;
+    team.fortyMan.push(best.id);
+    ensureMajorContract(best);
   }
 }
 
@@ -173,6 +207,8 @@ export function springTraining(ctx: RosterContext, waiverOrder: Team[]): void {
   healOverWinter(ctx.league);
   for (const team of ctx.league.teams) {
     trimFortyMan(ctx, team, waiverOrder);
+    // The user protects their own prospects when they run the roster.
+    if (!(team.id === ctx.league.userTeamId && team.manualRoster)) protectProspects(ctx, team, waiverOrder);
     balanceFortyMan(ctx, team, waiverOrder);
   }
   for (const team of ctx.league.teams) reorganize(ctx, team);

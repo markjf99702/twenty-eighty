@@ -12,6 +12,8 @@ dependencies; the browser UI in web/ uses Preact and Vite. See README.md for the
 - `npm run grade-chart [-- --pa 30000]`: what each 20-80 grade produces, per tool.
 - `npm run sim:years [-- --years 10 --verbose]`: many seasons with offseasons; watch the
   run environment, star counts, payrolls and the winter re-centering shifts for drift.
+- `npm run pipeline`: one year's draft and international intake over its career vs. a
+  generated league's age profile (the development tuning target).
 - `npm run probe`: batted-ball BA/SLG grid by exit velocity x launch angle.
 - `npm run sim:season [-- --team ABBR] [-- --no-minors]`, `npm run sim:game -- AWAY HOME`,
   `npm run scout -- ABBR`.
@@ -103,5 +105,9 @@ Targets and tolerances are in `src/calibration/targets.ts`.
 
 Changes to development, aging, contracts or the draft can make the universe drift over
 years rather than seasons: check `npm run sim:years -- --years 10` (and a second seed)
-for trends in R/G, HR%, the HR and WAR leaders, 70+ players, MLB age, payroll vs.
-budget, and the re-centering shifts (which should hover near zero).
+for trends in R/G, HR%, the HR and WAR leaders, 70+ players, MLB age, young players
+with big-league time (`<=25`), farm FV60+, payroll vs. budget, and the re-centering
+shifts (which should hover near zero). `npm run pipeline` is the fast check: one
+intake followed through its career should match a generated league's cross-section at
+the big-league line (count, age mix, stars). The generated league is the target; the
+development and amateur-talent numbers are tuned to it, not the other way around.
