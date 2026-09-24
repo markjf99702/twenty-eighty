@@ -7,10 +7,11 @@ import {
   designateForAssignment,
   optionPlayer,
   placeOnIl,
+  refreshDepth,
   rosterProblems,
   type RosterContext,
 } from "../src/org/roster";
-import type { Player } from "../src/players/types";
+import { FIELD_POSITIONS, type Player } from "../src/players/types";
 
 let league: League;
 let team: Team;
@@ -109,5 +110,31 @@ describe("roster rules", () => {
   it("logs every move", () => {
     optionPlayer(ctx, team, optionable());
     expect(league.transactions.at(-1)?.text).toMatch(/^Optioned/);
+  });
+
+  it("patches a hand-set depth chart without playing anyone twice", () => {
+    league.userTeamId = team.id;
+    team.manualDepth = true;
+    // Move the manager's first baseman to DH, then lose the new first baseman.
+    const d = team.depth;
+    const first = d.starters["1B"];
+    const newFirst = d.dh;
+    d.dh = first;
+    d.starters["1B"] = newFirst;
+    expect(optionPlayer(ctx, team, player(newFirst)).ok || designateForAssignment(ctx, team, player(newFirst)).ok).toBe(true);
+
+    const lineup = [...FIELD_POSITIONS.map((pos) => team.depth.starters[pos]), team.depth.dh];
+    expect(new Set(lineup).size).toBe(9);
+    expect(team.depth.dh).toBe(first);
+    const active = new Set(team.rosters.MLB);
+    for (const id of [...lineup, ...team.depth.bench, ...team.depth.rotation, ...team.depth.bullpen]) expect(active.has(id)).toBe(true);
+    const all = [...lineup, ...team.depth.bench, ...team.depth.rotation, ...team.depth.bullpen];
+    expect(new Set(all).size).toBe(all.length);
+    expect(all).toHaveLength(team.rosters.MLB.length);
+
+    // Refreshing again changes nothing.
+    const before = JSON.stringify(team.depth);
+    refreshDepth(league, team);
+    expect(JSON.stringify(team.depth)).toBe(before);
   });
 });

@@ -1,6 +1,8 @@
 import type { League, Team, TransactionType } from "../league/types";
 import {
+  FIELD_POSITIONS,
   type IlType,
+  isPitcher,
   type Level,
   MAX_OPTION_YEARS,
   MINOR_LEVELS,
@@ -83,24 +85,40 @@ export function canBeOptioned(p: Player): boolean {
 /** Rebuild the MLB depth chart after a move (the user's club keeps its choices, holes are patched). */
 export function refreshDepth(league: League, team: Team): void {
   const roster = team.rosters.MLB.map((id) => league.players[id]!);
+  const auto = autoDepthChart(roster);
   if (league.userTeamId !== team.id || !team.manualDepth) {
-    team.depth = autoDepthChart(roster);
+    team.depth = auto;
     return;
   }
-  // Manual depth: drop anyone no longer active and let the AI fill the gaps.
-  const active = new Set(team.rosters.MLB);
-  const auto = autoDepthChart(roster);
+  // Manual depth: keep the user's choices that are still valid (active, in
+  // their proper role, used once) and fill the rest from the manager's chart.
   const d = team.depth;
-  for (const pos of Object.keys(d.starters) as (keyof typeof d.starters)[]) {
-    if (!active.has(d.starters[pos])) d.starters[pos] = auto.starters[pos];
-  }
-  if (!active.has(d.dh)) d.dh = auto.dh;
-  const inLineup = new Set([...Object.values(d.starters), d.dh]);
-  d.bench = [...d.bench.filter((id) => active.has(id) && !inLineup.has(id)), ...auto.bench.filter((id) => !d.bench.includes(id) && !inLineup.has(id))];
-  d.rotation = d.rotation.filter((id) => active.has(id));
-  for (const id of auto.rotation) if (d.rotation.length < 5 && !d.rotation.includes(id)) d.rotation.push(id);
-  const inRotation = new Set(d.rotation);
-  d.bullpen = [...d.bullpen.filter((id) => active.has(id) && !inRotation.has(id)), ...auto.bullpen.filter((id) => !d.bullpen.includes(id) && !inRotation.has(id))];
+  const hitters = new Set(roster.filter((p) => !isPitcher(p)).map((p) => p.id));
+  const pitchers = new Set(roster.filter(isPitcher).map((p) => p.id));
+  const used = new Set<number>();
+  /** The first `limit` candidates from the pool not already placed elsewhere. */
+  const take = (candidates: Iterable<number>, pool: Set<number>, limit = Infinity): number[] => {
+    const out: number[] = [];
+    for (const id of candidates) {
+      if (out.length < limit && pool.has(id) && !used.has(id)) {
+        used.add(id);
+        out.push(id);
+      }
+    }
+    return out;
+  };
+  const pick = (candidates: Iterable<number>) => take(candidates, hitters, 1)[0] ?? -1;
+  // Lock in every lineup choice that still stands before filling any hole.
+  const slots = [...FIELD_POSITIONS, "DH"] as const;
+  const get = (slot: (typeof slots)[number]) => (slot === "DH" ? d.dh : d.starters[slot]);
+  const set = (slot: (typeof slots)[number], id: number) => (slot === "DH" ? (d.dh = id) : (d.starters[slot] = id));
+  const holes = slots.filter((slot) => pick([get(slot)]) < 0);
+  const fallback = [...FIELD_POSITIONS.map((pos) => auto.starters[pos]), auto.dh, ...auto.bench, ...hitters];
+  for (const slot of holes) set(slot, pick([slot === "DH" ? auto.dh : auto.starters[slot], ...fallback]));
+  d.bench = take([...d.bench, ...auto.bench, ...hitters], hitters);
+  const size = Math.min(5, Math.max(auto.rotation.length, d.rotation.length));
+  d.rotation = take([...d.rotation, ...auto.rotation, ...auto.bullpen], pitchers, size);
+  d.bullpen = take([...d.bullpen, ...auto.bullpen, ...pitchers], pitchers);
 }
 
 function removeFrom(list: number[], id: number): void {

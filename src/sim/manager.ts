@@ -53,7 +53,8 @@ export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: L
 
   for (const pos of FIELD_POSITIONS) {
     let id = depth.starters[pos];
-    const sits = out(id) || id < 0 || (allowRest && rng.chance(REST_RATE[pos]));
+    // (A player listed at two spots plays the first; the second goes to the bench.)
+    const sits = out(id) || id < 0 || used.has(id) || (allowRest && rng.chance(REST_RATE[pos]));
     if (sits) {
       const sub = takeBench((b) => defenseGrade(players[b]!, pos) + 3 * hitterQuality(players[b]!));
       if (sub !== undefined) id = sub;
@@ -62,7 +63,7 @@ export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: L
     slots.push({ id, pos });
   }
   let dh = depth.dh;
-  if (out(dh) || dh < 0 || (allowRest && rng.chance(REST_RATE.DH))) {
+  if (out(dh) || dh < 0 || used.has(dh) || (allowRest && rng.chance(REST_RATE.DH))) {
     const sub = takeBench((b) => hitterQuality(players[b]!));
     if (sub !== undefined) dh = sub;
   }
