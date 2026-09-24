@@ -1,3 +1,4 @@
+import type { OffseasonState } from "../offseason/types";
 import type { FieldPosition, Level, MinorLevel, Player } from "../players/types";
 
 export interface Park {
@@ -51,6 +52,10 @@ export interface Team {
   /** The user makes this club's roster moves; the AI stays out. */
   manualRoster?: boolean;
   affiliates: Record<MinorLevel, Affiliate>;
+  /** Payroll budget in millions of dollars, set by the market. */
+  budget: number;
+  /** Money still owed to released players: this season's amount and seasons left. */
+  deadMoney: { playerId: number; amount: number; years: number }[];
 }
 
 export interface LeagueStructure {
@@ -71,9 +76,19 @@ export type TransactionType =
   | "outright"
   | "release"
   | "add-40"
-  | "injury";
+  | "injury"
+  | "sign"
+  | "trade"
+  | "draft"
+  | "retire"
+  | "non-tender"
+  | "free-agent"
+  | "arbitration";
 
 export interface Transaction {
+  /** Season the move belongs to; offseason moves carry the season just finished. */
+  year: number;
+  /** Days from that season's Opening Day (offseason moves run past the regular season). */
   day: number;
   teamId: number;
   playerId: number;
@@ -91,6 +106,29 @@ export interface League {
   /** Roster moves and injuries, newest last. */
   transactions: Transaction[];
   /** The club the human manages (null = all clubs run by the AI). */
+  userTeamId: number | null;
+  /** One record per completed season. */
+  history: SeasonHistory[];
+  /** Unsigned players available to any club. */
+  freeAgents: number[];
+  /** Winter state between the postseason and the next Opening Day. */
+  offseason: OffseasonState | null;
+}
+
+export interface Award {
+  name: "MVP" | "Cy Young" | "Rookie of the Year";
+  league: number;
+  playerId: number;
+  teamId: number;
+  note: string;
+}
+
+export interface SeasonHistory {
+  year: number;
+  champion: number;
+  pennants: number[];
+  standings: { teamId: number; w: number; l: number; rs: number; ra: number; finish: string }[];
+  awards: Award[];
   userTeamId: number | null;
 }
 

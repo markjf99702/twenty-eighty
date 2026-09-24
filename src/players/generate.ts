@@ -57,9 +57,15 @@ function tool(present: number, future: number): ToolGrade {
   return { present: p, future: r1(clampGrade(Math.max(p, future))) };
 }
 
-/** Expected remaining growth (in grade points) for a player of this age. */
+/**
+ * Expected remaining growth (in grade points) for a player of this age. Sized
+ * so that each generation of prospects replaces the one before it: tuned with
+ * `npm run sim:years`, which plays many seasons and watches for drift.
+ */
+export const GROWTH = { perYear: 1.6, max: 11 };
+
 export function growthRoom(age: number): number {
-  return clamp((27 - age) * 2.6, 0, 18);
+  return clamp((27 - age) * GROWTH.perYear, 0, GROWTH.max);
 }
 
 /** Organizational fields for a newly generated player; the league generator assigns him. */
@@ -75,6 +81,9 @@ function unassigned(rng: Rng) {
     options: { used: 0, usedThisYear: false },
     service: 0,
     optionedDay: null,
+    contract: null,
+    career: [],
+    awards: [],
   };
 }
 
@@ -148,7 +157,8 @@ export function generateHitter(rng: Rng, opts: HitterOptions): Player {
     arm: tool(present.arm, present.arm + growth(0.3)),
   };
 
-  const powZ = (hitting.power.present - 50) / 10;
+  // A swing path is a hitter's style: it tracks the power he'll grow into, not his raw present power.
+  const powZ = (hitting.power.future - 50) / 10;
   const positions: FieldPosition[] = opts.position === "DH" ? [] : [opts.position];
   for (const p of tpl.alsoPlays) {
     if (RIGHTY_ONLY.has(p) && throws === "L") continue;
@@ -166,7 +176,7 @@ export function generateHitter(rng: Rng, opts: HitterOptions): Player {
     positions,
     hitting,
     traits: {
-      launch: r2(clamp(0.35 * powZ + 0.9 * rng.normal(), -2, 2)),
+      launch: r2(clamp(0.28 * powZ + 0.9 * rng.normal(), -2, 2)),
       pull: r2(clamp(0.3 * powZ + 0.95 * rng.normal(), -2, 2)),
       aggression: r2(clamp(0.4 * ((hitting.speed.present - 50) / 10) + 0.9 * rng.normal(), -2.5, 2.5)),
     },

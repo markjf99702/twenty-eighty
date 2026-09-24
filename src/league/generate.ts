@@ -1,6 +1,7 @@
 import { clampGrade } from "../core/grades";
 import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
+import { assignInitialContracts, budgetFor } from "../org/contracts";
 import { autoDepthChart } from "../org/depth";
 import { playerValue } from "../org/value";
 import { generateHitter, generatePitcher } from "../players/generate";
@@ -142,7 +143,7 @@ function levelRoster(rng: Rng, level: Level, strength: number, players: Player[]
  */
 const RAWNESS: Record<Level, number> = { MLB: 0, AAA: 0.25, AA: 0.45, "A+": 0.65, A: 0.85 };
 
-function rawness(p: Player, level: Level): void {
+export function rawness(p: Player, level: Level): void {
   const r = RAWNESS[level];
   if (r === 0) return;
   if (p.pitching) {
@@ -229,6 +230,8 @@ function buildTeam(rng: Rng, id: number, seed: FranchiseSeed, players: Player[],
     injured: [],
     depth: autoDepthChart(rosters.MLB.map((pid) => players[pid]!)),
     affiliates,
+    budget: budgetFor(seed.market),
+    deadMoney: [],
   };
 }
 
@@ -245,7 +248,14 @@ function shiftTool(t: ToolGrade, delta: number): void {
  * in this universe, not just in the generator's imagination. Minor leaguers
  * shift with everyone else, so their grades stay major-league relative.
  */
-export function recenterGrades(league: League): void {
+/**
+ * Where regulars' glove and arm and starting pitchers' stamina sit in a
+ * generated league. These aren't centered on 50 (a shortstop's glove is plus
+ * by nature), so each winter they're held at these levels instead.
+ */
+export const WINTER_TARGETS = { field: 57, arm: 56.5, stamina: 56 };
+
+export function recenterGrades(league: League, targets?: typeof WINTER_TARGETS): Record<string, number> {
   const { players, teams } = league;
   const hitterWeights = new Map<number, number>();
   const pitcherWeights = new Map<number, number>();
@@ -256,6 +266,7 @@ export function recenterGrades(league: League): void {
     for (const pid of t.depth.bullpen) pitcherWeights.set(pid, 0.4);
   }
 
+  const deltas: Record<string, number> = {};
   for (const key of ["hit", "power", "eye", "speed"] as const) {
     let sum = 0;
     let w = 0;
@@ -264,7 +275,20 @@ export function recenterGrades(league: League): void {
       w += weight;
     }
     const delta = 50 - sum / w;
-    for (const p of players) if (p.position !== "P") shiftTool(p.hitting[key], delta);
+    deltas[key] = delta;
+    for (const p of players) if (p.position !== "P" && p.retired === undefined) shiftTool(p.hitting[key], delta);
+  }
+  if (targets) {
+    const regulars = teams.flatMap((t) => Object.values(t.depth.starters)).map((pid) => players[pid]!);
+    for (const key of ["field", "arm"] as const) {
+      const delta = targets[key] - regulars.reduce((s, p) => s + p.hitting[key].present, 0) / regulars.length;
+      deltas[key] = delta;
+      for (const p of players) if (p.position !== "P" && p.retired === undefined) shiftTool(p.hitting[key], delta);
+    }
+    const rotation = teams.flatMap((t) => t.depth.rotation).map((pid) => players[pid]!);
+    const delta = targets.stamina - rotation.reduce((s, p) => s + p.pitching!.stamina.present, 0) / rotation.length;
+    deltas.stamina = delta;
+    for (const p of players) if (p.pitching && p.retired === undefined) shiftTool(p.pitching.stamina, delta);
   }
 
   let stuffSum = 0;
@@ -286,11 +310,12 @@ export function recenterGrades(league: League): void {
   const controlDelta = 50 - ctl.control[0]! / ctl.control[1]!;
   const commandDelta = 50 - ctl.command[0]! / ctl.command[1]!;
   for (const p of players) {
-    if (!p.pitching) continue;
+    if (!p.pitching || p.retired !== undefined) continue;
     for (const pitch of p.pitching.pitches) shiftTool(pitch.grade, stuffDelta);
     shiftTool(p.pitching.control, controlDelta);
     shiftTool(p.pitching.command, commandDelta);
   }
+  return { ...deltas, stuff: stuffDelta, control: controlDelta, command: commandDelta };
 }
 
 export function generateLeague(opts: GenerateLeagueOptions): League {
@@ -305,8 +330,12 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     players,
     transactions: [],
     userTeamId: null,
+    history: [],
+    freeAgents: [],
+    offseason: null,
   };
   recenterGrades(league);
   for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));
+  assignInitialContracts(league, rng.fork("contracts"));
   return league;
 }

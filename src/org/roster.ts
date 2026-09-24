@@ -12,7 +12,8 @@ import {
   SERVICE_DAYS_PER_YEAR,
 } from "../players/types";
 import { autoDepthChart } from "./depth";
-import { playerValue } from "./value";
+import { ensureMajorContract, outrightContract } from "./contracts";
+import { peakValue, playerValue } from "./value";
 
 /**
  * Roster rules, simplified from the real ones but faithful where it matters
@@ -40,6 +41,8 @@ export interface RosterContext {
   day: number;
   /** September rosters: 28 active, 14 pitchers. */
   expanded: boolean;
+  /** Winter and spring training: sending a player down doesn't use an option year. */
+  offseason?: boolean;
 }
 
 export const ACTIVE_LIMIT = 26;
@@ -66,7 +69,7 @@ export function positionLabel(p: Player): string {
 const label = (p: Player) => `${positionLabel(p)} ${playerName(p)}`;
 
 export function logTransaction(league: League, day: number, team: Team, p: Player, type: TransactionType, text: string): void {
-  league.transactions.push({ day, teamId: team.id, playerId: p.id, type, text });
+  league.transactions.push({ year: league.year, day, teamId: team.id, playerId: p.id, type, text });
 }
 
 export function activePitchers(league: League, team: Team): number {
@@ -141,6 +144,7 @@ export function addToFortyMan(ctx: RosterContext, team: Team, p: Player, log = t
   if (team.fortyMan.length >= FORTY_MAN_LIMIT) return fail("The 40-man roster is full. Designate someone for assignment first.");
   team.fortyMan.push(p.id);
   p.onFortyMan = true;
+  ensureMajorContract(p);
   if (log) logTransaction(ctx.league, ctx.day, team, p, "add-40", `Added ${label(p)} to the 40-man roster`);
   return ok;
 }
@@ -191,13 +195,15 @@ export function optionPlayer(ctx: RosterContext, team: Team, p: Player, to: Mino
   const check = canOption(ctx, team, p);
   if (!check.ok) return check;
   let note = "option year already used this season";
-  if (!p.options.usedThisYear) {
+  if (ctx.offseason) {
+    note = "offseason assignment, no option used";
+  } else if (!p.options.usedThisYear) {
     p.options.used++;
     p.options.usedThisYear = true;
     note = `option year ${p.options.used} of ${MAX_OPTION_YEARS}`;
   }
   moveLevel(team, p, to);
-  p.optionedDay = ctx.day;
+  p.optionedDay = ctx.offseason ? null : ctx.day;
   logTransaction(ctx.league, ctx.day, team, p, "option", `Optioned ${label(p)} to ${to} (${note})`);
   refreshDepth(ctx.league, team);
   return ok;
@@ -278,6 +284,7 @@ export function activateFromIl(ctx: RosterContext, team: Team, p: Player, to: "M
   if (p.il === "IL60") {
     team.fortyMan.push(p.id);
     p.onFortyMan = true;
+    ensureMajorContract(p);
   }
   p.il = null;
   p.ilDay = null;
@@ -343,6 +350,7 @@ export function designateForAssignment(
 
   moveLevel(team, p, "AAA");
   p.optionedDay = null;
+  outrightContract(p);
   logTransaction(league, ctx.day, team, p, "outright", `${label(p)} cleared waivers and was outrighted to AAA`);
   if (wasMlb) refreshDepth(league, team);
   return ok;
@@ -355,11 +363,18 @@ export function releasePlayer(ctx: RosterContext, team: Team, p: Player): Roster
   removeFrom(team.fortyMan, p.id);
   removeFrom(team.injured, p.id);
   const wasMlb = p.level === "MLB";
+  // The club still owes whatever is guaranteed.
+  const c = p.contract;
+  if (c && c.type === "guaranteed" && c.years > 0) team.deadMoney.push({ playerId: p.id, amount: c.salary, years: c.years });
   p.teamId = null;
   p.onFortyMan = false;
   p.il = null;
   p.ilDay = null;
+  p.contract = null;
   logTransaction(ctx.league, ctx.day, team, p, "release", `Released ${label(p)}`);
+  // Big leaguers and real prospects hit the open market; the rest leave the game.
+  if (p.service > 0 || playerValue(p) > -20 || peakValue(p) > 0) ctx.league.freeAgents.push(p.id);
+  else p.retired = ctx.league.year;
   if (wasMlb) refreshDepth(ctx.league, team);
   return ok;
 }

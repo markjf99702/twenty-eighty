@@ -96,6 +96,75 @@ export interface Injury {
 export const SERVICE_DAYS_PER_YEAR = 172;
 export const MAX_OPTION_YEARS = 3;
 
+/**
+ * Contract status. Minor league deals don't count against payroll. Players
+ * with under three years of service are pre-arbitration (near the minimum),
+ * three to six go to arbitration each winter, and six or more can become
+ * free agents when their deal runs out.
+ */
+export type ContractType = "minor" | "pre-arb" | "arb" | "guaranteed";
+
+export interface Contract {
+  type: ContractType;
+  /** This season's salary, in millions of dollars. */
+  salary: number;
+  /** Seasons left, counting the current one. */
+  years: number;
+  /** When a multi-year deal was signed, and its total value. */
+  signed?: number;
+  total?: number;
+}
+
+/** A season's line at one level, kept for the player's career record. */
+export interface CareerBatting {
+  G: number;
+  PA: number;
+  AB: number;
+  H: number;
+  D: number;
+  T: number;
+  HR: number;
+  R: number;
+  RBI: number;
+  BB: number;
+  SO: number;
+  SB: number;
+  wRCplus: number;
+  WAR: number;
+}
+
+export interface CareerPitching {
+  G: number;
+  GS: number;
+  W: number;
+  L: number;
+  SV: number;
+  outs: number;
+  H: number;
+  ER: number;
+  HR: number;
+  BB: number;
+  SO: number;
+  ERA: number;
+  FIP: number;
+  WAR: number;
+}
+
+export interface CareerLine {
+  year: number;
+  level: Level;
+  teamId: number | null;
+  bat?: CareerBatting;
+  pit?: CareerPitching;
+}
+
+export interface DraftInfo {
+  year: number;
+  round: number;
+  pick: number;
+  teamId: number;
+}
+
 export interface Player {
   id: number;
   firstName: string;
@@ -131,6 +200,18 @@ export interface Player {
   service: number;
   /** Day he was last optioned to the minors (enforces the minimum stay). */
   optionedDay: number | null;
+
+  // --- Career ------------------------------------------------------------------
+  /** Current contract (null for free agents and retired players). */
+  contract: Contract | null;
+  /** Season-by-season lines at every level. */
+  career: CareerLine[];
+  /** Awards won, e.g. "2027 Continental League MVP". */
+  awards: string[];
+  /** Amateur draft selection, if he was drafted in this universe. */
+  draft?: DraftInfo;
+  /** Year he retired. */
+  retired?: number;
 }
 
 export const playerName = (p: Player): string => `${p.firstName} ${p.lastName}`;

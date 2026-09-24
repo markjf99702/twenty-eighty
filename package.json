@@ -17,7 +17,8 @@
     "scout": "tsx scripts/scout.ts",
     "dev": "vite web",
     "build:web": "vite build web",
-    "preview": "vite preview web"
+    "preview": "vite preview web",
+    "sim:years": "tsx scripts/sim-years.ts"
   },
   "engines": {
     "node": ">=20"

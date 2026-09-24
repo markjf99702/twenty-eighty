@@ -1,7 +1,8 @@
 import { gradeToZ } from "../core/grades";
 import { OFFENSE_WEIGHTS, PITCHING_WEIGHTS } from "../players/generate";
 import { defenseZ } from "../players/defense";
-import type { FieldPosition, Level, Player } from "../players/types";
+import { projectPlayer, yearsToPeak } from "../players/development";
+import type { FieldPosition, Player } from "../players/types";
 import { FIELD_POSITIONS } from "../players/types";
 
 /**
@@ -94,22 +95,27 @@ export function playerValue(p: Player, future = false): number {
 }
 
 /**
- * Share of the gap between present and future grades a player at each level
- * is expected to close. Future grades are what a scout sees if the tools
- * come; Future Value prices in the risk that they don't, which is largest
- * far from the majors.
+ * Expected value at his peak: the best season the development model projects
+ * for him (no luck either way). For veterans it's just today's value.
  */
-const FV_REALIZATION: Record<Level, number> = { MLB: 0.6, AAA: 0.5, AA: 0.4, "A+": 0.33, A: 0.25 };
+export function peakValue(p: Player): number {
+  let best = playerValue(p);
+  let q = p;
+  const horizon = Math.min(12, yearsToPeak(p) + 1);
+  for (let y = 1; y <= horizon; y++) {
+    q = projectPlayer(q, 1);
+    best = Math.max(best, playerValue(q));
+  }
+  return best;
+}
 
 /**
  * Overall grade on the 20-80 scale. With `future`, it's a prospect list's
- * Future Value: 50 is an average regular (or mid-rotation starter), 60 an
- * above-average regular, 70 an All-Star, 80 an MVP-level player. Relievers
- * top out lower, as they do on real lists. A typical farm system's best
- * prospect comes out around 60.
+ * Future Value, the grade of his projected peak: 50 is an average regular (or
+ * mid-rotation starter), 60 an above-average regular, 70 an All-Star, 80 an
+ * MVP-level player. Relievers top out lower, as they do on real lists.
  */
 export function overallGrade(p: Player, future = false): number {
-  const now = playerValue(p);
-  const v = future ? now + FV_REALIZATION[p.level] * Math.max(0, playerValue(p, true) - now) : now;
+  const v = future ? peakValue(p) : playerValue(p);
   return Math.round(Math.max(20, Math.min(80, 50 + v / 2)));
 }

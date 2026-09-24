@@ -9,6 +9,7 @@ import type { Defense } from "../sim/battedBall";
 import type { BattedBallCounters, RunningCounters } from "../sim/game";
 import { emptyBatting, emptyFielding, emptyPitching, type LineBook } from "../stats/lines";
 import { RunTracker, type RunTrackerState } from "../stats/runExpectancy";
+import { migrateLeague } from "./migrate";
 
 /**
  * Save games: the league (plain JSON already) plus everything a season needs
@@ -17,7 +18,7 @@ import { RunTracker, type RunTrackerState } from "../stats/runExpectancy";
  */
 
 export const SAVE_FORMAT = "twenty-eighty-save";
-export const SAVE_VERSION = 1;
+export const SAVE_VERSION = 2;
 
 interface PackedBook {
   keys: string[];
@@ -119,6 +120,7 @@ export function loadGame(save: SaveGame): { league: League; season: Season | nul
   if (save.format !== SAVE_FORMAT) throw new Error("Not a twenty-eighty save file.");
   if (save.version > SAVE_VERSION) throw new Error(`Save version ${save.version} is newer than this game understands.`);
   const league = save.league;
+  migrateLeague(league, save.version);
   const s = save.season;
   if (!s) return { league, season: null };
 
