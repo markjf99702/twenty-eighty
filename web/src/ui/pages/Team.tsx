@@ -1,9 +1,10 @@
 import { useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
-import type { PlayerSummary, Status, TeamView } from "../../api/protocol";
+import type { ExtensionCandidateView, PlayerSummary, Status, TeamView } from "../../api/protocol";
 import type { DepthChart } from "../../../../src/league/types";
 import { FIELD_POSITIONS, MINOR_LEVELS } from "../../../../src/players/types";
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
+import { dollars, gainText } from "../components/Extension";
 import { PlayerTable, type RosterView } from "../components/PlayerTable";
 import { Grade } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
@@ -451,6 +452,47 @@ function Payroll({ d }: { d: TeamView }) {
       <Section title="Contracts" aside={`${p.contracts.length} big-league deals`}>
         <Table columns={columns} rows={p.contracts} rowKey={(r) => r.id} sortKey="salary" />
       </Section>
+      {d.isUser && <Extensions />}
     </>
+  );
+}
+
+/** The user's best players and what locking each one up would take. */
+function Extensions() {
+  const view = useApi("extensionCandidates", undefined);
+  type Row = ExtensionCandidateView;
+  const columns: Column<Row>[] = [
+    { key: "name", label: "Name", cls: "name", sort: (r) => r.player.name, asc: true, render: (r) => <a href={playerHref(r.player.id)}>{r.player.name}</a> },
+    { key: "pos", label: "Pos", render: (r) => r.player.pos },
+    { key: "age", label: "Age", cls: "num", sort: (r) => r.player.age, asc: true, render: (r) => r.player.age },
+    { key: "ovr", label: "Now", cls: "ctr", sort: (r) => r.player.ovr, render: (r) => <Grade g={r.player.ovr} /> },
+    { key: "deal", label: "Contract", render: (r) => <span class="dim">{r.player.contract?.label ?? "—"}</span> },
+    { key: "free", label: "FA after", title: "The last season before he can become a free agent", cls: "num", sort: (r) => r.freeAfter ?? 0, asc: true, render: (r) => r.freeAfter ?? "—" },
+    {
+      key: "best",
+      label: "Best deal by your read",
+      cls: "wrap",
+      render: (r) =>
+        r.best ? (
+          <span>
+            {r.best.years} yrs, {dollars(r.best.salary)} a year
+          </span>
+        ) : (
+          <span class="dim small">{r.reason ?? "Nothing that helps you"}</span>
+        ),
+    },
+    {
+      key: "gain",
+      label: "Gain",
+      title: "Surplus value the deal adds over keeping him as he is, by your read",
+      cls: "num",
+      sort: (r) => r.best?.gain ?? -99,
+      render: (r) => (r.best ? <span class="up">{gainText(r.best.gain)}</span> : ""),
+    },
+  ];
+  return (
+    <Section title="Extensions" aside="Open a player's page to talk terms">
+      {view.data ? <Table columns={columns} rows={view.data} rowKey={(r) => r.player.id} sortKey="gain" /> : <Loading />}
+    </Section>
   );
 }

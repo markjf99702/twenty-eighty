@@ -115,7 +115,10 @@ the GM:
   to the 40-man roster (a dot marks who's on it). A deal that would put you over 40
   still works: **Make room** lists your 40-man players, and whoever you mark to
   designate for assignment (or, in season, option to AAA to clear an active spot) goes
-  when the deal does. An offer that needs room loads into the builder to pick. AI clubs deal with each
+  when the deal does. An offer that needs room loads into the builder to pick.
+- **Extensions**: your players' pages show what each would sign for at every length,
+  and what the deal is worth by your front office's read; the Payroll tab lists your
+  best candidates, and your assistant GM brings one up in the winter and in spring. AI clubs deal with each
   other from late May, busiest in the last three weeks before the deadline, and those
   trades show up on the wire. **Payroll** shows every contract, your budget and future
   commitments; **History** keeps champions and award winners.
@@ -217,6 +220,18 @@ Every winter the whole universe moves forward a year:
   from the engine. Each club's budget is set by its owner from what the club takes in
   (see Finances and owners below); released players' guaranteed money stays on the
   books as dead money.
+- **Extensions**: any time, a club can buy out a player's arbitration years (and some
+  of his free-agent years) with a guaranteed deal of two to eight years, once it
+  covers at least one season past the pre-arbitration scale. He asks, season by
+  season, for what he'd otherwise make: the minimum, arbitration awards, then his
+  free-agent price, less a discount for the security (8% on arbitration years, 2-8% on
+  free-agent years, more the further off free agency is), spread evenly over the deal.
+  His side knows him about as well as his club does, so a deal that sees him as he is
+  gains the club only a little (about 10% of the money); what makes a deal is being
+  right about him, and the club carries the risk if he fades or gets hurt. Players
+  within two years of a deal's end can talk; about a third of players a season from
+  free agency would rather test the market. In season the deal starts at once. AI
+  clubs sign 15-25 extensions each spring, with the players their own scouts like.
 - **The draft**: ten rounds in reverse order of the standings, high schoolers (18,
   raw, the most room to grow) and college players (21-22, closer to ready).
 - **Free agency**: every free agent asks for years and salary from his projected

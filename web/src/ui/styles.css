@@ -1344,3 +1344,11 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .tbl select.sel { padding: 2px 4px; width: 9.5em; }
 .room-note { margin: 0; color: var(--ink-2); font-size: 14px; }
 .on40 { color: var(--accent-text); font-size: 11px; }
+
+/* ------------------------------------------------------------------ extensions */
+
+.ext { display: grid; gap: 10px; }
+.ext .facts .v.up, .tbl .up { color: var(--accent-text); }
+.ext p { margin: 0; max-width: 62ch; }
+.ext-reason { margin: 0; color: var(--ink-2); max-width: 62ch; }
+.tbl td.wrap, .tbl th.wrap { white-space: normal; min-width: 14em; max-width: 26em; }

@@ -25,6 +25,7 @@ import { unreadAdvice } from "../../../src/advice/advice";
 import { mood } from "../../../src/finance/owner";
 import { settingsOf } from "../../../src/league/settings";
 import { committed, payroll } from "../../../src/org/contracts";
+import { extensionCandidates, extensionGain, extensionOptions, serviceClock } from "../../../src/org/extensions";
 import { offerLive } from "../../../src/org/offers";
 import { surplusValue, TRADE_DEADLINE_DAY } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
@@ -39,6 +40,8 @@ import type {
   BoxScoreView,
   Confidence,
   ContractView,
+  ExtensionCandidateView,
+  ExtensionView,
   PayrollView,
   DashboardView,
   GameItem,
@@ -722,7 +725,8 @@ function familiarityLabel(league: League, p: Player): string {
 // ---------------------------------------------------------------------------
 // Transactions, scores, box scores
 
-const MAJOR_TYPES = new Set(["call-up", "option", "il-place", "il-activate", "il-transfer", "dfa", "claim", "outright", "release", "add-40", "injury"]);
+/** Moves between affiliates: hidden unless the wire asks for minor league shuffles. */
+const SHUFFLES = new Set(["promote", "demote"]);
 
 export function transactions(season: Season, opts: { teamId?: number; majorOnly?: boolean; limit?: number }): TransactionItem[] {
   const league = season.league;
@@ -730,7 +734,7 @@ export function transactions(season: Season, opts: { teamId?: number; majorOnly?
   for (let i = league.transactions.length - 1; i >= 0 && out.length < (opts.limit ?? 200); i--) {
     const t = league.transactions[i]!;
     if (opts.teamId !== undefined && t.teamId !== opts.teamId) continue;
-    if (opts.majorOnly && !MAJOR_TYPES.has(t.type)) continue;
+    if (opts.majorOnly && SHUFFLES.has(t.type)) continue;
     out.push({ date: dateLabel(season, t.day), year: t.year, teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
   }
   return out;
@@ -893,3 +897,47 @@ export function postseasonView(season: Season): PostseasonView | null {
 }
 
 export { positionLabel };
+
+// ---------------------------------------------------------------------------
+// Extensions
+
+const seasonLeft = (season: Season) => (season.league.offseason ? 1 : Math.max(0, 1 - season.day / season.totalDays));
+
+function clock(season: Season, p: Player): { clock: string | null; freeAfter: number | null } {
+  const c = serviceClock(season.league, p, seasonLeft(season));
+  if (!c) return { clock: null, freeAfter: null };
+  const parts = [`${c.service.toFixed(1)} years of service`];
+  if (c.arbFrom !== null) parts.push(c.arbFrom === contractYear(season) ? "arbitration-eligible" : `arbitration from ${c.arbFrom}`);
+  parts.push(`free agent after ${c.freeAfter}`);
+  return { clock: parts.join(" · "), freeAfter: c.freeAfter };
+}
+
+/** What an extension with one of the user's players would look like (null for anyone else's). */
+export function extensionView(season: Season, p: Player): ExtensionView | null {
+  const league = season.league;
+  const user = league.userTeamId;
+  if (user === null || p.teamId !== user) return null;
+  const fraction = seasonLeft(season);
+  const offer = extensionOptions(league, p, fraction);
+  const mine = warShift(season, user, p);
+  return {
+    reason: offer.ok ? null : offer.reason,
+    ...clock(season, p),
+    inSeason: !league.offseason,
+    options: offer.ok ? offer.options.map((t) => ({ ...t, gain: extensionGain(league, p, t, fraction, mine) })) : [],
+  };
+}
+
+/** The user's players worth talking to about an extension, with the best deal by the user's read. */
+export function extensionCandidatesView(season: Season, stats: StatsCache): ExtensionCandidateView[] {
+  const league = season.league;
+  const user = league.userTeamId;
+  if (user === null) return [];
+  const seen = (viewer: number, p: Player) => warShift(season, viewer, p);
+  return extensionCandidates(league, league.teams[user]!, seasonLeft(season), seen).map((c) => ({
+    player: playerSummary(c.p, season, stats),
+    ...clock(season, c.p),
+    reason: c.offer.ok ? null : c.offer.reason,
+    best: c.best ? { ...c.best.terms, gain: c.best.gain } : null,
+  }));
+}

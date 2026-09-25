@@ -27,6 +27,7 @@ import {
   rosterProblems,
 } from "../../../src/org/roster";
 import { payroll } from "../../../src/org/contracts";
+import { extensionOptions, signExtension } from "../../../src/org/extensions";
 import { evaluateTrade, executeTrade, makeRoom, roomMoveProblem, rostersAfter } from "../../../src/org/trades";
 import { warShift } from "../../../src/scouting/analytics";
 import {
@@ -67,6 +68,8 @@ import {
   boxScoreView,
   dashboardView,
   dateLabel,
+  extensionCandidatesView,
+  extensionView,
   gameItems,
   playerView,
   postseasonView,
@@ -639,6 +642,33 @@ const handlers: Handlers = {
 
   offers() {
     return offerViews(requireSeason(), stats);
+  },
+
+  extension({ playerId }) {
+    const s = requireSeason();
+    const p = s.league.players[playerId];
+    return p ? extensionView(s, p) : null;
+  },
+
+  signExtension({ playerId, years }) {
+    const s = requireSeason();
+    const team = userTeam();
+    const p = s.league.players[playerId];
+    if (!p || p.teamId !== team.id) return { ok: false, reason: "He isn't in your organization." };
+    if (s.league.gm?.fired) return { ok: false, reason: "You don't run the club anymore." };
+    const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
+    const offer = extensionOptions(s.league, p, fraction);
+    if (!offer.ok) return offer;
+    const terms = offer.options.find((t) => t.years === years);
+    if (!terms) return { ok: false, reason: `He won't sign for ${years} years.` };
+    signExtension(ctx(), team, p, terms);
+    stats.clear();
+    persistSoon();
+    return { ok: true };
+  },
+
+  extensionCandidates() {
+    return extensionCandidatesView(requireSeason(), stats);
   },
 
   answerOffer({ id, accept }) {

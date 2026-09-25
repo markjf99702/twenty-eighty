@@ -3,6 +3,7 @@ import { bump, call, useApi } from "../../api/client";
 import type { CareerLine, PlayerView, StatLine, Status } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeBar, PresentFuture } from "../components/Grade";
+import { ExtensionPanel } from "../components/Extension";
 import { RosterMoves, StatusBadges } from "../components/PlayerTable";
 import { LEVEL_NAMES, fixed, gradeWord, ip, pct, rate3, scout, whole } from "../format";
 import { useBasics } from "../settings";
@@ -138,6 +139,8 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
               </div>
             )}
           </Section>
+
+          {v.team && status.userTeamId === v.team.id && <ExtensionPanel playerId={playerId} name={p.name} />}
 
           <Section title="Status">
             <div class="facts">

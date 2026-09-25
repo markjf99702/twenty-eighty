@@ -62,7 +62,12 @@ late May, more near `TRADE_DEADLINE_DAY`) and now and then proposes a deal to th
 (`proposeToUser`; winter weeks call `winterOffer`). Offers live in `league.tradeOffers`
 on one clock (`offerClock`: season days, then 1000 plus the winter day) and are only
 made if the club would accept them as a proposal. After a trade the AI trims active
-rosters the next morning (`trimActiveRoster`). The user can attach `RoomMove`s (option or
+rosters the next morning (`trimActiveRoster`). Extensions (src/org/extensions.ts) are ordinary guaranteed contracts: `extensionOptions`
+prices each length from the player's year-by-year alternative (on his near-true read,
+`agentShift`), `extensionGain` compares surplus with and without, `signExtension` also
+clears a pending tender or expiring contract, and `aiExtensions` runs at spring training.
+`controlYears` and extensions share `serviceAt`, the service clock (in season it counts
+only what a player will have banked by each spring). The user can attach `RoomMove`s (option or
 DFA) to a deal: `evaluateTrade` counts them toward the 40-man, `roomMoveProblem`
 validates them, and `makeRoom` makes them after `executeTrade`. Sim stop triggers are checked in the
 worker after each day.

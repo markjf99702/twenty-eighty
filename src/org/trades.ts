@@ -2,7 +2,7 @@ import type { Rng } from "../core/rng";
 import { dials } from "../league/settings";
 import type { League, Team } from "../league/types";
 import { projectPlayer } from "../players/development";
-import { LEVELS, type Level, playerName, type Player } from "../players/types";
+import { LEVELS, type Level, playerName, type Player, SERVICE_DAYS_PER_YEAR } from "../players/types";
 import {
   ARB_SHARE,
   ARB_YEARS,
@@ -34,7 +34,7 @@ import {
  */
 
 /** Each year further out is worth this much less. */
-const DISCOUNT = 0.1;
+export const DISCOUNT = 0.1;
 /** The last day of the season (from Opening Day) that trades are allowed: July 31. */
 export const TRADE_DEADLINE_DAY = 127;
 
@@ -47,50 +47,65 @@ export interface ControlYear {
   guaranteed: boolean;
 }
 
+/** Seasons until a prospect is projected to be a big leaguer (0 for anyone already there or with service time). */
+export function yearsToMajors(p: Player): number {
+  if (p.level === "MLB" || serviceYears(p) > 0) return 0;
+  let eta = 0;
+  let r = p;
+  while (eta < 6 && seasonWar(r) < 1) {
+    r = projectPlayer(r, 1);
+    eta++;
+  }
+  return eta;
+}
+
+/**
+ * Service years at the start of each season from now (0 = this season, or in
+ * the winter the coming one). `fraction` is how much of this season is left:
+ * a player banks it if he's in the majors or ready to be, and a prospect's
+ * clock starts when he's projected to arrive.
+ */
+export function serviceAt(p: Player, fraction: number, eta = yearsToMajors(p)): (y: number) => number {
+  const active = p.level === "MLB" || p.il !== null || eta === 0;
+  const next = Math.floor((p.service + (active ? fraction * SERVICE_DAYS_PER_YEAR : 0)) / SERVICE_DAYS_PER_YEAR);
+  return (y) => (y === 0 ? (active ? Math.max(0, next - 1) : serviceYears(p)) : next + Math.max(0, y - Math.max(1, eta)));
+}
+
 /**
  * The seasons a club controls a player, with projected WAR and salary.
  * `fraction` is how much of the current season is left (1 in the offseason).
+ * Control runs through a guaranteed deal and until six years of service; a
+ * prospect adds nothing in the majors until he's projected to arrive (though
+ * a guaranteed deal still pays him).
  */
 export function controlYears(p: Player, fraction = 1, warShift = 0): ControlYear[] {
   const c = p.contract;
   if (!c || p.teamId === null) return [];
+  const eta = yearsToMajors(p);
+  const svc = serviceAt(p, fraction, eta);
+  const guaranteed = c.type === "guaranteed" ? c.years : 0;
+  let control = eta;
+  while (control < 12 && svc(control) < FREE_AGENT_YEARS) control++;
   const out: ControlYear[] = [];
   let q = p;
-  if (c.type === "guaranteed") {
-    for (let y = 0; y < c.years; y++) {
-      out.push({ offset: y, war: seasonWar(q) + warShift, salary: c.salary, guaranteed: true });
-      q = projectPlayer(q, 1);
+  for (let y = 0; y < Math.min(12, Math.max(guaranteed, control)); y++) {
+    const war = y < eta ? 0 : seasonWar(q) + warShift;
+    let salary: number;
+    if (y < guaranteed) salary = c.salary;
+    else if (y < eta) salary = 0;
+    else if (y === 0 && c.type !== "minor") salary = c.salary;
+    else {
+      const s = svc(y);
+      salary = s < ARB_YEARS ? MIN_SALARY : ARB_SHARE[Math.min(ARB_SHARE.length - 1, s - ARB_YEARS)]! * marketSalary(war);
     }
-    return out;
-  }
-  // Pre-arbitration and arbitration: control runs until six years of service.
-  // A prospect's clock starts when he's projected to be a big leaguer.
-  const service = serviceYears(p);
-  let eta = 0;
-  if (p.level !== "MLB" && service === 0) {
-    let r = p;
-    while (eta < 6 && seasonWar(r) < 1) {
-      r = projectPlayer(r, 1);
-      eta++;
-    }
-  }
-  const years = Math.max(0, FREE_AGENT_YEARS - service) + eta;
-  for (let y = 0; y < Math.min(12, years); y++) {
-    const war = seasonWar(q) + warShift;
-    if (y < eta) {
-      out.push({ offset: y, war: 0, salary: 0, guaranteed: false });
-    } else {
-      const svc = service + (y - eta);
-      const salary =
-        y === 0 && c.type !== "minor"
-          ? c.salary
-          : svc < ARB_YEARS
-            ? MIN_SALARY
-            : ARB_SHARE[Math.min(ARB_SHARE.length - 1, svc - ARB_YEARS)]! * marketSalary(war);
-      out.push({ offset: y, war, salary, guaranteed: false });
-    }
+    out.push({ offset: y, war, salary, guaranteed: y < guaranteed });
     q = projectPlayer(q, 1);
   }
+  return prorate(out, fraction);
+}
+
+/** In season, only what's left of this year counts. */
+function prorate(out: ControlYear[], fraction: number): ControlYear[] {
   if (out[0]) {
     out[0].war *= fraction;
     out[0].salary *= fraction;

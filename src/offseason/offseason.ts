@@ -18,6 +18,7 @@ import {
   serviceYears,
 } from "../org/contracts";
 import { logTransaction, refreshDepth, releasePlayer, type RosterContext } from "../org/roster";
+import { aiExtensions } from "../org/extensions";
 import { winterOffer } from "../org/offers";
 import { aiTradeMarket } from "../org/trades";
 import { believedWar, warShift } from "../scouting/analytics";
@@ -324,6 +325,8 @@ function advancePhase(league: League, season: Season): Season | null {
     }
     case "international":
       finishInternational(league, s.international!, WINTER_DAYS.international, null);
+      // Spring is when clubs lock up the players they believe in.
+      aiExtensions(winterContext(league, "spring"), winterRng(league, "extensions"), (viewer, p) => warShift(season, viewer, p));
       springTraining(winterContext(league, "spring"), waivers);
       setGoals(league, WINTER_DAYS.spring);
       s.phase = "spring";

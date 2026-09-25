@@ -495,6 +495,39 @@ export interface OffseasonView {
   payroll: { payroll: number; staff: number; budget: number; fortyMan: number };
 }
 
+export interface ExtensionOptionView {
+  years: number;
+  /** Annual salary, $M. */
+  salary: number;
+  total: number;
+  first: number;
+  through: number;
+  /** Seasons it covers that would have been pre-arbitration, arbitration and free agency. */
+  covers: { preArb: number; arb: number; free: number };
+  /** What the deal adds over keeping him as he is, in surplus value by your front office's read, $M. */
+  gain: number;
+}
+
+export interface ExtensionView {
+  /** Why he won't sign one right now (null when he will). */
+  reason: string | null;
+  /** "2.4 years of service · arbitration from 2028 · free agent after 2031". */
+  clock: string | null;
+  /** The last season before he can walk. */
+  freeAfter: number | null;
+  inSeason: boolean;
+  options: ExtensionOptionView[];
+}
+
+export interface ExtensionCandidateView {
+  player: PlayerSummary;
+  clock: string | null;
+  freeAfter: number | null;
+  reason: string | null;
+  /** The length that gains the most by your read (null if none gains). */
+  best: ExtensionOptionView | null;
+}
+
 export interface TradeSide {
   team: TeamRef;
   players: (PlayerSummary & { surplus: number })[];
@@ -699,6 +732,9 @@ export interface Api {
   tradeSides: { req: { partnerId: number }; res: { mine: TradeSide; theirs: TradeSide } };
   trade: { req: { partnerId: number; give: number[]; get: number[]; moves?: RoomMove[]; execute: boolean }; res: TradeCheckView };
   offers: { req: void; res: OfferView[] };
+  extension: { req: { playerId: number }; res: ExtensionView | null };
+  signExtension: { req: { playerId: number; years: number }; res: { ok: boolean; reason?: string } };
+  extensionCandidates: { req: void; res: ExtensionCandidateView[] };
   answerOffer: { req: { id: number; accept: boolean }; res: { ok: boolean; reason?: string; warning?: string } };
   setSettings: { req: Partial<GameSettings>; res: Status };
   advice: { req: void; res: AdviceView[] };

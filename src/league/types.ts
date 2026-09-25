@@ -88,7 +88,8 @@ export type TransactionType =
   | "retire"
   | "non-tender"
   | "free-agent"
-  | "arbitration";
+  | "arbitration"
+  | "extension";
 
 export interface Transaction {
   /** Season the move belongs to; offseason moves carry the season just finished. */

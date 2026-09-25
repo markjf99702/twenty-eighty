@@ -4,6 +4,7 @@ import { expectedGate, formFactor, referencePrice } from "../finance/finance";
 import { settingsOf } from "../league/settings";
 import type { AdviceNote, League, Team } from "../league/types";
 import { budgetRoom, FREE_AGENT_YEARS, orgPlayers, payroll, serviceYears } from "../org/contracts";
+import { extensionCandidates } from "../org/extensions";
 import { gamesOut } from "../org/offers";
 import { rosterProblems } from "../org/roster";
 import { TRADE_DEADLINE_DAY } from "../org/trades";
@@ -12,7 +13,7 @@ import { boardValue } from "../offseason/draft";
 import { IL_THRESHOLD_DAYS } from "../players/injuries";
 import { randomName } from "../players/names";
 import { FIELD_POSITIONS, type FieldPosition, type Level, playerName, type Player } from "../players/types";
-import { belief, believedWar } from "../scouting/analytics";
+import { belief, believedWar, warShift } from "../scouting/analytics";
 import { perceive, staffCost, valueShift } from "../scouting/scouting";
 import type { Season } from "../season/season";
 import type { BattingLine, PitchingLine } from "../stats/lines";
@@ -398,6 +399,25 @@ export function winterAdvice(league: League, season: Season, now: number): void 
       if (cut.length) parts.push(`By our read, ${cut.map((t) => `${tag(P(t.playerId))} (${money(t.salary)} for about ${Math.max(0, war(P(t.playerId))).toFixed(1)} wins)`).join(", ")} ${cut.length === 1 ? "costs" : "cost"} more than ${cut.length === 1 ? "he's" : "they're"} worth in arbitration; consider non-tendering.`);
       if (keep.length) parts.push(`${keep.map((t) => tag(P(t.playerId))).join(", ")} ${keep.length === 1 ? "is" : "are"} marked to be non-tendered, but we think ${keep.length === 1 ? "he's" : "they're"} worth the raise.`);
       add(league, now, { key: `tender:${league.year}`, from: "assistant", urgent: false, title: "Arbitration decisions", text: parts.join(" "), href: "#winter" });
+    }
+  }
+
+  // The winter review and spring training: the best player to lock up, if a deal looks good.
+  if (w.phase === "review" || w.phase === "spring") {
+    const seen = (viewer: number, p: Player) => warShift(season, viewer, p);
+    const top = extensionCandidates(league, team, 1, seen, 8)
+      .filter((c) => c.best && c.best.gain >= 3)
+      .sort((a, b) => b.best!.gain - a.best!.gain)[0];
+    if (top?.best) {
+      const t = top.best.terms;
+      add(league, now, {
+        key: `extend:${league.year}:${w.phase}`,
+        from: "assistant",
+        urgent: false,
+        title: `Time to lock up ${playerName(top.p)}?`,
+        text: `${tag(top.p)} would sign for ${t.years} years at ${money(t.salary)} a year, through ${t.through}. By our read that's worth ${money(top.best.gain)} more than going year to year. The risk is ours if he gets hurt or fades.`,
+        href: `#player-${top.p.id}`,
+      });
     }
   }
 
