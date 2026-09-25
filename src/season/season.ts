@@ -1,3 +1,4 @@
+import { seasonAdvice } from "../advice/advice";
 import { Rng } from "../core/rng";
 import { accrueDay, bookGate, crowdFor } from "../finance/finance";
 import { ownerCheckIn } from "../finance/owner";
@@ -639,6 +640,8 @@ export class Season {
     ownerCheckIn(this);
     // Overnight: trades between clubs, and now and then an offer to the user.
     if (this.aiRosters) tradeDay(this);
+    // And the user's staff has its say.
+    seasonAdvice(this);
     this.day++;
     return out;
   }

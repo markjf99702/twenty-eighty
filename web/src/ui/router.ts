@@ -22,6 +22,7 @@ export type Route =
   | { page: "scouting" }
   | { page: "finances"; teamId: number | null }
   | { page: "owner" }
+  | { page: "staff" }
   | { page: "office" };
 
 export function parse(hash: string): Route {
@@ -59,6 +60,8 @@ export function parse(hash: string): Route {
       return { page: "finances", teamId: n(a) };
     case "owner":
       return { page: "owner" };
+    case "staff":
+      return { page: "staff" };
     default:
       return { page: "home" };
   }
@@ -98,6 +101,8 @@ export function href(r: Route): string {
       return r.teamId === null ? "#finances" : `#finances-${r.teamId}`;
     case "owner":
       return "#owner";
+    case "staff":
+      return "#staff";
   }
 }
 

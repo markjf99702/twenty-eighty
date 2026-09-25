@@ -21,7 +21,9 @@ import {
   type RosterContext,
   rosterProblems,
 } from "../../../src/org/roster";
+import { unreadAdvice } from "../../../src/advice/advice";
 import { mood } from "../../../src/finance/owner";
+import { settingsOf } from "../../../src/league/settings";
 import { committed, payroll } from "../../../src/org/contracts";
 import { offerLive } from "../../../src/org/offers";
 import { surplusValue, TRADE_DEADLINE_DAY } from "../../../src/org/trades";
@@ -147,6 +149,8 @@ export function status(league: League | null, season: Season | null, hasSave: bo
     record: rec ? { w: rec.w, l: rec.l } : null,
     owner: league.gm ? { confidence: league.gm.confidence, mood: mood(league.gm.confidence), fired: league.gm.fired } : null,
     offers: user !== null ? league.tradeOffers.filter((o) => offerLive(league, o, offerClock(league, season))).length : 0,
+    settings: settingsOf(league),
+    staffUnread: user !== null ? unreadAdvice(league) : 0,
     deadline:
       !league.offseason && season.day <= TRADE_DEADLINE_DAY
         ? { date: dateLabel(season, TRADE_DEADLINE_DAY), daysLeft: TRADE_DEADLINE_DAY - season.day }

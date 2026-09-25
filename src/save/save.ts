@@ -19,7 +19,7 @@ import { migrateLeague } from "./migrate";
  */
 
 export const SAVE_FORMAT = "twenty-eighty-save";
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 
 interface PackedBook {
   keys: string[];

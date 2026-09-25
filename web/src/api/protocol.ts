@@ -2,12 +2,13 @@
  * Messages between the UI and the simulation worker, and the view models the
  * worker sends back. Everything here is plain, structured-cloneable data.
  */
+import type { GameSettings } from "../../../src/league/settings";
 import type { DepthChart, TransactionType } from "../../../src/league/types";
 import type { OffseasonPhase } from "../../../src/offseason/types";
 import type { CareerLine, ContractType, FieldPosition, Level, MinorLevel, PitchType } from "../../../src/players/types";
 import type { HitterRow, PitcherRow } from "../../../src/season/season";
 
-export type { CareerLine, HitterRow, OffseasonPhase, PitcherRow };
+export type { CareerLine, GameSettings, HitterRow, OffseasonPhase, PitcherRow };
 
 export interface TeamRef {
   id: number;
@@ -46,6 +47,22 @@ export interface Status {
   deadline?: { date: string; daysLeft: number } | null;
   /** Why the last sim stopped early (a stop trigger), if it did. */
   stop?: StopNote;
+  settings?: GameSettings;
+  /** Staff notes not yet read. */
+  staffUnread?: number;
+}
+
+export interface AdviceView {
+  key: string;
+  from: "assistant" | "scouting" | "analytics" | "business";
+  /** "Dana Ruiz, Assistant GM". */
+  who: string;
+  when: string;
+  urgent: boolean;
+  title: string;
+  text: string;
+  href?: string;
+  read: boolean;
 }
 
 /** When a running sim should stop by itself. */
@@ -58,10 +75,12 @@ export interface StopRules {
   offer: boolean;
   /** Stop with deadline day still to play. */
   deadline: boolean;
+  /** A staff member sends an urgent note. */
+  staff: boolean;
 }
 
 export interface StopNote {
-  kind: "streak" | "injury" | "offer" | "deadline";
+  kind: "streak" | "injury" | "offer" | "deadline" | "staff";
   text: string;
   /** Where to look (a route hash). */
   href?: string;
@@ -628,7 +647,7 @@ export interface OwnerView {
 export interface Api {
   status: { req: void; res: Status };
   newGameTeams: { req: { seed: string }; res: NewGameTeam[] };
-  newGame: { req: { seed: string; teamId: number; minors: boolean }; res: Status };
+  newGame: { req: { seed: string; teamId: number; minors: boolean; settings?: GameSettings }; res: Status };
   load: { req: void; res: Status };
   importSave: { req: { text: string }; res: Status };
   exportSave: { req: void; res: string };
@@ -667,6 +686,9 @@ export interface Api {
   trade: { req: { partnerId: number; give: number[]; get: number[]; execute: boolean }; res: TradeCheckView };
   offers: { req: void; res: OfferView[] };
   answerOffer: { req: { id: number; accept: boolean }; res: { ok: boolean; reason?: string; warning?: string } };
+  setSettings: { req: Partial<GameSettings>; res: Status };
+  advice: { req: void; res: AdviceView[] };
+  readAdvice: { req: void; res: Status };
   history: { req: void; res: HistoryView };
   scouting: { req: void; res: ScoutingView };
   setDepartments: { req: { scouting: number; analytics: number }; res: { ok: boolean; reason?: string } };

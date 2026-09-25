@@ -1,6 +1,7 @@
 import { Rng } from "../core/rng";
 import type { League } from "../league/types";
 import { createFinance } from "../finance/finance";
+import { DEFAULT_SETTINGS } from "../league/settings";
 import { createOwner, hireGm } from "../finance/owner";
 import { assignInitialContracts, budgetFor } from "../org/contracts";
 import { defaultScouting } from "../scouting/scouting";
@@ -9,7 +10,8 @@ import { defaultScouting } from "../scouting/scouting";
  * Bring an older save up to date. Version 1 predates contracts, careers and
  * league history: those start fresh, with contracts assigned the way a new
  * universe's are. Version 2 predates scouting departments; version 3
- * predates finances and owners; version 4, trade offers.
+ * predates finances and owners; version 4, trade offers; version 5, settings
+ * and staff advice.
  */
 export function migrateLeague(league: League, fromVersion: number): void {
   if (fromVersion < 2) {
@@ -48,5 +50,11 @@ export function migrateLeague(league: League, fromVersion: number): void {
   if (fromVersion < 5) {
     // Trade offers to the user arrive.
     (league as Partial<League> & League).tradeOffers ??= [];
+  }
+  if (fromVersion < 6) {
+    // Difficulty, stat detail and staff advice arrive; older games play as they did.
+    const l = league as Partial<League> & League;
+    l.settings ??= { ...DEFAULT_SETTINGS };
+    l.advice ??= [];
   }
 }

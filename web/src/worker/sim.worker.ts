@@ -5,6 +5,7 @@
  */
 import { bestTicketPrice } from "../../../src/finance/finance";
 import { acceptJob, hireGm } from "../../../src/finance/owner";
+import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { generateLeague } from "../../../src/league/generate";
 import { answerOffer } from "../../../src/org/offers";
 import { TRADE_DEADLINE_DAY } from "../../../src/org/trades";
@@ -91,14 +92,18 @@ let stopRequested = false;
 /** Minimum wall-clock time per simulated day (the user's sim speed). */
 let msPerDay = 0;
 /** When a running sim stops by itself. */
-let stops: StopRules = { streak: 0, injury: false, offer: true, deadline: true };
+let stops: StopRules = { streak: 0, injury: false, offer: true, deadline: true, staff: true };
 
 /** What the day just played changed that the user asked to be stopped for. */
-function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number }): StopNote | null {
+function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: number }): StopNote | null {
   const league = s.league;
   const user = league.userTeamId;
   if (user === null) return null;
   const team = s.team(user);
+  if (stops.staff) {
+    const urgent = league.advice.slice(before.notes).find((a) => a.urgent);
+    if (urgent) return { kind: "staff", text: `${STAFF_TITLES[urgent.from]}: ${urgent.title}. ${urgent.text}`, href: urgent.href ?? "#staff" };
+  }
   if (stops.offer) {
     const o = league.tradeOffers.find((x) => x.status === "open" && !before.offers.has(x.id));
     if (o) return { kind: "offer", text: `Trade offer. ${o.pitch}`, href: "#trades" };
@@ -316,9 +321,11 @@ const handlers: Handlers = {
     return previewTeams(leagueFor(seed));
   },
 
-  async newGame({ seed, teamId, minors }) {
+  async newGame({ seed, teamId, minors, settings }) {
     const l = leagueFor(seed);
     preview = null;
+    // Settings first: the difficulty sets the budget and the owner's patience.
+    if (settings) l.settings = { ...l.settings, ...settings };
     hireGm(l, teamId);
     league = l;
     season = new Season(l, { minors });
@@ -375,6 +382,7 @@ const handlers: Handlers = {
           offers: new Set(s.league.tradeOffers.map((o) => o.id)),
           streak: user !== null ? s.records[user]!.streak : 0,
           start,
+          notes: s.league.advice.length,
         };
         s.simDay();
         progress(s.day - start, target - start);
@@ -692,6 +700,38 @@ const handlers: Handlers = {
     acceptJob(s.league, teamId);
     stats.clear();
     await persist();
+    return currentStatus();
+  },
+
+  // --- Settings and the staff ------------------------------------------------
+
+  async setSettings(patch) {
+    const s = requireSeason();
+    s.league.settings = { ...s.league.settings, ...patch };
+    stats.clear();
+    await persist();
+    return currentStatus();
+  },
+
+  advice() {
+    const s = requireSeason();
+    const league = s.league;
+    return [...league.advice].reverse().map((a) => ({
+      key: a.key,
+      from: a.from,
+      who: `${staffName(league, a.from)}, ${STAFF_TITLES[a.from]}`,
+      when: a.at >= 1000 ? `Winter ${a.year}-${String(a.year + 1).slice(2)}` : `${dateLabel(s, Math.min(a.at, s.totalDays - 1))}, ${a.year}`,
+      urgent: a.urgent,
+      title: a.title,
+      text: a.text,
+      href: a.href,
+      read: a.read,
+    }));
+  },
+
+  readAdvice() {
+    for (const a of requireSeason().league.advice) a.read = true;
+    persistSoon();
     return currentStatus();
   },
 

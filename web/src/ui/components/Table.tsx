@@ -1,5 +1,6 @@
 import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
+import { GLOSSARY } from "../format";
 
 export interface Column<T> {
   key: string;
@@ -65,7 +66,7 @@ export function Table<T>(props: Props<T>) {
                 <th
                   key={c.key}
                   class={`${c.cls ?? ""}${sort.key === c.key ? " sorted" : ""}`}
-                  title={c.title}
+                  title={c.title ?? GLOSSARY[c.label]}
                   aria-sort={sort.key === c.key ? (sort.asc ? "ascending" : "descending") : undefined}
                 >
                   {c.sort ? (

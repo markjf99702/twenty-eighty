@@ -1,6 +1,7 @@
 import { hashNormal, seedHash } from "../core/hash";
 import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
+import { dials } from "../league/settings";
 import type { League, Team } from "../league/types";
 import { orgPlayers } from "../org/contracts";
 import { teamStrength } from "../org/trades";
@@ -36,7 +37,6 @@ export const STYLE_LABEL: Record<OwnerStyle, string> = {
   patient: "Patient builder",
 };
 
-export const STARTING_CONFIDENCE = 60;
 export const FIRING_LINE = 20;
 /** A young regular: 25 or younger with this much big-league work in a season. */
 export const YOUTH_PA = 150;
@@ -79,12 +79,15 @@ function say(gm: GmState, m: OwnerMessage): void {
 }
 
 /** Put the user in charge of a club. */
-export function hireGm(league: League, teamId: number, confidence = STARTING_CONFIDENCE, day = 0): GmState {
+export function hireGm(league: League, teamId: number, confidence?: number, day = 0): GmState {
   const team = league.teams[teamId]!;
+  // The difficulty sets the owner's starting faith and how much money there is.
+  const d = dials(league);
+  team.budget = Math.round(team.budget * d.budget);
   const year = league.offseason ? league.year + 1 : league.year;
   const gm: GmState = {
     teamId,
-    confidence,
+    confidence: confidence ?? d.startConfidence,
     hired: year,
     seasons: 0,
     expectedWins: null,
@@ -142,7 +145,8 @@ export function setGoals(league: League, day = 0): void {
   const year = league.offseason ? league.year + 1 : league.year;
   const e = expectedWins(league, team.id);
   const goals: OwnerGoal[] = [];
-  const add = (kind: GoalKind, target: number, weight: number) => goals.push({ kind, target, weight });
+  const bump = dials(league).winGoal;
+  const add = (kind: GoalKind, target: number, weight: number) => goals.push({ kind, target: kind === "wins" ? target + bump : target, weight });
   const fans = () => {
     const form = formFactor(e, 162 - e);
     const projected = expectedGate(team, bestTicketPrice(team), form).fans;
@@ -261,7 +265,8 @@ export function reviewSeason(league: League, season: Season): GmReview | null {
   const l = team.finance.ledger;
   const before = gm.confidence;
   // A new GM gets some rope in the first season.
-  const patience = OWNER_PATIENCE[owner.style] * (gm.seasons === 0 ? 1.6 : 1);
+  const d = dials(league);
+  const patience = OWNER_PATIENCE[owner.style] * (gm.seasons === 0 ? 1.6 : 1) * d.ownerPatience;
   const scale = (d: number) => (d < 0 ? d / patience : d);
 
   const goals: GoalResult[] = goalProgress(league, season).map(({ goal, actual, met }) => {
@@ -301,7 +306,7 @@ export function reviewSeason(league: League, season: Season): GmReview | null {
   const met = goals.filter((g) => g.met).length;
   const day = season.totalDays + 30;
   const tally = goals.length ? `You met ${met} of ${goals.length} goal${goals.length === 1 ? "" : "s"}. ` : "";
-  const fired = gm.confidence < FIRING_LINE && (gm.seasons >= 2 || gm.confidence < 10);
+  const fired = gm.seasons > d.graceSeasons && gm.confidence < FIRING_LINE && (gm.seasons >= 2 || gm.confidence < 10);
   if (fired) {
     gm.fired = true;
     gm.offers = jobOffers(league, season, team.id);

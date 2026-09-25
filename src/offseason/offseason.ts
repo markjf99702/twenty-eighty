@@ -1,3 +1,4 @@
+import { winterAdvice } from "../advice/advice";
 import { clamp } from "../core/math";
 import { closeBooks, priceTickets } from "../finance/finance";
 import { acceptJob, reviewSeason, setGoals } from "../finance/owner";
@@ -241,6 +242,7 @@ export function beginOffseason(league: League, season: Season): OffseasonState {
     international: null,
   };
   league.offseason = state;
+  winterAdvice(league, season, offerClock(league, season));
   return state;
 }
 
@@ -286,6 +288,13 @@ function startSeason(league: League, minors: boolean): Season {
  * next. Returns the new Season once spring training ends.
  */
 export function advanceOffseason(league: League, season: Season): Season | null {
+  const next = advancePhase(league, season);
+  // The staff's notes for the phase that just opened.
+  if (!next) winterAdvice(league, season, offerClock(league, season));
+  return next;
+}
+
+function advancePhase(league: League, season: Season): Season | null {
   const s = league.offseason;
   if (!s) throw new Error("Not in the offseason.");
   const waivers = waiverOrder(league, season);

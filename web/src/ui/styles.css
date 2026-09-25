@@ -1276,3 +1276,58 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .offer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .traits.picked .trait { cursor: pointer; border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); font: inherit; font-size: 13px; }
 .traits.picked .trait:hover { border-color: var(--alert); color: var(--alert); }
+
+/* ------------------------------------------------------------------ staff advice */
+
+.advice-list { display: grid; gap: 10px; max-width: 860px; }
+.advice {
+  display: grid;
+  gap: 4px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.advice.unread { border-left-color: var(--accent); }
+.advice.urgent { border-left-color: var(--alert); }
+.advice-head { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; }
+.advice-head .desk { font-family: var(--display); font-weight: 700; font-size: 12px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent-text); }
+.advice-title { font-weight: 700; }
+.advice-text { margin: 0; max-width: 75ch; }
+.advice-foot { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 6px 12px; }
+
+/* ------------------------------------------------------------------ settings */
+
+.settings-picker { display: grid; gap: 14px; }
+.settings-picker fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 6px; }
+.settings-picker legend {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ink-3);
+  padding: 0;
+  margin-bottom: 6px;
+}
+.choice-row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.choice-row.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) { .choice-row, .choice-row.two { grid-template-columns: minmax(0, 1fr); } }
+.choice {
+  display: grid;
+  gap: 3px;
+  align-content: start;
+  padding: 9px 11px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+.choice:hover { border-color: var(--accent); }
+.choice.on { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.choice input { position: absolute; opacity: 0; pointer-events: none; }
+.choice:focus-within { outline: 2px solid var(--focus); outline-offset: 2px; }
+.choice .t { font-weight: 700; }
+.choice .s { font-size: 13px; color: var(--ink-2); }
+.ovr-block .word { font-size: 12px; color: var(--ink-2); white-space: nowrap; }

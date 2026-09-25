@@ -1,6 +1,8 @@
 import { useMemo, useState } from "preact/hooks";
 import { call, useApi } from "../../api/client";
-import type { NewGameTeam, Status } from "../../api/protocol";
+import type { GameSettings, NewGameTeam, Status } from "../../api/protocol";
+import { SettingsPicker } from "../components/SettingsPicker";
+import { DEFAULT_SETTINGS } from "../settings";
 import { ErrorNote, Loading, notify } from "../components/Common";
 import { ScaleLegend } from "../components/Grade";
 import { ordinal } from "../format";
@@ -27,6 +29,7 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
   const [teamId, setTeamId] = useState<number | null>(null);
   const [minors, setMinors] = useState(true);
   const [starting, setStarting] = useState(false);
+  const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
   const teams = useApi("newGameTeams", { seed }, [seed]);
 
   const byDivision = useMemo(() => {
@@ -50,7 +53,7 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
     if (teamId === null) return;
     setStarting(true);
     try {
-      onStarted(await call("newGame", { seed, teamId, minors }));
+      onStarted(await call("newGame", { seed, teamId, minors, settings }));
     } catch (err) {
       notify((err as Error).message, true);
       setStarting(false);
@@ -109,6 +112,14 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
           <ScaleLegend />
         </div>
       </div>
+
+      <section class="section">
+        <header>
+          <h2>How you want to play</h2>
+          <span class="aside">You can change these later in the League office.</span>
+        </header>
+        <SettingsPicker value={settings} onChange={setSettings} />
+      </section>
 
       <section class="section">
         <header>

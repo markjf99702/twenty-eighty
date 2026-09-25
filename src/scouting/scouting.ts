@@ -1,6 +1,7 @@
 import { hashNormal, seedHash } from "../core/hash";
 import { clamp } from "../core/math";
 import type { Rng } from "../core/rng";
+import { dials } from "../league/settings";
 import type { League, Team } from "../league/types";
 import { DEFENSE_TOOL_WEIGHTS } from "../players/defense";
 import { OFFENSE_WEIGHTS, PITCHING_WEIGHTS } from "../players/generate";
@@ -131,7 +132,10 @@ function familiarity(league: League, viewer: Viewer, p: Player): number {
 /** The club's baseline error for this player, in grade points (before tool difficulty). */
 export function uncertainty(league: League, viewer: Viewer, p: Player): number {
   const tier = viewer === null ? 3 : league.scouting.scouting[viewer]!;
-  return SCOUTING_TIERS[tier - 1]!.sigma * familiarity(league, viewer, p);
+  // Difficulty sharpens or blurs the user's scouts (and on Hard, sharpens everyone else's).
+  const d = dials(league);
+  const scale = viewer === null ? 1 : viewer === league.userTeamId ? d.userScoutError : d.rivalScoutError;
+  return SCOUTING_TIERS[tier - 1]!.sigma * familiarity(league, viewer, p) * scale;
 }
 
 type ToolKey = keyof typeof TOOL_DIFFICULTY;

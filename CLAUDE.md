@@ -63,6 +63,18 @@ made if the club would accept them as a proposal. After a trade the AI trims act
 rosters the next morning (`trimActiveRoster`). Sim stop triggers are checked in the
 worker after each day.
 
+Settings (src/league/settings.ts): `league.settings` holds the difficulty, stat view
+and advice switch. Difficulty is a table of dials read through `dials(league)` where
+they apply (scouting error in `uncertainty`, the AI's trade margin, the user's budget,
+owner patience, grace seasons, win goals, starting confidence), so a new dial is a field
+there plus one read at its point of use. The stat view is UI-only (`useBasics()`).
+
+Staff advice (src/advice/advice.ts): `seasonAdvice` runs at the end of `simDay` and
+`winterAdvice` when a winter phase opens (`advanceOffseason`, `beginOffseason`). Notes
+go into `league.advice` through `add`, which dedupes by `key` (so re-running a day adds
+nothing) and keeps the latest 60. Advice reads the user's beliefs, never the truth.
+Urgent notes can stop the sim (the worker's `staff` stop).
+
 The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
 owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with
 plain view models built in `web/src/worker/views.ts`. Pages call it through `useApi`

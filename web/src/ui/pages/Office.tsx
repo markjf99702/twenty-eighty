@@ -2,6 +2,8 @@ import { useState } from "preact/hooks";
 import { bump, call } from "../../api/client";
 import type { Status } from "../../api/protocol";
 import { notify, Section } from "../components/Common";
+import { SettingsPicker } from "../components/SettingsPicker";
+import { DEFAULT_SETTINGS } from "../settings";
 
 /** Downloads are blocked where the app is embedded as a hosted page; the local build can export. */
 const CAN_DOWNLOAD = !import.meta.env.VITE_NO_DOWNLOAD;
@@ -50,6 +52,15 @@ export function Office({ status, onStatus }: { status: Status; onStatus: (s: Sta
     location.hash = "";
   };
 
+  const changeSettings = async (next: NonNullable<Status["settings"]>) => {
+    try {
+      onStatus(await call("setSettings", next));
+      bump();
+    } catch (err) {
+      notify((err as Error).message, true);
+    }
+  };
+
   return (
     <>
       <div class="page-head">
@@ -58,6 +69,15 @@ export function Office({ status, onStatus }: { status: Status; onStatus: (s: Sta
           <h1>Your league</h1>
         </div>
       </div>
+      {status.userTeamId !== null && status.userTeamId !== undefined && (
+        <Section title="How you play">
+          <SettingsPicker value={status.settings ?? DEFAULT_SETTINGS} onChange={changeSettings} />
+          <p class="dim small" style={{ margin: 0 }}>
+            A new challenge level takes effect at once for scouting reports and trade talks; the owner's patience and goals follow from the next
+            review, and the budget moves toward the new level each winter.
+          </p>
+        </Section>
+      )}
       <div class="grid-2">
         <Section title="This universe">
           <div class="facts">

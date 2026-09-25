@@ -12,6 +12,7 @@ import { generateHitter, generatePitcher } from "../players/generate";
 import type { FieldPosition, Level, MinorLevel, Player, ToolGrade } from "../players/types";
 import { FIELD_POSITIONS, MAX_OPTION_YEARS, MINOR_LEVELS, SERVICE_DAYS_PER_YEAR } from "../players/types";
 import { DEFAULT_STRUCTURE, FRANCHISES, type FranchiseSeed } from "./franchises";
+import { DEFAULT_SETTINGS } from "./settings";
 import type { Affiliate, League, Park, Team } from "./types";
 
 export interface GenerateLeagueOptions {
@@ -346,6 +347,8 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     scouting: { scouting: [], analytics: [], looks: {}, looksLeft: 0, looksWindow: "" },
     gm: null,
     tradeOffers: [],
+    settings: { ...DEFAULT_SETTINGS },
+    advice: [],
   };
   recenterGrades(league);
   for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));

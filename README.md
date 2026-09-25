@@ -43,8 +43,33 @@ produces the same players and the same season.
 ## Playing in the browser
 
 `npm run dev` starts the game; `npm run build:web` builds a static site into `web/dist`
-that any web server can host. Pick a seed and a club, and you're the GM:
+that any web server can host. Pick a seed, a club and how you want to play, and you're
+the GM:
 
+- **How you want to play** (chosen at the start, changeable any time in the League
+  office): a **challenge** level, how much **stat** detail to show, and whether your
+  **staff** sends advice.
+  - *Easy*: your scouts see players almost as they are, other clubs deal at close to
+    fair value (a 2% edge instead of 10%), the budget is 15% bigger, win targets are two
+    games lower, and the owner starts more confident, forgives twice as much and can't
+    fire you in your first three seasons.
+  - *Normal* is the game as designed.
+  - *Hard*: your scouts miss by 30% more and rivals' by 20% less, clubs want a 20% edge in
+    a trade, the budget is 10% smaller, win targets are two games higher, and the owner
+    is quicker to lose patience.
+  - *Basics* stats show the familiar numbers (AVG/OBP/SLG, HR, RBI, SB; W, SV, ERA,
+    WHIP) with a toggle for the rest, and put words beside grades ("60, plus"); *Full*
+    shows everything. Either way, hovering a column header explains the stat.
+- **Staff advice**: your assistant GM, scouting director, analytics director and business
+  office leave notes on the **Staff** page (the latest also show in the front office)
+  when there's something worth doing. They flag a player left on the active roster while
+  hurt or an illegal roster, a minor leaguer who'd help now, the weakest spot on the club
+  a month from the deadline (or which rentals to sell if the race is gone), a unit
+  ranking near the bottom of the league, luck that's due to turn (ERA against FIP,
+  wOBA against xwOBA, once the analytics department is good enough to see it), crowds short of the owner's goal, and spending over budget. In
+  the winter they size up tender decisions, the draft board, free agents who'd fill the
+  biggest hole, and international targets. The advice comes from your own scouts and
+  analysts, so it's only as good as they are.
 - **Scoreboard sims**: play a day, a week, a month or the rest of the season, then the
   postseason. A full season with all four affiliates takes about 15-20 seconds, running in
   a Web Worker so the page stays responsive. Set the speed to **Steady** (about a month
@@ -52,8 +77,9 @@ that any web server can host. Pick a seed and a club, and you're the GM:
   along day by day, so you can watch the standings and stop (the button or Esc) when
   you see a losing streak; the speed can change mid-sim and is remembered. **Stops**
   pause the sim by themselves when your club loses a set number in a row, a big
-  leaguer goes down for injured-list time, a club makes you a trade offer, or it's
-  trade deadline day (with the day still to play), and a note says why it stopped.
+  leaguer goes down for injured-list time, a club makes you a trade offer, it's
+  trade deadline day (with the day still to play), or your staff has something urgent,
+  and a note says why it stopped.
 - **Front office**: record, division race, recent games, club leaders, injuries, your top
   prospects, and the transaction wire.
 - **My club**: the active roster, injured list and every affiliate, with each player's
@@ -361,6 +387,7 @@ src/
   org/          roster rules, AI front office, depth charts, valuation, contracts, trades
   scouting/     each club's view of players: scouting error, analytics reads, beliefs
   finance/      club books, attendance and ticket prices, owners, goals and the GM's job
+  advice/       the user's staff: notes and suggestions drawn from the club's own beliefs
   sim/          the engine: pitch model, batted-ball physics, game state machine, substitutions
   season/       schedule, multi-level season runner, standings, pitcher workload, postseason
   stats/        stat lines, run expectancy / linear weights, advanced stats and WAR

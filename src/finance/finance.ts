@@ -1,6 +1,7 @@
 import { hashNormal, seedHash } from "../core/hash";
 import { clamp } from "../core/math";
 import type { Rng } from "../core/rng";
+import { dials } from "../league/settings";
 import type { League, Team } from "../league/types";
 import { payroll } from "../org/contracts";
 import { staffCost } from "../scouting/scouting";
@@ -271,7 +272,9 @@ export function ownerBudget(league: League, team: Team): number {
   const f = team.finance;
   const last = f.history.at(-1);
   const revenue = projectedRevenue(team, f.autoPrice ? bestTicketPrice(team) : f.ticketPrice) + 0.5 * (last?.postseason ?? 0);
-  const target = OWNER_SPEND[team.owner.style] * (revenue - operations(team) - BONUS_ALLOWANCE);
+  // The difficulty loosens or tightens the purse for the user's club.
+  const scale = team.id === league.userTeamId ? dials(league).budget : 1;
+  const target = scale * OWNER_SPEND[team.owner.style] * (revenue - operations(team) - BONUS_ALLOWANCE);
   let b = 0.6 * team.budget + 0.4 * target;
   // Deep in the red, the owner tightens up.
   if (f.cash < -60) b *= 0.93;

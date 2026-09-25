@@ -6,6 +6,23 @@ import { StatusBadges } from "../components/PlayerTable";
 import { LEVEL_NAMES, gamesBack, ordinal, signed, streak } from "../format";
 import { href, playerHref, teamHref } from "../router";
 import { ConfidenceMeter, GoalList } from "./Owner";
+import { AdviceItem } from "./Staff";
+
+/** The latest from the user's staff. */
+function StaffCard() {
+  const view = useApi("advice", undefined);
+  const notes = view.data?.slice(0, 3) ?? [];
+  if (notes.length === 0) return null;
+  return (
+    <Section title="From your staff" aside={<a href={href({ page: "staff" })}>All notes</a>}>
+      <div class="advice-list">
+        {notes.map((a) => (
+          <AdviceItem key={a.key} a={a} compact />
+        ))}
+      </div>
+    </Section>
+  );
+}
 
 const $m = (x: number) => `${x < 0 ? "-" : ""}$${Math.abs(x).toFixed(1)}M`;
 
@@ -232,6 +249,7 @@ export function Dashboard({ status }: { status: Status }) {
         </Section>
       </div>
 
+      {status.settings?.advice !== false && <StaffCard />}
       {status.owner && <Boardroom />}
 
       <div class="grid-2">

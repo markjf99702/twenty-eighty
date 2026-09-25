@@ -1,5 +1,6 @@
 import type { GmState, Owner, TeamFinance } from "../finance/types";
 import type { OffseasonState } from "../offseason/types";
+import type { GameSettings } from "./settings";
 import type { ScoutingState } from "../scouting/types";
 import type { FieldPosition, Level, MinorLevel, Player } from "../players/types";
 
@@ -123,6 +124,27 @@ export interface League {
   gm: GmState | null;
   /** Trade proposals AI clubs have made to the user (recent ones, whatever became of them). */
   tradeOffers: TradeOffer[];
+  /** Difficulty, stat detail and staff advice. */
+  settings: GameSettings;
+  /** Notes from the user's staff, newest last. */
+  advice: AdviceNote[];
+}
+
+/** A note from someone on the user's staff. */
+export interface AdviceNote {
+  /** What it's about, so the same advice isn't repeated (e.g. "sell:2027"). */
+  key: string;
+  year: number;
+  /** When it came, on the offer clock (season days; winter days from 1000). */
+  at: number;
+  from: "assistant" | "scouting" | "analytics" | "business";
+  /** Urgent notes can stop the sim. */
+  urgent: boolean;
+  title: string;
+  text: string;
+  /** Where to act (a route hash). */
+  href?: string;
+  read: boolean;
 }
 
 /** An AI club's proposal to the user. */

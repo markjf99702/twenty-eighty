@@ -4,6 +4,7 @@ import { bump, call } from "../../api/client";
 import type { PlayerSummary, RosterActionOption } from "../../api/protocol";
 import { fixed, ip, LEVEL_NAMES, pct, rate3, whole } from "../format";
 import { playerHref } from "../router";
+import { useBasics } from "../settings";
 import { notify } from "./Common";
 import { Grade } from "./Grade";
 import { type Column, Table } from "./Table";
@@ -100,7 +101,16 @@ function tone(value: number | null | undefined, goodAbove: number, badBelow: num
   return v >= good ? "good" : v <= bad ? "bad" : "";
 }
 
-function statColumns(pitchers: boolean, view: RosterView, rows: PlayerSummary[]): Column<PlayerSummary>[] {
+/** Columns kept in Basics mode: the familiar numbers. */
+const BASIC_BAT = new Set(["slvl", "G", "PA", "AVG", "OBP", "SLG", "HR", "SB", "WAR"]);
+const BASIC_PIT = new Set(["slvl", "G", "GS", "IP", "W", "SV", "ERA", "WHIP", "WAR"]);
+
+function statColumns(pitchers: boolean, view: RosterView, rows: PlayerSummary[], basics = false): Column<PlayerSummary>[] {
+  const all = allStatColumns(pitchers, view, rows);
+  return basics ? all.filter((c) => (pitchers ? BASIC_PIT : BASIC_BAT).has(c.key)) : all;
+}
+
+function allStatColumns(pitchers: boolean, view: RosterView, rows: PlayerSummary[]): Column<PlayerSummary>[] {
   const cell = (render: (s: Snap) => ComponentChildren, cls?: (s: Snap) => string) => (p: PlayerSummary) => {
     const s = snapOf(p, view);
     if (!s || (pitchers ? !s.pit : !s.bat)) return <span class="muted">—</span>;
@@ -208,6 +218,7 @@ interface Props {
 }
 
 export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey, view = "scouting" }: Props) {
+  const basics = useBasics();
   const [open, setOpen] = useState<number | null>(null);
   const tools = pitchers ? PITCHER_TOOLS : HITTER_TOOLS;
   const toolIndex = (label: string) => tools.indexOf(label);
@@ -233,7 +244,7 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
     ...(scouting ? [{ key: "bt", label: "B/T", cls: "ctr", render: (p: PlayerSummary) => `${p.bats}/${p.throws}` }] : []),
     { key: "ovr", label: "Now", title: "Your read of his overall grade today (scouts blended with analytics)", cls: "ctr", sort: (p) => p.ovr, render: (p) => <NowGrade p={p} /> },
     { key: "fv", label: "FV", title: "Future value", cls: "ctr", sort: (p) => p.fv, render: (p) => <Grade g={p.fv} /> },
-    ...(scouting ? scoutingColumns() : statColumns(pitchers, view, rows)),
+    ...(scouting ? scoutingColumns() : statColumns(pitchers, view, rows, basics)),
   ];
 
   function scoutingColumns(): Column<PlayerSummary>[] {

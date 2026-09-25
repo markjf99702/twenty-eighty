@@ -1,4 +1,5 @@
 import { Rng } from "../core/rng";
+import { dials } from "../league/settings";
 import type { League, Team, TradeOffer } from "../league/types";
 import { playerName, type Player } from "../players/types";
 import { warShift } from "../scouting/analytics";
@@ -179,7 +180,8 @@ function buyOffer(league: League, user: Team, buyers: Team[], rng: Rng, now: num
   const t = choose(rng, targets);
   if (!t) return null;
   // They keep an edge in their own eyes (the same one they'd want from a proposal).
-  const got = pack(packPool(league, buyer, buyer, rng, now, fraction, seen), 0.72 * t.v, Math.min(0.9 * t.v, t.v - 1.1));
+  const hi = Math.min(t.v / (1 + dials(league).tradeMargin) - 0.1, t.v - 1.1);
+  const got = pack(packPool(league, buyer, buyer, rng, now, fraction, seen), 0.8 * hi, hi);
   return got ? { partner: buyer, give: [t.p], get: got.map((x) => x.p), kind: "buy" } : null;
 }
 
@@ -201,7 +203,7 @@ function sellOffer(league: League, user: Team, sellers: Team[], rng: Rng, now: n
     });
   const t = choose(rng, vets);
   if (!t) return null;
-  const lo = Math.max(1.12 * t.v + 1, t.v + 2);
+  const lo = Math.max((1.02 + dials(league).tradeMargin) * t.v + 1, t.v + 2);
   const got = pack(packPool(league, user, seller, rng, now, fraction, seen), lo, 1.35 * lo + 2);
   return got ? { partner: seller, give: got.map((x) => x.p), get: [t.p], kind: "sell" } : null;
 }

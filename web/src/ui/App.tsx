@@ -17,6 +17,8 @@ import { History } from "./pages/History";
 import { Scouting } from "./pages/Scouting";
 import { Finances } from "./pages/Finances";
 import { Owner } from "./pages/Owner";
+import { Staff } from "./pages/Staff";
+import { DEFAULT_SETTINGS, SettingsContext } from "./settings";
 import { Trades } from "./pages/Trades";
 import { Transactions } from "./pages/Transactions";
 import { Winter } from "./pages/Winter";
@@ -38,7 +40,7 @@ const PACE_KEY = "twenty-eighty.pace";
 const paceMs = (p: Pace) => PACES.find((x) => x.key === p)!.ms;
 
 const STOPS_KEY = "twenty-eighty.stops";
-const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: true, deadline: true };
+const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: true, deadline: true, staff: true };
 
 function storedStops(): StopRules {
   try {
@@ -202,6 +204,7 @@ export function App() {
   }
 
   return (
+    <SettingsContext.Provider value={status.settings ?? DEFAULT_SETTINGS}>
     <div class="app">
       <Board
         status={status}
@@ -222,7 +225,7 @@ export function App() {
             <span class="t">{stopNote.text}</span>
             {stopNote.href && (
               <a class="btn small" href={stopNote.href} onClick={() => setStopNote(null)}>
-                {stopNote.kind === "offer" || stopNote.kind === "deadline" ? "Trade desk" : stopNote.kind === "injury" ? "See him" : "Your club"}
+                {stopNote.kind === "offer" || stopNote.kind === "deadline" ? "Trade desk" : stopNote.kind === "injury" ? "See him" : stopNote.kind === "staff" ? "Take a look" : "Your club"}
               </a>
             )}
             <button type="button" class="btn ghost small" aria-label="Dismiss" onClick={() => setStopNote(null)}>
@@ -234,6 +237,7 @@ export function App() {
       </main>
       <Toasts />
     </div>
+    </SettingsContext.Provider>
   );
 }
 
@@ -282,6 +286,8 @@ function Page({
       return <Finances teamId={route.teamId} status={status} />;
     case "owner":
       return <Owner onStatus={onStatus} />;
+    case "staff":
+      return <Staff onStatus={onStatus} />;
   }
 }
 
@@ -455,7 +461,7 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
       window.removeEventListener("keydown", close);
     };
   }, [open]);
-  const count = (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer ? 1 : 0) + (stops.deadline ? 1 : 0);
+  const count = (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer ? 1 : 0) + (stops.deadline ? 1 : 0) + (stops.staff ? 1 : 0);
   const set = (patch: Partial<StopRules>) => onChange({ ...stops, ...patch });
   return (
     <div class="stops" ref={ref}>
@@ -495,6 +501,10 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
           <label>
             <input type="checkbox" checked={stops.deadline} onChange={(e) => set({ deadline: (e.target as HTMLInputElement).checked })} />
             <span>It's trade deadline day (July 31), with the day still to play</span>
+          </label>
+          <label>
+            <input type="checkbox" checked={stops.staff} onChange={(e) => set({ staff: (e.target as HTMLInputElement).checked })} />
+            <span>My staff has something urgent</span>
           </label>
         </div>
       )}
@@ -537,6 +547,16 @@ function Rail({ status, route }: { status: Status; route: Route }) {
             label: "Owner",
             on: route.page === "owner",
             tag: status.owner.fired ? "Fired" : String(status.owner.confidence),
+          },
+        ]
+      : []),
+    ...(userTeam && status.settings?.advice !== false
+      ? [
+          {
+            to: { page: "staff" } as Route,
+            label: "Staff",
+            on: route.page === "staff",
+            tag: status.staffUnread ? `${status.staffUnread} new` : undefined,
           },
         ]
       : []),

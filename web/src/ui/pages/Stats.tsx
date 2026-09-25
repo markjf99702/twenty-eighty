@@ -6,6 +6,7 @@ import { ErrorNote, Loading, Section, Seg } from "../components/Common";
 import { type Column, Table } from "../components/Table";
 import { LEVEL_NAMES, fixed, ip, pct, rate3, whole } from "../format";
 import { go, playerHref } from "../router";
+import { useBasics } from "../settings";
 
 // Minor league games skip the per-ball expected-stat and fielding bookkeeping (it's the slow part).
 const MLB_ONLY = new Set(["xwOBA", "Fld"]);
@@ -90,6 +91,7 @@ function pitcherColumns(level: Level): Column<PitcherRow>[] {
     n("xwOBA", "xwOBA", (p) => p.xwOBA, rate3, "Expected wOBA allowed", true),
     n("ERAm", "ERA-", (p) => p.ERAminus, whole, "Park-adjusted ERA, 100 = average, lower is better", true),
     n("FIPm", "FIP-", (p) => p.FIPminus, whole, "Park-adjusted FIP, 100 = average, lower is better", true),
+    n("SO", "SO", (p) => p.line.SO, int),
     n("WAR", "WAR", (p) => p.WAR, (x) => fixed(x), "FIP-based wins above replacement"),
   ];
   return cols.filter((c) => level === "MLB" || !MLB_ONLY.has(c.key));
@@ -97,8 +99,17 @@ function pitcherColumns(level: Level): Column<PitcherRow>[] {
 
 const POSITIONS = ["All", "C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
 
+/** Basics mode shows the familiar numbers (strikeouts as a count rather than a rate). */
+const BASIC_HITTING = new Set(["name", "team", "pos", "G", "PA", "AVG", "OBP", "SLG", "HR", "R", "RBI", "SB", "WAR"]);
+const BASIC_PITCHING = new Set(["name", "team", "role", "G", "GS", "W", "L", "SV", "IP", "ERA", "SO", "WHIP", "WAR"]);
+
 export function StatsPage({ level, kind, status }: { level: Level; kind: "hitters" | "pitchers"; status: Status }) {
   const view = useApi("stats", { level, kind }, [level, kind]);
+  const basics = useBasics();
+  const [advanced, setAdvanced] = useState(false);
+  const simple = basics && !advanced;
+  const hitCols = hitterColumns(level).filter((c) => (simple ? BASIC_HITTING.has(c.key) : c.key !== "SO"));
+  const pitCols = pitcherColumns(level).filter((c) => (simple ? BASIC_PITCHING.has(c.key) : c.key !== "SO"));
   const [qualified, setQualified] = useState(true);
   const [team, setTeam] = useState("All");
   const [pos, setPos] = useState("All");
@@ -157,6 +168,12 @@ export function StatsPage({ level, kind, status }: { level: Level; kind: "hitter
             </option>
           ))}
         </select>
+        {basics && (
+          <label class="check">
+            <input type="checkbox" checked={advanced} onChange={(e) => setAdvanced((e.target as HTMLInputElement).checked)} />
+            Show advanced stats
+          </label>
+        )}
       </div>
 
       {view.error && <ErrorNote error={view.error} />}
@@ -164,7 +181,7 @@ export function StatsPage({ level, kind, status }: { level: Level; kind: "hitter
       {d && kind === "hitters" && (
         <Table
           key={`h-${level}`}
-          columns={hitterColumns(level)}
+          columns={hitCols}
           rows={hitters}
           rowKey={(h) => h.id}
           sortKey="WAR"
@@ -177,7 +194,7 @@ export function StatsPage({ level, kind, status }: { level: Level; kind: "hitter
       {d && kind === "pitchers" && (
         <Table
           key={`p-${level}`}
-          columns={pitcherColumns(level)}
+          columns={pitCols}
           rows={pitchers}
           rowKey={(p) => p.id}
           sortKey="WAR"

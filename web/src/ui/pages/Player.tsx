@@ -5,11 +5,13 @@ import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeBar, PresentFuture } from "../components/Grade";
 import { RosterMoves, StatusBadges } from "../components/PlayerTable";
 import { LEVEL_NAMES, fixed, gradeWord, ip, pct, rate3, scout, whole } from "../format";
+import { useBasics } from "../settings";
 import { teamHref } from "../router";
 
 const HANDS: Record<string, string> = { L: "left", R: "right", S: "both sides" };
 
 export function PlayerPage({ playerId, status }: { playerId: number; status: Status }) {
+  const basics = useBasics();
   const view = useApi("player", { playerId }, [playerId]);
   if (view.error) return <ErrorNote error={view.error} />;
   if (!view.data) return <Loading />;
@@ -42,10 +44,12 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
           <div>
             <span class="k">Now</span>
             <Grade g={p.ovr} large />
+            {basics && <span class="word">{gradeWord(p.ovr)}</span>}
           </div>
           <div>
             <span class="k">Future</span>
             <Grade g={p.fv} large />
+            {basics && <span class="word">{gradeWord(p.fv)}</span>}
           </div>
         </div>
       </div>

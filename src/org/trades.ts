@@ -1,4 +1,5 @@
 import type { Rng } from "../core/rng";
+import { dials } from "../league/settings";
 import type { League, Team } from "../league/types";
 import { projectPlayer } from "../players/development";
 import { LEVELS, type Level, playerName, type Player } from "../players/types";
@@ -28,8 +29,7 @@ import { FORTY_MAN_LIMIT, logTransaction, refreshDepth, type RosterContext } fro
 const DISCOUNT = 0.1;
 /** The last day of the season (from Opening Day) that trades are allowed: July 31. */
 export const TRADE_DEADLINE_DAY = 127;
-/** What an AI club wants on top of fair value before it says yes to the user. */
-const AI_MARGIN = 0.1;
+
 
 export interface ControlYear {
   /** Seasons from now (0 = the current or upcoming season). */
@@ -159,7 +159,9 @@ export function evaluateTrade(
   // The other club judges with its own scouts.
   const theirIn = value(partner.id, give);
   const theirOut = value(partner.id, get);
-  const want = theirOut + Math.max(1, AI_MARGIN * Math.abs(theirOut));
+  // What an AI club wants on top of fair value before it says yes (set by the difficulty).
+  const margin = dials(league).tradeMargin;
+  const want = theirOut + Math.max(1, margin * Math.abs(theirOut));
   if (theirIn < want) {
     const short = Math.round((want - theirIn) * 10) / 10;
     return { ...base, ok: false, reason: `${partner.nickname} want more: about $${short}M more in surplus value.` };
