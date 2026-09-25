@@ -262,6 +262,14 @@ through its own scouts: the true grade plus an error. That error depends on:
 The errors come from a stable hash of club, player and tool, so a report doesn't
 flicker from day to day; part of each error is redrawn every year.
 
+Scouts also know what players like him usually are (for an 18-year-old, for a
+Double-A regular, for a big leaguer), and a report is their best estimate, not just what
+they saw: the blurrier the look, the more each grade is pulled toward the usual one.
+Without that, the top of every draft board would be the players the scouts happened to
+overrate. The best amateurs in a class grade out around 55-60 FV, the way real prospect
+lists read, and across a board they turn out about as good as they looked. A few looks
+let a report stand further from the usual.
+
 The **analytics department** reads players from what they've done, translated to the
 major-league scale. Better departments trust better metrics: SIERA and xwOBA, which
 settle faster and say more about skill, instead of runs allowed and wOBA. Your "Now"

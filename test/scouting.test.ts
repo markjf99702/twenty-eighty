@@ -48,6 +48,20 @@ describe("scouting reports", () => {
     expect(takeLook(league, 0, own).ok).toBe(false);
   });
 
+  it("don't flatter the top of a draft board", () => {
+    // The best-looking amateurs are partly the ones the scouts overrated; reports
+    // weigh that in, so the top of the board turns out about as good as it looked.
+    const pool = [0, 1, 2].flatMap((i) => draftClass(new Rng(`board-${i}`), 450));
+    league.scouting.scouting[6] = 3;
+    const rows = pool
+      .map((p) => ({ seen: overallGrade(perceive(league, 6, p), true), truth: overallGrade(p, true) }))
+      .sort((a, b) => b.seen - a.seen)
+      .slice(0, 30);
+    const avg = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
+    expect(Math.abs(avg(rows.map((r) => r.seen)) - avg(rows.map((r) => r.truth)))).toBeLessThan(3);
+    expect(avg(rows.map((r) => r.seen))).toBeLessThan(62);
+  });
+
   it("miss by about what the department's level says", () => {
     const miss = (tier: number) => {
       league.scouting.scouting[1] = tier;

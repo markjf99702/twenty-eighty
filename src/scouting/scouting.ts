@@ -7,6 +7,7 @@ import { DEFENSE_TOOL_WEIGHTS } from "../players/defense";
 import { OFFENSE_WEIGHTS, PITCHING_WEIGHTS } from "../players/generate";
 import type { Player, ToolGrade } from "../players/types";
 import { bestPosition, canStart, DEFENSE_RUNS_PER_Z } from "../org/value";
+import { PRIOR_MEANS, type PriorGroup, type ScoutTool, TOOL_SPREAD } from "./priors";
 import type { ScoutingState } from "./types";
 
 /**
@@ -20,6 +21,11 @@ import type { ScoutingState } from "./types";
  * itself comes from a stable hash of (club, player, tool), so a report doesn't
  * flicker from day to day; part of it is redrawn each year. Nothing here is
  * saved except the department levels and the user's looks.
+ *
+ * Scouts also know what players like him usually are (src/scouting/priors.ts),
+ * and a report weighs what they saw against that: the blurrier their look,
+ * the more a grade is pulled toward the usual one. Without that, the players
+ * who top a noisy board would mostly be the ones the scouts overrated.
  *
  * The simulation always runs on true grades. Beliefs only drive decisions:
  * the user's screens, and the AI clubs' draft boards, free-agent bids,
@@ -50,7 +56,7 @@ export const ANALYTICS_TIERS: (Department & { trust: number; basis: string })[] 
 ];
 
 /** How hard each tool is to read, relative to the department's baseline error. */
-const TOOL_DIFFICULTY = {
+const TOOL_DIFFICULTY: Record<ScoutTool, number> = {
   hit: 1.2,
   power: 0.8,
   eye: 1.0,
@@ -61,7 +67,7 @@ const TOOL_DIFFICULTY = {
   control: 0.9,
   command: 1.2,
   stamina: 0.8,
-} as const;
+};
 
 /** How familiar a club is with a player, as a multiplier on its error. */
 export const FAMILIARITY = {
@@ -138,21 +144,46 @@ export function uncertainty(league: League, viewer: Viewer, p: Player): number {
   return SCOUTING_TIERS[tier - 1]!.sigma * familiarity(league, viewer, p) * scale;
 }
 
-type ToolKey = keyof typeof TOOL_DIFFICULTY;
+/**
+ * How much more scouts doubt a look than one tool's spread alone would say.
+ * Tools trade off within a player, so a report that's strong across the board
+ * is less likely than the tool-by-tool odds suggest. Set so that, across a
+ * draft board or a level, players turn out as good as they were seen on
+ * average (test/scouting.test.ts checks it).
+ */
+const CAUTION = 1.7;
 
-/** Present and future errors (grade points) for one tool. `slot` distinguishes pitches. */
-function toolError(league: League, viewer: Viewer, p: Player, key: ToolKey, slot: number, sigma: number) {
+/** The players a report is weighed against: unsigned amateurs by age, everyone else by level. */
+function priorGroup(p: Player): PriorGroup {
+  if (p.id < 0 || (p.teamId === null && p.service === 0 && p.career.length === 0)) return p.age >= 21 ? "college" : "young";
+  if (p.teamId === null) return p.service > 0 ? "MLB" : "AAA";
+  return p.level;
+}
+
+/**
+ * How far a club's report on one tool is from the truth (grade points),
+ * present and future. `slot` distinguishes pitches. What the scouts saw is
+ * the truth plus an error; the report is their best estimate from it,
+ * pulled toward the usual grade by how blurry the look was.
+ */
+function toolError(league: League, viewer: Viewer, p: Player, key: ScoutTool, slot: number, sigma: number, truth: ToolGrade) {
   const seed = seedHash(league.seed);
   const who = viewer === null ? 97 : viewer;
   const pid = scoutKey(league, p);
   const keyId = Object.keys(TOOL_DIFFICULTY).indexOf(key) * 16 + slot;
   const z = 0.8 * hashNormal(seed, who, pid, keyId, 11) + 0.6 * hashNormal(seed, who, pid, keyId, league.year);
   const s = sigma * TOOL_DIFFICULTY[key];
-  const present = s * z;
   // Projection is harder than evaluation, and more so the further off the peak is.
   const reach = clamp((27 - p.age) / 8, 0, 1);
-  const future = present + s * 0.8 * reach * hashNormal(seed, who, pid, keyId, 23);
-  return { present, future };
+  const seenNow = truth.present + s * z;
+  const seenPeak = truth.future + s * z + s * 0.8 * reach * hashNormal(seed, who, pid, keyId, 23);
+  const [usualNow, usualPeak] = PRIOR_MEANS[priorGroup(p)][key];
+  const spread = TOOL_SPREAD[key] ** 2;
+  const estimate = (seen: number, usual: number, noise: number) => usual + (spread / (spread + (CAUTION * noise) ** 2)) * (seen - usual);
+  return {
+    present: estimate(seenNow, usualNow, s) - truth.present,
+    future: estimate(seenPeak, usualPeak, s * Math.sqrt(1 + 0.64 * reach * reach)) - truth.future,
+  };
 }
 
 function shifted(t: ToolGrade, e: { present: number; future: number }): ToolGrade {
@@ -164,26 +195,26 @@ function shifted(t: ToolGrade, e: { present: number; future: number }): ToolGrad
 /** The player as a club's scouts see him: same person, perceived grades. */
 export function perceive(league: League, viewer: Viewer, p: Player): Player {
   const sigma = uncertainty(league, viewer, p);
-  const e = (key: ToolKey, slot = 0) => toolError(league, viewer, p, key, slot, sigma);
+  const see = (t: ToolGrade, key: ScoutTool, slot = 0) => shifted(t, toolError(league, viewer, p, key, slot, sigma, t));
   const h = p.hitting;
   const hitting = p.pitching
     ? h
     : {
-        hit: shifted(h.hit, e("hit")),
-        power: shifted(h.power, e("power")),
-        eye: shifted(h.eye, e("eye")),
-        speed: shifted(h.speed, e("speed")),
-        field: shifted(h.field, e("field")),
-        arm: shifted(h.arm, e("arm")),
+        hit: see(h.hit, "hit"),
+        power: see(h.power, "power"),
+        eye: see(h.eye, "eye"),
+        speed: see(h.speed, "speed"),
+        field: see(h.field, "field"),
+        arm: see(h.arm, "arm"),
       };
   const pit = p.pitching;
   const pitching = pit
     ? {
         ...pit,
-        pitches: pit.pitches.map((x, i) => ({ ...x, grade: shifted(x.grade, e("stuff", i)) })),
-        control: shifted(pit.control, e("control")),
-        command: shifted(pit.command, e("command")),
-        stamina: shifted(pit.stamina, e("stamina")),
+        pitches: pit.pitches.map((x, i) => ({ ...x, grade: see(x.grade, "stuff", i) })),
+        control: see(pit.control, "control"),
+        command: see(pit.command, "command"),
+        stamina: see(pit.stamina, "stamina"),
       }
     : undefined;
   return { ...p, hitting, pitching };
@@ -197,24 +228,26 @@ export function perceive(league: League, viewer: Viewer, p: Player): Player {
  */
 export function valueShift(league: League, viewer: Viewer, p: Player, future = false): number {
   const sigma = uncertainty(league, viewer, p);
-  const pick = (key: ToolKey, slot = 0) => {
-    const err = toolError(league, viewer, p, key, slot, sigma);
+  const pick = (t: ToolGrade, key: ScoutTool, slot = 0) => {
+    const err = toolError(league, viewer, p, key, slot, sigma, t);
     return future ? err.future : err.present;
   };
   if (p.pitching) {
     const pit = p.pitching;
     const usage = pit.pitches.reduce((s, x) => s + x.usage, 0);
-    const stuff = pit.pitches.reduce((s, x, i) => s + x.usage * pick("stuff", i), 0) / usage;
+    const stuff = pit.pitches.reduce((s, x, i) => s + x.usage * pick(x.grade, "stuff", i), 0) / usage;
     const W = PITCHING_WEIGHTS;
-    const runs = (W.stuff * stuff + W.control * pick("control") + W.command * pick("command")) / 10;
+    const runs = (W.stuff * stuff + W.control * pick(pit.control, "control") + W.command * pick(pit.command, "command")) / 10;
     return runs * (canStart(p) ? 1.25 : 0.45);
   }
+  const h = p.hitting;
   const W = OFFENSE_WEIGHTS;
-  let runs = (W.hit * pick("hit") + W.power * pick("power") + W.eye * pick("eye") + W.speed * pick("speed")) / 10;
+  const speed = pick(h.speed, "speed");
+  let runs = (W.hit * pick(h.hit, "hit") + W.power * pick(h.power, "power") + W.eye * pick(h.eye, "eye") + W.speed * speed) / 10;
   const pos = bestPosition(p).pos;
   if (pos !== "DH") {
     const w = DEFENSE_TOOL_WEIGHTS[pos];
-    runs += (DEFENSE_RUNS_PER_Z[pos] * (w.field * pick("field") + w.arm * pick("arm") + w.speed * pick("speed"))) / 10;
+    runs += (DEFENSE_RUNS_PER_Z[pos] * (w.field * pick(h.field, "field") + w.arm * pick(h.arm, "arm") + w.speed * speed)) / 10;
   }
   return runs;
 }
