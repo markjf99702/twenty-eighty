@@ -60,7 +60,9 @@ late May, more near `TRADE_DEADLINE_DAY`) and now and then proposes a deal to th
 (`proposeToUser`; winter weeks call `winterOffer`). Offers live in `league.tradeOffers`
 on one clock (`offerClock`: season days, then 1000 plus the winter day) and are only
 made if the club would accept them as a proposal. After a trade the AI trims active
-rosters the next morning (`trimActiveRoster`). Sim stop triggers are checked in the
+rosters the next morning (`trimActiveRoster`). The user can attach `RoomMove`s (option or
+DFA) to a deal: `evaluateTrade` counts them toward the 40-man, `roomMoveProblem`
+validates them, and `makeRoom` makes them after `executeTrade`. Sim stop triggers are checked in the
 worker after each day.
 
 Settings (src/league/settings.ts): `league.settings` holds the difficulty, stat view

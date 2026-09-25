@@ -111,7 +111,11 @@ the GM:
   yours, each valuing players through its own scouts (so an offer can be a steal or a
   trap). Interest spreads around: nobody is asked about twice within three weeks (or
   twice in a winter), and players who've come up before come up less. Offers stand for three days (a week in the winter);
-  accept, decline, or load one into the builder to counter. AI clubs deal with each
+  accept, decline, or load one into the builder to counter. Either side can be filtered
+  to the 40-man roster (a dot marks who's on it). A deal that would put you over 40
+  still works: **Make room** lists your 40-man players, and whoever you mark to
+  designate for assignment (or, in season, option to AAA to clear an active spot) goes
+  when the deal does. An offer that needs room loads into the builder to pick. AI clubs deal with each
   other from late May, busiest in the last three weeks before the deadline, and those
   trades show up on the wire. **Payroll** shows every contract, your budget and future
   commitments; **History** keeps champions and award winners.

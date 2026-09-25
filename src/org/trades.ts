@@ -15,7 +15,15 @@ import {
   seasonWar,
   serviceYears,
 } from "./contracts";
-import { FORTY_MAN_LIMIT, logTransaction, refreshDepth, type RosterContext } from "./roster";
+import {
+  canOption,
+  designateForAssignment,
+  FORTY_MAN_LIMIT,
+  logTransaction,
+  optionPlayer,
+  refreshDepth,
+  type RosterContext,
+} from "./roster";
 
 /**
  * Trades, valued the way front offices value them: surplus value, meaning
@@ -112,6 +120,8 @@ export interface TradeCheck {
   /** Surplus the user sends and receives, $M. */
   give: number;
   get: number;
+  /** The other club would say yes, but the user's 40-man would be this many over. */
+  over?: number;
 }
 
 function fortyManAfter(league: League, team: Team, out: number[], incoming: number[]): number {
@@ -119,13 +129,79 @@ function fortyManAfter(league: League, team: Team, out: number[], incoming: numb
   return team.fortyMan.length - out.filter(on).length + incoming.filter(on).length;
 }
 
+/**
+ * A move the user makes along with a trade to open room for what's coming:
+ * option a big leaguer to AAA, or designate a 40-man player for assignment.
+ */
+export interface RoomMove {
+  playerId: number;
+  move: "option" | "dfa";
+}
+
+/** A club's 40-man and active roster counts after a trade and the moves that go with it. */
+export function rostersAfter(
+  league: League,
+  team: Team,
+  out: number[],
+  incoming: number[],
+  moves: RoomMove[] = [],
+): { fortyMan: number; active: number } {
+  const active = (id: number) => {
+    const teamId = league.players[id]!.teamId;
+    return teamId !== null && league.teams[teamId]!.rosters.MLB.includes(id);
+  };
+  const designated = moves.filter((m) => m.move === "dfa" && league.players[m.playerId]!.onFortyMan).length;
+  return {
+    fortyMan: fortyManAfter(league, team, out, incoming) - designated,
+    active: team.rosters.MLB.length - out.filter(active).length + incoming.filter(active).length - moves.filter((m) => active(m.playerId)).length,
+  };
+}
+
+/** Why these moves can't go along with a trade that sends `give` (null when they can). */
+export function roomMoveProblem(ctx: RosterContext, team: Team, give: number[], moves: RoomMove[]): string | null {
+  const seen = new Set<number>();
+  for (const m of moves) {
+    const p = ctx.league.players[m.playerId];
+    if (!p || p.teamId !== team.id) return "Those moves have to be for your own players.";
+    const name = playerName(p);
+    if (give.includes(p.id)) return `${name} is in the deal.`;
+    if (seen.has(p.id)) return `${name} can only make one move.`;
+    seen.add(p.id);
+    if (m.move === "option") {
+      const check = canOption(ctx, team, p);
+      if (!check.ok) return check.reason ?? `${name} can't be optioned.`;
+    } else if (!p.onFortyMan) return `${name} isn't on the 40-man roster.`;
+    else if (p.il) return `${name} is on the injured list and can't be designated.`;
+  }
+  return null;
+}
+
+/** Make the moves that go with a trade, once it's done. Returns what happened, a line each. */
+export function makeRoom(ctx: RosterContext, team: Team, moves: RoomMove[], waiverOrder: Team[]): string[] {
+  const out: string[] = [];
+  for (const m of moves) {
+    const p = ctx.league.players[m.playerId]!;
+    const name = playerName(p);
+    if (m.move === "option") {
+      if (optionPlayer(ctx, team, p, "AAA").ok) out.push(`${name} was optioned to AAA.`);
+    } else if (designateForAssignment(ctx, team, p, waiverOrder).ok) {
+      out.push(
+        p.teamId === team.id
+          ? `${name} cleared waivers and was outrighted to AAA.`
+          : `The ${ctx.league.teams[p.teamId!]!.nickname} claimed ${name} off waivers.`,
+      );
+    }
+  }
+  return out;
+}
+
 /** A club's belief about a player's WAR relative to the truth (0 = sees him exactly). */
 export type WarShift = (viewer: number, p: Player) => number;
 
 /**
- * Would the AI club accept? The user's club sends `give` and receives `get`.
- * Each side values the players through its own scouts (`seen`); the values
- * returned are the user's view.
+ * Would the AI club accept? The user's club sends `give` and receives `get`,
+ * making `moves` to open room on its 40-man. Each side values the players
+ * through its own scouts (`seen`); the values returned are the user's view.
  */
 export function evaluateTrade(
   league: League,
@@ -135,6 +211,7 @@ export function evaluateTrade(
   get: number[],
   fraction = 1,
   seen: WarShift = () => 0,
+  moves: RoomMove[] = [],
 ): TradeCheck {
   const P = (id: number) => league.players[id]!;
   const value = (viewer: number, ids: number[]) => ids.reduce((s, id) => s + surplusValue(P(id), fraction, seen(viewer, P(id))), 0);
@@ -144,9 +221,6 @@ export function evaluateTrade(
   if (give.length === 0 && get.length === 0) return { ...base, ok: false, reason: "Put players on both sides." };
   if (give.some((id) => P(id).teamId !== userTeam.id) || get.some((id) => P(id).teamId !== partner.id)) {
     return { ...base, ok: false, reason: "Those players aren't all on the right clubs." };
-  }
-  if (fortyManAfter(league, userTeam, give, get) > FORTY_MAN_LIMIT) {
-    return { ...base, ok: false, reason: "You'd be over 40 on the 40-man roster. Clear a spot first." };
   }
   if (fortyManAfter(league, partner, get, give) > FORTY_MAN_LIMIT + 2) {
     return { ...base, ok: false, reason: `${partner.nickname} don't have room on their 40-man roster.` };
@@ -165,6 +239,10 @@ export function evaluateTrade(
   if (theirIn < want) {
     const short = Math.round((want - theirIn) * 10) / 10;
     return { ...base, ok: false, reason: `${partner.nickname} want more: about $${short}M more in surplus value.` };
+  }
+  const fortyMan = rostersAfter(league, userTeam, give, get, moves).fortyMan;
+  if (fortyMan > FORTY_MAN_LIMIT) {
+    return { ...base, ok: false, over: fortyMan - FORTY_MAN_LIMIT, reason: `You'd have ${fortyMan} on the 40-man roster (the limit is ${FORTY_MAN_LIMIT}).` };
   }
   return { ...base, ok: true };
 }

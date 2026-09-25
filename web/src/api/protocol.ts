@@ -5,6 +5,7 @@
 import type { GameSettings } from "../../../src/league/settings";
 import type { DepthChart, TransactionType } from "../../../src/league/types";
 import type { OffseasonPhase } from "../../../src/offseason/types";
+import type { RoomMove } from "../../../src/org/trades";
 import type { CareerLine, ContractType, FieldPosition, Level, MinorLevel, PitchType } from "../../../src/players/types";
 import type { HitterRow, PitcherRow } from "../../../src/season/season";
 
@@ -510,14 +511,27 @@ export interface OfferView {
   get: (PlayerSummary & { surplus: number })[];
   /** Surplus you send and receive, as your front office sees it. */
   value: { give: number; get: number };
+  /** Taking it would put your 40-man this many over: designate someone in the builder. */
+  over?: number;
 }
+
+export type { RoomMove };
 
 export interface TradeCheckView {
   ok: boolean;
   reason?: string;
   give: number;
   get: number;
+  /** They'd say yes, but your 40-man would be this many over. */
+  over?: number;
+  /** Your 40-man after the deal and the room moves. */
+  fortyMan?: number;
+  /** Your active roster after the deal and the room moves (null in the winter, when it doesn't matter yet). */
+  active?: number | null;
+  activeLimit?: number;
   done?: boolean;
+  /** After a trade: what became of the players moved to make room. */
+  moves?: string[];
   /** After a trade: a roster problem the user needs to fix (or the assistant will). */
   warning?: string;
 }
@@ -683,7 +697,7 @@ export interface Api {
   faWithdraw: { req: { playerId: number }; res: { ok: boolean } };
   intlSign: { req: { playerId: number }; res: { ok: boolean; reason?: string } };
   tradeSides: { req: { partnerId: number }; res: { mine: TradeSide; theirs: TradeSide } };
-  trade: { req: { partnerId: number; give: number[]; get: number[]; execute: boolean }; res: TradeCheckView };
+  trade: { req: { partnerId: number; give: number[]; get: number[]; moves?: RoomMove[]; execute: boolean }; res: TradeCheckView };
   offers: { req: void; res: OfferView[] };
   answerOffer: { req: { id: number; accept: boolean }; res: { ok: boolean; reason?: string; warning?: string } };
   setSettings: { req: Partial<GameSettings>; res: Status };

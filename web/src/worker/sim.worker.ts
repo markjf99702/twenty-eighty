@@ -13,6 +13,7 @@ import { IL_THRESHOLD_DAYS } from "../../../src/players/injuries";
 import type { DepthChart, League, Team } from "../../../src/league/types";
 import {
   activateFromIl,
+  activeLimit,
   addToFortyMan,
   assignMinors,
   callUp,
@@ -26,7 +27,7 @@ import {
   rosterProblems,
 } from "../../../src/org/roster";
 import { payroll } from "../../../src/org/contracts";
-import { evaluateTrade, executeTrade } from "../../../src/org/trades";
+import { evaluateTrade, executeTrade, makeRoom, roomMoveProblem, rostersAfter } from "../../../src/org/trades";
 import { warShift } from "../../../src/scouting/analytics";
 import {
   ANALYTICS_TIERS,
@@ -612,22 +613,28 @@ const handlers: Handlers = {
 
   tradeSides({ partnerId }) {
     const s = requireSeason();
-    return { mine: tradeSide(s, stats, userTeam()), theirs: tradeSide(s, stats, s.team(partnerId)) };
+    return { mine: tradeSide(s, stats, userTeam(), ctx()), theirs: tradeSide(s, stats, s.team(partnerId)) };
   },
 
-  trade({ partnerId, give, get, execute }) {
+  trade({ partnerId, give, get, moves = [], execute }) {
     const s = requireSeason();
+    const c = ctx();
     const mine = userTeam();
     const partner = s.team(partnerId);
     const st = currentStatus();
     const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
-    const check = evaluateTrade(s.league, mine, partner, give, get, fraction, (viewer, p) => warShift(s, viewer, p));
-    if (!st.canTrade) return { ...check, ok: false, reason: st.tradeNote };
-    if (!execute || !check.ok) return check;
-    executeTrade(ctx(), mine, partner, give, get);
+    const check = evaluateTrade(s.league, mine, partner, give, get, fraction, (viewer, p) => warShift(s, viewer, p), moves);
+    const after = rostersAfter(s.league, mine, give, get, moves);
+    const view = { ...check, fortyMan: after.fortyMan, active: c.offseason ? null : after.active, activeLimit: activeLimit(c) };
+    const problem = roomMoveProblem(c, mine, give, moves);
+    if (problem) return { ...view, ok: false, over: undefined, reason: problem };
+    if (!st.canTrade) return { ...view, ok: false, reason: st.tradeNote };
+    if (!execute || !check.ok) return view;
+    executeTrade(c, mine, partner, give, get);
+    const made = makeRoom(c, mine, moves, waiverOrder(s));
     stats.clear();
     persistSoon();
-    return { ...check, done: true, warning: rosterWarning(mine) };
+    return { ...view, done: true, moves: made, warning: rosterWarning(mine) };
   },
 
   offers() {

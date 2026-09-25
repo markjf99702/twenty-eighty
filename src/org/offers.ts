@@ -314,6 +314,8 @@ export function answerOffer(
   const user = league.teams[league.userTeamId!]!;
   const partner = league.teams[o.teamId]!;
   const check = evaluateTrade(league, user, partner, o.give, o.get, fraction, seen);
+  // Still a deal once the user makes room (the builder can designate someone along with it).
+  if (check.over) return { ok: false, reason: `${check.reason} Use Adjust to pick who to designate with the deal.` };
   if (!check.ok) {
     o.status = "expired";
     return { ok: false, reason: `The ${partner.nickname} have changed their minds. ${check.reason ?? ""}`.trim() };

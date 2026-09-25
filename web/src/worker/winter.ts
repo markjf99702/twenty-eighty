@@ -4,6 +4,7 @@
 import type { League, Team } from "../../../src/league/types";
 import { payroll } from "../../../src/org/contracts";
 import { orgPlayers } from "../../../src/org/contracts";
+import type { RosterContext } from "../../../src/org/roster";
 import { offerLive } from "../../../src/org/offers";
 import { evaluateTrade, surplusValue } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
@@ -16,7 +17,7 @@ import { believedWar, warShift } from "../../../src/scouting/analytics";
 import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
 import type { DevRow, HistoryView, OffseasonView, OfferView, TradeSide } from "../api/protocol";
-import { dateLabel, playerSummary, type StatsCache, teamRef } from "./views";
+import { dateLabel, playerSummary, rosterActions, type StatsCache, teamRef } from "./views";
 
 const abbrev = (league: League, id: number | null) => (id === null ? "FA" : (league.teams[id]?.abbrev ?? "FA"));
 
@@ -162,10 +163,14 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
   return view;
 }
 
-export function tradeSide(season: Season, stats: StatsCache, team: Team): TradeSide {
+/** One club's side of the trade desk; with `ctx`, each player carries the roster moves open to him. */
+export function tradeSide(season: Season, stats: StatsCache, team: Team, ctx?: RosterContext): TradeSide {
   const league = season.league;
   const players = orgPlayers(league, team)
-    .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p, 1, warShift(season, league.userTeamId, p)) }))
+    .map((p) => ({
+      ...playerSummary(p, season, stats, ctx ? rosterActions(p, team, ctx) : undefined),
+      surplus: surplusValue(p, 1, warShift(season, league.userTeamId, p)),
+    }))
     .sort((a, b) => b.surplus - a.surplus);
   return { team: teamRef(team), players };
 }
@@ -196,6 +201,7 @@ export function offerViews(season: Season, stats: StatsCache): OfferView[] {
         give: o.give.map(row),
         get: o.get.map(row),
         value: { give: check.give, get: check.get },
+        ...(check.over ? { over: check.over } : {}),
       };
     });
 }

@@ -1331,3 +1331,16 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .choice .t { font-weight: 700; }
 .choice .s { font-size: 13px; color: var(--ink-2); }
 .ovr-block .word { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
+
+/* ------------------------------------------------------------------ trades: making room */
+
+.room-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 26px; margin-bottom: 10px; }
+.room-head > div { display: grid; }
+.room-head .k { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.room-head .v { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
+.room-head .v small { font-size: 15px; color: var(--ink-3); font-weight: 600; }
+.room-head .over .v { color: var(--alert); }
+.room-head p { flex: 1 1 280px; margin: 0; max-width: 72ch; }
+.tbl select.sel { padding: 2px 4px; width: 9.5em; }
+.room-note { margin: 0; color: var(--ink-2); font-size: 14px; }
+.on40 { color: var(--accent-text); font-size: 11px; }
