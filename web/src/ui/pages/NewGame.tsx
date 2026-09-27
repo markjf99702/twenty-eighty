@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS } from "../settings";
 import { ErrorNote, Loading, notify } from "../components/Common";
 import { ScaleLegend } from "../components/Grade";
 import { ordinal } from "../format";
+import { DrawerFoot } from "../components/DrawerFoot";
 
 /** Rank among 30 clubs, colored like a grade: top third blue, bottom third orange. */
 function Rank({ n, title }: { n: number; title: string }) {
@@ -172,6 +173,7 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
           {starting ? "Setting up…" : chosen ? `Take the ${chosen.nickname} job` : "Take the job"}
         </button>
       </div>
+      <DrawerFoot />
     </>
   );
 }

@@ -1,4 +1,85 @@
-# twenty-eighty
+# Twenty-Eighty
+
+**Play it: [junkdrawer.works/twenty-eighty](https://junkdrawer.works/twenty-eighty/)**
+
+**A baseball front-office game where every player carries the scouts' 20-80 grades.** You're the
+general manager of a made-up club: set the roster, run the farm system, draft, trade, sign free
+agents and extend your own players, then watch the seasons play out pitch by pitch. Your scouts can
+be wrong, the owner has goals, and 29 other front offices are doing the same thing you are.
+
+<p align="center">
+  <img src="docs/phone-new-league.png" alt="Starting a league: a seed box, the 20-80 scale from 20 Poor to 80 Elite, and the choice of how to play" width="250">
+  &nbsp;
+  <img src="docs/phone-front-office.png" alt="The front office in late May: the Milwaukee Ironmen 35-20 and first in their division, with the division table and recent games" width="250">
+  &nbsp;
+  <img src="docs/phone-player.png" alt="A 20-year-old shortstop's page: Now 55, Future 65, and each tool's present and future grade as a bar, with a 70 arm" width="250">
+</p>
+
+## How it plays
+
+- **Two grades for every tool**, now and at his peak, on the 20-80 scale. Your scouts see them with an
+  error that shrinks with a bigger scouting budget and more looks.
+- **Sim a day, a week, a month or the rest of the season** at a pace you can watch, with stops for a
+  losing streak, an injury, a trade offer or the deadline.
+- **The moves a real GM makes**: call-ups and options, the 40-man roster, trades (clubs call you too),
+  the draft, free agency, international signings, arbitration and contract extensions.
+- **An owner with goals and a budget**, ticket prices and a club's books. Fall far enough short and
+  you're fired, and other clubs call.
+- **Easy, Normal or Hard, Basics or Full stats**, and a staff who send notes when there's something
+  worth doing.
+- No account and no server. The league saves in your browser, and you can export it to a file. It
+  works offline and installs to a phone's home screen.
+
+## Running it
+
+The game is TypeScript: the engine is in `src/` and the browser UI (Preact) in `web/`. GitHub Pages
+serves a built copy from the repo root (`index.html` and `assets/`), so rebuild it after changing the
+code.
+
+```sh
+npm install
+npm run dev                 # play it locally with live reload (http://localhost:5173)
+npm run build:site          # rebuild index.html and assets/ at the repo root: what Pages serves
+npm test                    # the engine's test suite (vitest)
+npm run test:e2e            # plays the built site in Chromium through the real page (needs Playwright)
+npm run screenshots         # redraws docs/*.png and og.png
+npm run icons               # redraws the PNG icons from icon.svg
+npm run build:artifact      # one page for the Artifact viewer (fonts inlined, no downloads)
+```
+
+The engine also runs from the command line:
+
+```sh
+npm run sim:season                 # a full season (majors + 4 affiliate levels): standings, playoffs, awards, leaders
+npm run sim:season -- --team BOS   # ...plus one club's transaction log and end-of-season organization
+npm run sim:game -- DEN BOS        # one game, with a box score
+npm run scout -- NYE               # an organization's scouting report on the 20-80 scale
+npm run grade-chart                # what each grade means in stats (see below)
+npm run calibrate                  # compare a simulated season to real MLB
+npm run sim:years -- --years 10    # many seasons, offseasons included, watching for drift
+npm run pipeline                   # what one year's draft and international class becomes, vs. a league's age profile
+```
+
+Every universe is generated from a seed (`--seed my-league`), so the same seed always
+produces the same players and the same season.
+
+To put it online with GitHub Pages: **Settings → Pages → Build and deployment → Deploy from a branch**,
+then pick `main` and `/ (root)`.
+
+### Files
+
+- `src/`: the engine (players, organizations, the pitch-by-pitch game, seasons, the offseason, scouting,
+  money). See [Project layout](#project-layout) below.
+- `web/`: the browser UI. The simulation runs in a Web Worker (`web/src/worker/`), and the league is
+  saved in IndexedDB.
+- `index.html`, `assets/`: the built site, from `npm run build:site`.
+- `web/src/ui/fonts/`: Barlow Condensed, IBM Plex Mono and Source Sans 3 (SIL Open Font License),
+  served from here so nothing loads from elsewhere.
+- `sw.js`: keeps a copy for playing offline.
+- `icon.svg`, `icon-*.png`, `manifest.webmanifest`, `og.png`: the icon, home-screen install and link preview.
+- `tools/`: the screenshot and icon scripts. `test/`: the engine tests, and `e2e.mjs` for the site.
+
+## Under the hood
 
 A baseball front-office simulation in the spirit of *Baseball Mogul*: you're the GM
 (and a little bit the owner), you build the roster and the farm system, and the seasons
@@ -12,33 +93,6 @@ Two things are different from the late-90s version:
   velocity, barrels, whiff and chase rates, and FanGraphs-style WAR. The constants behind
   them (wOBA weights, FIP constant, runs per win, park factors) are re-derived every
   season from the simulated league's own run environment.
-
-> Status: **phases 1-6 are done**: the engine, player generation, full organizations
-> with four minor league affiliates, roster rules, injuries, in-game substitutions, AI
-> front offices, postseason, advanced stats, calibration, a browser UI, the offseason
-> (development and aging, contracts and payroll, the draft, free agency, international
-> signings and trades), scouting uncertainty with scouting and analytics departments,
-> and club finances with owners who set goals and can fire you. Seasons roll on
-> indefinitely.
-
-## Quick start
-
-```bash
-npm install
-npm run dev                        # the game in your browser (http://localhost:5173)
-npm run sim:season                 # a full season (majors + 4 affiliate levels): standings, playoffs, awards, leaders
-npm run sim:season -- --team BOS   # ...plus one club's transaction log and end-of-season organization
-npm run sim:game -- DEN BOS        # one game, with a box score
-npm run scout -- NYE               # an organization's scouting report on the 20-80 scale
-npm run grade-chart                # what each grade means in stats (see below)
-npm run calibrate                  # compare a simulated season to real MLB
-npm run sim:years -- --years 10    # many seasons, offseasons included, watching for drift
-npm run pipeline                   # what one year's draft and international class becomes, vs. a league's age profile
-npm test                           # vitest suite
-```
-
-Every universe is generated from a seed (`--seed my-league`), so the same seed always
-produces the same players and the same season.
 
 ## Playing in the browser
 

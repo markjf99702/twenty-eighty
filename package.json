@@ -2,7 +2,7 @@
   "name": "twenty-eighty",
   "version": "0.1.0",
   "private": true,
-  "description": "A baseball GM / front-office simulation with modern 20-80 scouting grades and modern stats.",
+  "description": "Run a baseball club as its general manager, on the scouts' 20-80 scale.",
   "type": "module",
   "scripts": {
     "typecheck": "tsc --noEmit && tsc --noEmit -p web",
@@ -17,6 +17,11 @@
     "scout": "tsx scripts/scout.ts",
     "dev": "vite web",
     "build:web": "vite build web",
+    "build:site": "VITE_SITE=1 vite build web",
+    "build:artifact": "VITE_NO_DOWNLOAD=1 vite build web --outDir dist-artifact",
+    "test:e2e": "node test/e2e.mjs",
+    "screenshots": "node tools/screenshots.mjs",
+    "icons": "node tools/make-icons.mjs",
     "preview": "vite preview web",
     "sim:years": "tsx scripts/sim-years.ts",
     "pipeline": "tsx scripts/pipeline.ts"

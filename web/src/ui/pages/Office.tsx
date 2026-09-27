@@ -4,6 +4,7 @@ import type { Status } from "../../api/protocol";
 import { notify, Section } from "../components/Common";
 import { SettingsPicker } from "../components/SettingsPicker";
 import { DEFAULT_SETTINGS } from "../settings";
+import { DrawerFoot } from "../components/DrawerFoot";
 
 /** Downloads are blocked where the app is embedded as a hosted page; the local build can export. */
 const CAN_DOWNLOAD = !import.meta.env.VITE_NO_DOWNLOAD;
@@ -142,6 +143,7 @@ export function Office({ status, onStatus }: { status: Status; onStatus: (s: Sta
           )}
         </Section>
       </div>
+      <DrawerFoot />
     </>
   );
 }
