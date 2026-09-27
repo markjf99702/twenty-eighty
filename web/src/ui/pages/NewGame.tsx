@@ -7,6 +7,7 @@ import { ErrorNote, Loading, notify } from "../components/Common";
 import { ScaleLegend } from "../components/Grade";
 import { ordinal } from "../format";
 import { DrawerFoot } from "../components/DrawerFoot";
+import { DriveContinue } from "../components/Drive";
 
 /** Rank among 30 clubs, colored like a grade: top third blue, bottom third orange. */
 function Rank({ n, title }: { n: number; title: string }) {
@@ -75,6 +76,7 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
             19-year-old in Single-A, carries a present and future grade the way a scout writes them up. The seasons
             are played pitch by pitch, and the numbers come back as wOBA, FIP and WAR.
           </p>
+          <DriveContinue onStarted={onStarted} />
         </div>
         <div class="panel setup">
           <label class="k" for="seed">

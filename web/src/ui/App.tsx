@@ -2,6 +2,9 @@ import { useEffect, useRef, useState } from "preact/hooks";
 import { bump, call } from "../api/client";
 import type { Status, StopNote, StopRules } from "../api/protocol";
 import { notify, Toasts } from "./components/Common";
+import { DriveCloud, NewerCopy } from "./components/Drive";
+import { drive } from "./drive";
+import { syncLeague } from "./sync";
 import { href, type Route, useRoute } from "./router";
 import { BoxScorePage } from "./pages/BoxScore";
 import { Dashboard } from "./pages/Dashboard";
@@ -69,6 +72,48 @@ export function App() {
   const [stops, setStops] = useState<StopRules>(storedStops);
   const stopsRef = useRef(stops);
   const [stopNote, setStopNote] = useState<StopNote | null>(null);
+  const statusRef = useRef(status);
+  statusRef.current = status;
+  const simRef = useRef(sim);
+  simRef.current = sim;
+
+  // Google Drive (at junkdrawer.works, once connected): send this device's league when the page is
+  // hidden and every half minute (roster moves), list what other devices saved, and catch a sign-in.
+  useEffect(() => {
+    if (!drive.available()) return;
+    const sync = () => {
+      const st = statusRef.current;
+      if (!simRef.current && st?.hasGame) void syncLeague(st.leagueId);
+    };
+    drive.onSignedIn = () => {
+      sync();
+      void drive.refresh(0);
+    };
+    if (drive.connected) {
+      drive.prepare();
+      void drive.refresh(0);
+    }
+    const timer = setInterval(sync, 30_000);
+    const onHide = () => {
+      if (document.visibilityState === "hidden") sync();
+    };
+    const onFocus = () => void drive.refresh();
+    document.addEventListener("visibilitychange", onHide);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      clearInterval(timer);
+      document.removeEventListener("visibilitychange", onHide);
+      window.removeEventListener("focus", onFocus);
+      drive.onSignedIn = null;
+    };
+  }, []);
+
+  // ...and a few seconds after a sim or a winter step changes it.
+  useEffect(() => {
+    if (!drive.connected || sim || !status?.hasGame) return;
+    const t = setTimeout(() => void syncLeague(status.leagueId), 4000);
+    return () => clearTimeout(t);
+  }, [status?.savedAt, sim === null]);
 
   const changeStops = (next: StopRules) => {
     setStops(next);
@@ -219,6 +264,7 @@ export function App() {
       />
       <Rail status={status} route={route} />
       <main>
+        <NewerCopy status={status} onStatus={setStatus} />
         {stopNote && (
           <div class={`stop-note ${stopNote.kind}`} role="status">
             <span class="k">Stopped</span>
@@ -367,6 +413,7 @@ function Board({
               </span>
             </div>
           )}
+          <DriveCloud status={game} />
         </div>
       )}
       {game && onSim && (

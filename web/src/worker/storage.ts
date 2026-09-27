@@ -74,3 +74,29 @@ export async function clearSave(): Promise<void> {
     // nothing to clear
   }
 }
+
+// ---------------------------------------------------------------------------
+// League codes: a save as compressed text, for Google Drive (and Import).
+
+const CODE_PREFIX = "twenty-eighty league 1\n";
+
+export const isLeagueCode = (text: string) => text.startsWith(CODE_PREFIX);
+
+/** The save, gzip-compressed and base64-encoded behind a short header. */
+export async function encodeLeague(json: string): Promise<string> {
+  const data = await gzip(json);
+  if (typeof data === "string") return data; // no compression here: plain JSON still imports
+  const bytes = new Uint8Array(await data.arrayBuffer());
+  let bin = "";
+  for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode(...bytes.subarray(i, i + 0x8000));
+  return CODE_PREFIX + btoa(bin);
+}
+
+/** A league code (or plain save JSON) back to save JSON. */
+export async function decodeLeague(text: string): Promise<string> {
+  if (!isLeagueCode(text)) return text;
+  const bin = atob(text.slice(CODE_PREFIX.length).trim());
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return gunzip(new Blob([bytes]));
+}

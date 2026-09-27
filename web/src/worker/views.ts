@@ -134,9 +134,14 @@ export function status(league: League | null, season: Season | null, hasSave: bo
   if (!league || !season) return { hasGame: false, hasSave };
   const user = league.userTeamId;
   const rec = user !== null ? season.records[user] : null;
+  const club = user !== null ? teamName(league.teams[user]!) : "";
   return {
     hasGame: true,
     hasSave,
+    leagueId: league.id,
+    savedAt: league.savedAt,
+    club,
+    when: whenLabel(league, season),
     seed: league.seed,
     year: league.year,
     day: season.day,
@@ -159,6 +164,16 @@ export function status(league: League | null, season: Season | null, hasSave: bo
         ? { date: dateLabel(season, TRADE_DEADLINE_DAY), daysLeft: TRADE_DEADLINE_DAY - season.day }
         : null,
   };
+}
+
+/** Where a league stands, in words: "May 21, 2026", "October 2026", "Winter 2026-27: free agency". */
+export function whenLabel(league: League, season: Season): string {
+  const phase = phaseOf(season);
+  if (phase === "regular") return `${dateLabel(season, Math.min(season.day, season.totalDays - 1))}, ${league.year}`;
+  if (phase === "postseason") return `October ${league.year}`;
+  if (phase === "done") return `End of ${league.year}`;
+  const w = winterStatus(league, season).winter;
+  return `Winter ${league.year}-${String((league.year + 1) % 100).padStart(2, "0")}${w ? `: ${w.label.toLowerCase()}` : ""}`;
 }
 
 function winterStatus(league: League, season: Season): Partial<Status> {

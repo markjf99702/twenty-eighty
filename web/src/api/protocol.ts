@@ -20,9 +20,24 @@ export interface TeamRef {
   division: number;
 }
 
+/** What a Google Drive copy says about the league inside it. */
+export interface DriveMeta {
+  league: string;
+  club: string;
+  when: string;
+  /** When the league last changed, ms since 1970. */
+  saved: number;
+}
+
 export interface Status {
   hasGame: boolean;
   hasSave: boolean;
+  /** Which league this is across devices, and when it last changed (ms since 1970). */
+  leagueId?: string;
+  savedAt?: number;
+  /** The user's club and where the league stands, for naming a Drive copy: "May 21, 2026". */
+  club?: string;
+  when?: string;
   seed?: string;
   year?: number;
   day?: number;
@@ -697,6 +712,10 @@ export interface Api {
   newGame: { req: { seed: string; teamId: number; minors: boolean; settings?: GameSettings }; res: Status };
   load: { req: void; res: Status };
   importSave: { req: { text: string }; res: Status };
+  /** The league as compressed text for Google Drive, if it changed after `since` (else null). */
+  driveCode: { req: { since: number }; res: { code: string; meta: DriveMeta } | null };
+  /** Replace the league on this device with a copy from Google Drive. */
+  openCode: { req: { code: string }; res: Status };
   exportSave: { req: void; res: string };
   deleteSave: { req: void; res: Status };
   /** `msPerDay`: at least this long per simulated day, so a page can be watched as it plays (0 = as fast as possible). */

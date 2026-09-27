@@ -5,6 +5,7 @@ import { notify, Section } from "../components/Common";
 import { SettingsPicker } from "../components/SettingsPicker";
 import { DEFAULT_SETTINGS } from "../settings";
 import { DrawerFoot } from "../components/DrawerFoot";
+import { DrivePanel } from "../components/Drive";
 
 /** Downloads are blocked where the app is embedded as a hosted page; the local build can export. */
 const CAN_DOWNLOAD = !import.meta.env.VITE_NO_DOWNLOAD;
@@ -105,6 +106,8 @@ export function Office({ status, onStatus }: { status: Status; onStatus: (s: Sta
           </p>
         </Section>
 
+        <DrivePanel status={status} onStatus={onStatus} />
+
         <Section title="Save files">
           <div class="toolbar">
             {CAN_DOWNLOAD && (
@@ -114,10 +117,11 @@ export function Office({ status, onStatus }: { status: Status; onStatus: (s: Sta
             )}
             <label class="btn">
               Import save…
-              <input type="file" accept=".json,application/json" hidden onChange={(e) => importSave((e.target as HTMLInputElement).files?.[0])} />
+              <input type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => importSave((e.target as HTMLInputElement).files?.[0])} />
             </label>
           </div>
-          {!CAN_DOWNLOAD && <p class="dim small" style={{ margin: 0 }}>Exporting needs the local version (npm run dev); importing works here.</p>}
+          {!CAN_DOWNLOAD && <p class="dim small" style={{ margin: 0 }}>Exporting works at junkdrawer.works/twenty-eighty; importing works here.</p>}
+          <p class="dim small" style={{ margin: 0 }}>Import takes an exported save or a copy downloaded from the Twenty-Eighty folder in Google Drive.</p>
         </Section>
 
         <Section title="Start over">

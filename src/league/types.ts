@@ -103,6 +103,10 @@ export interface Transaction {
 }
 
 export interface League {
+  /** Which league this is, across devices (its Google Drive copies share it). Set by the browser. */
+  id?: string;
+  /** When the league last changed, in ms since 1970. Set by the browser when it saves. */
+  savedAt?: number;
   seed: string;
   year: number;
   structure: LeagueStructure;

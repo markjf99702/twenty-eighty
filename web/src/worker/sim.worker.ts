@@ -61,7 +61,7 @@ import type {
   StopNote,
   StopRules,
 } from "../api/protocol";
-import { clearSave, hasSave, readSave, writeSave } from "./storage";
+import { clearSave, decodeLeague, encodeLeague, hasSave, readSave, writeSave } from "./storage";
 import { financeView, ownerView } from "./business";
 import { historyView, offerViews, offseasonView, tradeSide } from "./winter";
 import {
@@ -189,8 +189,20 @@ function attach(s: Season): void {
 // ---------------------------------------------------------------------------
 // Saving
 
-async function persist(): Promise<void> {
+/** A short random id for a league (letters and digits, so it can go into Drive queries). */
+function newLeagueId(): string {
+  const bytes = crypto.getRandomValues(new Uint8Array(12));
+  return Array.from(bytes, (b) => (b % 36).toString(36)).join("");
+}
+
+/**
+ * Save to this browser. `touch` marks the league as changed now; opening a
+ * copy from another device keeps that copy's time, so it doesn't look newer.
+ */
+async function persist(touch = true): Promise<void> {
   if (!league) return;
+  league.id ??= newLeagueId();
+  if (touch || !league.savedAt) league.savedAt = Date.now();
   saveExists = await writeSave(serialize(saveGame(league, season)));
 }
 
@@ -209,6 +221,9 @@ function restore(text: string): void {
   if (!loaded.season) throw new Error("That save has no season in progress.");
   league = loaded.league;
   season = loaded.season;
+  // Saves from before Drive copies: give the league an id, and count it as changed now.
+  league.id ??= newLeagueId();
+  league.savedAt ??= Date.now();
   attach(season);
 }
 
@@ -347,8 +362,26 @@ const handlers: Handlers = {
   },
 
   async importSave({ text }) {
-    restore(text);
-    await persist();
+    restore(await decodeLeague(text));
+    await persist(false);
+    return currentStatus();
+  },
+
+  async driveCode({ since }) {
+    if (!league || !season || simulating) return null;
+    league.id ??= newLeagueId();
+    league.savedAt ??= Date.now();
+    if (league.savedAt <= since) return null;
+    const st = currentStatus();
+    const code = await encodeLeague(serialize(saveGame(league, season)));
+    return { code, meta: { league: league.id, club: st.club ?? "", when: st.when ?? "", saved: league.savedAt } };
+  },
+
+  async openCode({ code }) {
+    restore(await decodeLeague(code));
+    boxes.clear();
+    stats.clear();
+    await persist(false);
     return currentStatus();
   },
 

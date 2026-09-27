@@ -14,6 +14,15 @@ dependencies; the browser UI in web/ uses Preact and Vite. See README.md for the
   outside requests, no sideways scrolling). If a built file is added or renamed, update
   `sw.js`'s list and bump its cache name. `npm run screenshots` redraws `docs/` and `og.png`.
 - `npm run build:artifact`: one page for the Artifact viewer (fonts inlined, no downloads).
+
+Google Drive saving (the junkdrawer.works rules, Terraville's approach): `web/src/ui/drive.ts`
+(shared OAuth client and `junkdrawer.google` sign-in, `drive.file`, a `Twenty-Eighty` folder,
+one file per league per device tagged with `appProperties`; never revoke) and `web/src/ui/sync.ts`
+(when to upload, opening a copy, the newer-copy check). Leagues can't be merged, so nothing is:
+the person picks a copy. The worker gives each league `id` and `savedAt` (set in `persist`;
+opening a copy keeps its time) and answers `driveCode` (a gzip+base64 league code, or null if
+unchanged) and `openCode`. `test/drive.mjs` rewrites the origin list in `assets/index.js` to
+allow localhost; it's minified as a template literal, `[`https://junkdrawer.works`]`.
 - `npm run calibrate [-- --seasons 3]`: full-season league metrics vs. MLB targets,
   plus player/team spread. Aim for "0 metric(s) outside 2x tolerance".
 - `npm run grade-chart [-- --pa 30000]`: what each 20-80 grade produces, per tool.

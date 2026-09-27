@@ -19,7 +19,7 @@
     "build:web": "vite build web",
     "build:site": "VITE_SITE=1 vite build web",
     "build:artifact": "VITE_NO_DOWNLOAD=1 vite build web --outDir dist-artifact",
-    "test:e2e": "node test/e2e.mjs",
+    "test:e2e": "node test/e2e.mjs && node test/drive.mjs",
     "screenshots": "node tools/screenshots.mjs",
     "icons": "node tools/make-icons.mjs",
     "preview": "vite preview web",

@@ -27,8 +27,39 @@ be wrong, the owner has goals, and 29 other front offices are doing the same thi
   you're fired, and other clubs call.
 - **Easy, Normal or Hard, Basics or Full stats**, and a staff who send notes when there's something
   worth doing.
+- **Google Drive, if you want it**: keep a copy of your league in your own Drive and pick it up on
+  another device. See [Google Drive](#google-drive) below.
 - No account and no server. The league saves in your browser, and you can export it to a file. It
   works offline and installs to a phone's home screen.
+
+## Google Drive
+
+In the **League office**, choose **Connect Google Drive**. From then on your league also goes to a
+`Twenty-Eighty` folder in your Drive: a few seconds after each sim, every half minute after other
+changes, and when you leave the page. A league is one running simulation, so two copies can't be merged:
+each device writes its own file per league, such as `Milwaukee Ironmen (iPhone).txt`, and never touches
+another device's.
+
+- **On another device**, connect the same way (or tap **Played on another device?** on the title
+  screen). The League office lists every copy with its device and where the league stands, and
+  **Continue from this** carries on from one. When another device has played further with the league
+  you're in, a note at the top of the page offers its copy. Carrying on from a copy replaces the league
+  on that device; it always asks first.
+- **What's in a file**: the whole league, compressed (every club, player and season played, your moves
+  and your club's books). Sim speed and the stops stay on each device. A file is a league code that
+  **Import save** also takes, so you can download one from Drive and load it by hand.
+- Twenty-Eighty asks Google only for `drive.file`, so it can reach the files it made and nothing else in
+  your Drive.
+- Google signs the page out after an hour. The league keeps saving on the device meanwhile; the cloud in
+  the scoreboard turns red, and one tap signs back in and uploads what waited. The sign-in is shared
+  with the other junkdrawer.works projects on the device (under `junkdrawer.google` in localStorage), so
+  signing in to any of them lets Twenty-Eighty save during that hour without asking.
+- **Stop saving on this device** leaves the files in Drive and doesn't revoke Google's permission,
+  which would sign every project out. To take the permission back, remove junkdrawer.works under
+  Third-party apps & services in your Google Account.
+- It works only at `https://junkdrawer.works`, where Google accepts the shared OAuth client
+  (`GOOGLE_CLIENT_ID` in `web/src/ui/drive.ts`). Anywhere else (a local copy, the Artifact copy) the
+  Drive controls don't appear.
 
 ## Running it
 
@@ -41,7 +72,7 @@ npm install
 npm run dev                 # play it locally with live reload (http://localhost:5173)
 npm run build:site          # rebuild index.html and assets/ at the repo root: what Pages serves
 npm test                    # the engine's test suite (vitest)
-npm run test:e2e            # plays the built site in Chromium through the real page (needs Playwright)
+npm run test:e2e            # plays the built site in Chromium, then Drive saving against a fake Google (needs Playwright)
 npm run screenshots         # redraws docs/*.png and og.png
 npm run icons               # redraws the PNG icons from icon.svg
 npm run build:artifact      # one page for the Artifact viewer (fonts inlined, no downloads)
@@ -75,9 +106,12 @@ then pick `main` and `/ (root)`.
 - `index.html`, `assets/`: the built site, from `npm run build:site`.
 - `web/src/ui/fonts/`: Barlow Condensed, IBM Plex Mono and Source Sans 3 (SIL Open Font License),
   served from here so nothing loads from elsewhere.
+- `web/src/ui/drive.ts`, `web/src/ui/sync.ts`: Google Drive saving (sign-in, uploads, listing, opening
+  a copy), adapted from Terraville's.
 - `sw.js`: keeps a copy for playing offline.
 - `icon.svg`, `icon-*.png`, `manifest.webmanifest`, `og.png`: the icon, home-screen install and link preview.
-- `tools/`: the screenshot and icon scripts. `test/`: the engine tests, and `e2e.mjs` for the site.
+- `tools/`: the screenshot and icon scripts. `test/`: the engine tests, `e2e.mjs` for the site, and
+  `drive.mjs`, which plays three devices sharing a fake Google Drive (`fake-google.mjs`).
 
 ## Under the hood
 

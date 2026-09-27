@@ -1405,3 +1405,65 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .jd-foot a { color: inherit; text-decoration: none; }
 .jd-foot a:hover, .jd-foot a:focus-visible { text-decoration: underline; color: var(--ink-2); }
 @media print { .jd-foot { display: none; } }
+
+/* ------------------------------------------------------------------ Google Drive */
+
+.cloud {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-height: 40px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: var(--board-2);
+  color: var(--board-ink);
+  cursor: pointer;
+}
+.cloud:hover, .cloud:focus-visible { border-color: var(--board-dim); }
+.cloud .dot, .drive-state .dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #3fb27f;
+}
+.cloud .dot { position: absolute; right: 6px; bottom: 7px; box-shadow: 0 0 0 2px var(--board-2); }
+.cloud.wait .dot, .drive-state.wait .dot { background: var(--bulb); }
+.cloud.act .dot, .drive-state.act .dot { background: #e5695e; }
+.drive-state { display: flex; align-items: center; gap: 8px; margin: 0; }
+.drive-state .dot { flex: none; }
+.drive-about { margin: 0; max-width: 62ch; color: var(--ink-2); }
+.copies { display: grid; gap: 0; }
+.copies-h, .drive-continue h2 {
+  margin: 4px 0 2px;
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 14px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.copy .who { display: grid; gap: 1px; min-width: 0; }
+.drive-continue { display: grid; gap: 10px; margin-top: 18px; max-width: 62ch; }
+.drive-ask { margin: 14px 0 0; }
+.linkish {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.drive-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; }
