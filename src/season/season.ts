@@ -44,7 +44,7 @@ import {
 } from "../stats/lines";
 import { batRow, pitRow, RECENT_GAMES, RecentLog } from "../stats/recent";
 import { RunTracker } from "../stats/runExpectancy";
-import type { PostseasonResult } from "./postseason";
+import type { Bracket, PostseasonResult } from "./postseason";
 import { buildSchedule, type Schedule } from "./schedule";
 import { StaffTracker } from "./staff";
 
@@ -311,6 +311,8 @@ export class Season {
   staff = new StaffTracker();
   /** Set once the playoffs have been played. */
   postseason: PostseasonResult | null = null;
+  /** The postseason while it's being played, game by game (kept once it's over). */
+  bracket: Bracket | null = null;
   /** Called with every finished game (the UI keeps recent box scores). */
   onGame?: (level: Level, result: GameResult, day: number) => void;
   readonly levels: Record<Level, LevelSeason>;
@@ -422,8 +424,9 @@ export class Season {
     return this.league.players[id]!;
   }
 
-  /** Calendar date of a season day. */
+  /** Calendar date of a season day (the postseason, two days after the last game, opens October 1). */
   dateOf(day: number): Date {
+    if (day > this.totalDays) return new Date(Date.UTC(this.league.year, 9, 1 + day - (this.totalDays + 2)));
     return new Date(Date.UTC(this.league.year, OPENING_DAY.month, OPENING_DAY.day + day));
   }
 
@@ -441,15 +444,19 @@ export class Season {
     return inj !== null && inj.daysLeft > 0;
   };
 
-  /** Lineup, starter, bench and bullpen state for one club at one level today. */
-  gameSetup(team: Team, rng: Rng, day = this.day, level: Level = "MLB"): TeamGameSetup {
+  /**
+   * Lineup, starter, bench and bullpen state for one club at one level today.
+   * The postseason passes its own depth chart (the playoff roster and rotation)
+   * and rotation key.
+   */
+  gameSetup(team: Team, rng: Rng, day = this.day, level: Level = "MLB", playoff?: { depth: DepthChart; rotationKey: string }): TeamGameSetup {
     const league = this.league;
-    const depth = level === "MLB" ? team.depth : this.minorDepth(team, level);
+    const depth = playoff?.depth ?? (level === "MLB" ? team.depth : this.minorDepth(team, level));
     const lineup = buildLineup(league, depth, rng, { unavailable: this.isOut });
     const inLineup = new Set(lineup.map((s) => s.id));
     const position = [...Object.values(depth.starters), depth.dh, ...depth.bench];
     const bench = position.filter((id) => id >= 0 && !inLineup.has(id) && !this.isOut(id));
-    const starter = this.staff.nextStarter(`${team.id}:${level}`, depth.rotation, day, (id) => !this.isOut(id));
+    const starter = this.staff.nextStarter(playoff?.rotationKey ?? `${team.id}:${level}`, depth.rotation, day, (id) => !this.isOut(id));
     // Relievers first; the other starters are emergency arms only.
     const relievers = depth.bullpen.filter((id) => !this.isOut(id));
     const bullpen = [...relievers, ...depth.rotation.filter((id) => id !== starter && !this.isOut(id))];

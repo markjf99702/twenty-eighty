@@ -46,7 +46,15 @@ import { signInternational } from "../../../src/offseason/international";
 import { advanceOffseason, beginOffseason, offerClock, WINTER_DAYS, winterContext, winterWeek } from "../../../src/offseason/offseason";
 import { FIELD_POSITIONS, MINOR_LEVELS, type Level } from "../../../src/players/types";
 import { deserialize, loadGame, saveGame, serialize } from "../../../src/save/save";
-import { runPostseason } from "../../../src/season/postseason";
+import {
+  defaultPlayoffRoster,
+  defaultPlayoffRotation,
+  planProblem,
+  playPostseason,
+  startPostseason,
+  stillAlive,
+} from "../../../src/season/postseason";
+import { playoffPlanView, postseasonView } from "./october";
 import { Season } from "../../../src/season/season";
 import type {
   Api,
@@ -71,8 +79,8 @@ import {
   extensionCandidatesView,
   extensionView,
   gameItems,
+  gameKey,
   playerView,
-  postseasonView,
   StatsCache,
   standingsView,
   status,
@@ -452,9 +460,56 @@ const handlers: Handlers = {
   async playoffs() {
     const s = requireSeason();
     if (!s.done) throw new Error("The regular season isn't over yet.");
-    if (!s.postseason) runPostseason(s);
+    if (!s.postseason && !s.bracket) {
+      const b = startPostseason(s);
+      // The user's club starts October with the playoff roster its manager would pick.
+      const user = s.league.userTeamId;
+      if (user !== null && b.seeds.flat().includes(user)) {
+        const team = s.team(user);
+        const roster = defaultPlayoffRoster(s, team);
+        b.plan = { roster, rotation: defaultPlayoffRotation(s, team, roster) };
+      }
+    }
     await persist();
     return currentStatus();
+  },
+
+  async playPostseason({ step }) {
+    const s = requireSeason();
+    if (!s.done) throw new Error("The regular season isn't over yet.");
+    if (s.postseason) return { status: currentStatus(), games: [] };
+    const user = s.league.userTeamId;
+    const played = playPostseason(s, step, user);
+    // What to tell the user: their own games (or, out of it, nothing but the final).
+    const view = postseasonView(s, boxes);
+    const games = played
+      .filter((g) => user !== null && (g.awayId === user || g.homeId === user))
+      .map((g) => {
+        const series = view?.series.find((x) => x.games.some((y) => y.key === gameKey(g.day, g.homeId)));
+        const game = series?.games.find((y) => y.key === gameKey(g.day, g.homeId));
+        return { recap: g.recap, after: game ? `Game ${game.n}. ${game.after}.` : "", mine: true };
+      });
+    await persist();
+    return { status: currentStatus(), games };
+  },
+
+  playoffPlan() {
+    const s = requireSeason();
+    return s.league.userTeamId === null ? null : playoffPlanView(s, stats, userTeam());
+  },
+
+  setPlayoffPlan({ roster, rotation }) {
+    const s = requireSeason();
+    const b = s.bracket;
+    const team = userTeam();
+    if (!b || b.champion !== null) return { ok: false, reason: "October isn't on." };
+    if (!stillAlive(b, team.id)) return { ok: false, reason: "Your club's season is over." };
+    const plan = { roster, rotation };
+    const problem = planProblem(s, team, plan);
+    if (problem) return { ok: false, reason: problem };
+    b.plan = plan;
+    persistSoon();
+    return { ok: true };
   },
 
   dashboard() {
@@ -553,7 +608,7 @@ const handlers: Handlers = {
   },
 
   postseason() {
-    return postseasonView(requireSeason());
+    return postseasonView(requireSeason(), boxes);
   },
 
   // --- The offseason -------------------------------------------------------

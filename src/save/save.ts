@@ -1,7 +1,7 @@
 import { Rng, type RngState } from "../core/rng";
 import type { League } from "../league/types";
 import { LEVELS, type Level } from "../players/types";
-import type { PostseasonResult } from "../season/postseason";
+import type { Bracket, PostseasonResult } from "../season/postseason";
 import type { Schedule } from "../season/schedule";
 import { Season, type GameSummary, type TeamRecord } from "../season/season";
 import { StaffTracker, type StaffState } from "../season/staff";
@@ -51,6 +51,8 @@ export interface SeasonState {
   injured: number[];
   seasonService: [number, number][];
   postseason: PostseasonResult | null;
+  /** The postseason as it's played (absent in saves made before it was played game by game). */
+  bracket?: Bracket | null;
   levels: Record<Level, LevelState>;
 }
 
@@ -126,6 +128,7 @@ export function saveGame(league: League, season: Season | null): SaveGame {
       injured: [...season.injured],
       seasonService: [...season.seasonService],
       postseason: season.postseason,
+      bracket: season.bracket,
       levels,
     };
   }
@@ -148,6 +151,7 @@ export function loadGame(save: SaveGame): { league: League; season: Season | nul
   for (const id of s.injured) season.injured.add(id);
   for (const [id, days] of s.seasonService) season.seasonService.set(id, days);
   season.postseason = s.postseason;
+  season.bracket = s.bracket ?? null;
   for (const level of LEVELS) {
     const ls = season.levels[level];
     const st = s.levels[level];

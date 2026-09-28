@@ -53,6 +53,15 @@ export class StaffTracker {
     return id;
   }
 
+  /** Who `nextStarter` would pick, without moving the rotation along (for previews). */
+  peekStarter(key: string, rotation: number[], day: number, isAvailable: (id: number) => boolean = () => true): number {
+    const saved = this.rotationIndex.get(key);
+    const id = this.nextStarter(key, rotation, day, isAvailable);
+    if (saved === undefined) this.rotationIndex.delete(key);
+    else this.rotationIndex.set(key, saved);
+    return id;
+  }
+
   /** Days since a pitcher last appeared (Infinity if never). */
   daysSince(id: number, day: number): number {
     const last = this.lastOuting(id);

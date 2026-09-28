@@ -45,6 +45,8 @@ export interface Status {
   totalDays?: number;
   date?: string;
   phase?: "regular" | "postseason" | "done" | "offseason";
+  /** October: whether it's started, whether the user's club is still in it, and its next game ("Game 3"). */
+  october?: { started: boolean; alive: boolean; next: string | null };
   /** Where the winter stands, during the offseason. */
   winter?: { phase: OffseasonPhase; label: string; action: string; week?: number; weeks?: number; userOnClock?: boolean };
   /** Whether the user can trade right now (no trades after the deadline until the season ends). */
@@ -448,10 +450,77 @@ export interface DashboardView {
   userNews: TransactionItem[];
 }
 
+export interface PostGameView {
+  /** Game number in the series. */
+  n: number;
+  date: string;
+  key: string;
+  hasBox: boolean;
+  away: string;
+  home: string;
+  score: [number, number];
+  innings: number;
+  /** "Forge 5, Firebirds 4: a walk-off in the 10th." */
+  recap: string;
+  winner: string;
+  /** The series after this game: "Forge lead 2-1". */
+  after: string;
+}
+
+export interface SeriesView {
+  round: string;
+  /** "" for the World Series. */
+  league: string;
+  higher: { id: number; abbrev: string; name: string; seed: number | null };
+  lower: { id: number; abbrev: string; name: string; seed: number | null };
+  /** [higher, lower] */
+  wins: [number, number];
+  winner: string | null;
+  /** "Forge lead 2-1", "Tied 1-1", "Game 1 to come". */
+  status: string;
+  games: PostGameView[];
+  next: { n: number; date: string; home: string } | null;
+  mvp: { playerId: number; name: string; team: string; line: string } | null;
+  mine: boolean;
+}
+
+export interface StarterView {
+  id: number;
+  name: string;
+  /** Regular season: "14-8, 3.12 ERA". */
+  line: string;
+}
+
 export interface PostseasonView {
+  started: boolean;
+  over: boolean;
   seeds: { teamId: number; abbrev: string; name: string }[][];
-  series: { round: string; league: string; higher: string; lower: string; winner: string; wins: [number, number]; games: string[] }[];
+  leagues: string[];
+  series: SeriesView[];
+  /** The round being played. */
+  round: string | null;
+  /** When the next games are. */
+  date: string | null;
   champion: string | null;
+  /** The user's October (null without a club). */
+  user: {
+    /** Seed, or null if the club missed the postseason. */
+    seed: number | null;
+    alive: boolean;
+    series: SeriesView[];
+    next: { n: number; round: string; date: string; home: boolean; opponent: string; starter: StarterView | null; theirStarter: StarterView | null } | null;
+    plan: { roster: number; pitchers: number; rotation: { id: number; name: string }[] };
+  } | null;
+}
+
+export interface PlayoffPlanView {
+  /** False once the club is out. */
+  editable: boolean;
+  /** Everyone eligible: the 40-man roster. */
+  players: PlayerSummary[];
+  roster: number[];
+  rotation: number[];
+  limits: { roster: number; pitchers: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -766,6 +835,10 @@ export interface Api {
   setPace: { req: { msPerDay: number }; res: { ok: boolean } };
   setStops: { req: StopRules; res: { ok: boolean } };
   playoffs: { req: void; res: Status };
+  /** Play October on: through the user's next game, to the end of the round, or to the end. */
+  playPostseason: { req: { step: "game" | "round" | "all" }; res: { status: Status; games: { recap: string; after: string; mine: boolean }[] } };
+  playoffPlan: { req: void; res: PlayoffPlanView | null };
+  setPlayoffPlan: { req: { roster: number[]; rotation: number[] }; res: { ok: boolean; reason?: string } };
   dashboard: { req: void; res: DashboardView };
   standings: { req: { level: Level }; res: StandingsView };
   team: { req: { teamId: number }; res: TeamView };

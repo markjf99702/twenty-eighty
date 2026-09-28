@@ -34,6 +34,7 @@ import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season
 import type { GameResult } from "../../../src/sim/game";
 import { inningsPitched } from "../../../src/stats/lines";
 import { BAT_ROW, PIT_ROW, sumRows } from "../../../src/stats/recent";
+import { octoberStatus } from "./october";
 import { belief, warShift } from "../../../src/scouting/analytics";
 import { looksLeft, perceive, staffCost, uncertainty } from "../../../src/scouting/scouting";
 import type {
@@ -47,7 +48,6 @@ import type {
   GameItem,
   PlayerSummary,
   PlayerView,
-  PostseasonView,
   RosterActionOption,
   StandingRow,
   StatSnapshot,
@@ -148,6 +148,7 @@ export function status(league: League | null, season: Season | null, hasSave: bo
     totalDays: season.totalDays,
     date: dateLabel(season, Math.min(season.day, season.totalDays - 1)),
     phase: phaseOf(season),
+    ...(phaseOf(season) === "postseason" ? { october: octoberStatus(season) } : {}),
     ...winterStatus(league, season),
     userTeamId: user,
     minors: season.simulateMinors,
@@ -900,25 +901,6 @@ export function dashboardView(season: Season, stats: StatsCache, boxes: Map<stri
     prospects: prospects.map((p) => playerSummary(p, season, stats)),
     news: transactions(season, { majorOnly: true, limit: 14 }),
     userNews: transactions(season, { teamId: team.id, majorOnly: true, limit: 14 }),
-  };
-}
-
-export function postseasonView(season: Season): PostseasonView | null {
-  const post = season.postseason;
-  if (!post) return null;
-  const ab = (id: number) => season.team(id).abbrev;
-  return {
-    seeds: post.seeds.map((lg) => lg.map((id) => ({ teamId: id, abbrev: ab(id), name: teamName(season.team(id)) }))),
-    series: post.series.map((s) => ({
-      round: s.round,
-      league: s.league === null ? "" : season.league.structure.leagues[s.league]!,
-      higher: ab(s.higher),
-      lower: ab(s.lower),
-      winner: ab(s.winner),
-      wins: s.wins,
-      games: s.games.map((g) => `${ab(g.awayId)} ${g.score[0]}, ${ab(g.homeId)} ${g.score[1]}${g.innings > 9 ? ` (${g.innings})` : ""}`),
-    })),
-    champion: ab(post.champion),
   };
 }
 

@@ -192,10 +192,29 @@ export function App() {
   };
 
   const playoffs = async () => {
-    setSim({ done: 0, total: 0, label: "Playing October" });
+    setSim({ done: 0, total: 0, label: "Seeding the bracket" });
     try {
       setStatus(await call("playoffs", undefined));
       location.hash = href({ page: "playoffs" });
+    } catch (err) {
+      notify((err as Error).message, true);
+    } finally {
+      setSim(null);
+      bump();
+    }
+  };
+
+  /** October, a step at a time: the user's next game, the rest of a round, or the rest of it. */
+  const october = async (step: "game" | "round" | "all") => {
+    if (sim) return;
+    const label = step === "game" ? "Playing ball" : step === "round" ? "Playing the round" : "Playing October";
+    setSim({ done: 0, total: 0, label });
+    try {
+      const res = await call("playPostseason", { step });
+      setStatus(res.status);
+      // Game by game, each of your games; played in a batch, just the last.
+      for (const g of step === "game" ? res.games : res.games.slice(-1)) notify(`${g.recap} ${g.after}`.trim());
+      if (route.page !== "playoffs") location.hash = href({ page: "playoffs" });
     } catch (err) {
       notify((err as Error).message, true);
     } finally {
@@ -256,6 +275,7 @@ export function App() {
         sim={sim}
         onSim={runSim}
         onPlayoffs={playoffs}
+        onOctober={october}
         onWinter={winterStep}
         pace={pace}
         onPace={changePace}
@@ -345,6 +365,7 @@ function Board({
   sim,
   onSim,
   onPlayoffs,
+  onOctober,
   onWinter,
   pace,
   onPace,
@@ -355,6 +376,7 @@ function Board({
   sim: SimState | null;
   onSim?: (days: number | "end") => void;
   onPlayoffs?: () => void;
+  onOctober?: (step: "game" | "round" | "all") => void;
   onWinter?: (kind: "beginOffseason" | "advance" | "winterWeek") => void;
   pace?: Pace;
   onPace?: (p: Pace) => void;
@@ -451,9 +473,32 @@ function Board({
               {stops && onStops && <StopsMenu stops={stops} onChange={onStops} />}
             </>
           ) : game.phase === "postseason" ? (
-            <button type="button" class="btn primary" onClick={onPlayoffs}>
-              Play the postseason
-            </button>
+            !game.october?.started ? (
+              <button type="button" class="btn primary" onClick={onPlayoffs}>
+                Start the postseason
+              </button>
+            ) : game.october.alive ? (
+              <>
+                <button type="button" class="btn primary" onClick={() => onOctober?.("game")}>
+                  {game.october.next ?? "Next game"}
+                </button>
+                <button type="button" class="btn" onClick={() => onOctober?.("round")}>
+                  Finish the round
+                </button>
+                <button type="button" class="btn" onClick={() => onOctober?.("all")}>
+                  To the end
+                </button>
+              </>
+            ) : (
+              <>
+                <button type="button" class="btn primary" onClick={() => onOctober?.("round")}>
+                  Next round
+                </button>
+                <button type="button" class="btn" onClick={() => onOctober?.("all")}>
+                  To the end
+                </button>
+              </>
+            )
           ) : game.phase === "done" ? (
             <>
               <a class="btn" href="#playoffs">
