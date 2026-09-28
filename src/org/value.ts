@@ -109,6 +109,19 @@ export function peakValue(p: Player): number {
   return best;
 }
 
+/** Days of big-league service a player can have and still be a rookie (and so a prospect). */
+export const ROOKIE_DAYS = 45;
+
+/** Still a prospect: rookie-eligible, so what he'll become (his future value) is the number to know. */
+export const isProspect = (p: Player) => p.service < ROOKIE_DAYS;
+
+/**
+ * Close enough to the majors that wins a season is the number to know: a big
+ * leaguer, anyone at AAA, or anyone who has been up. The 20-80 overall grade
+ * bunches up there (a good reliever and a mop-up man both read about 50).
+ */
+export const measuredInWins = (p: Player) => p.level === "MLB" || p.level === "AAA" || !isProspect(p);
+
 /**
  * Overall grade on the 20-80 scale. With `future`, it's a prospect list's
  * Future Value, the grade of his projected peak: 50 is an average regular (or

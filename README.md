@@ -171,7 +171,8 @@ the GM:
 - **Front office**: record, division race, recent games, club leaders, injuries, your top
   prospects, and the transaction wire.
 - **My club**: the active roster, injured list and every affiliate, with each player's
-  present grades, overall and future value (FV), 40-man status, options left and service
+  present grades, projected WAR (for big leaguers and anyone close) or future value (for
+  prospects), the overall Now grade, 40-man status, options left and service
   time. Switch the tables between the scouting report, the club's last 15 games, this
   season's stats (AVG/OBP/SLG,
   wRC+, xwOBA, fielding runs and WAR for hitters; ERA, ERA-, FIP, K%, BB%, WHIP and WAR
@@ -256,6 +257,15 @@ scouts carry around:
 | 40 | .223 / 27.6% | 11 / .100 | 6.8% | .290 |
 | 30 | .189 / 34.1% | 8 / .071 | 5.2% | .279 |
 | 20 | .163 / 40.8% | 4 / .046 | 3.9% | .277 |
+
+The one-number overall grade is a prospect list's tool, though. Once a player is in the
+majors (or at AAA, or has been up), what a club wants to know is how many wins he's worth,
+and the overall grade bunches up there: nearly every reliever reads about 50, whether he's
+a closer or a mop-up man. So big leaguers lead with **projected WAR** (Proj): wins over a
+full season in his role, by your own read. It's the same belief as the Now grade (scouts
+blended with analytics, blurred by how good your departments are) in units that separate
+players. Prospects (rookie-eligible, under 45 days of big-league service) keep **FV**, the
+grade of their projected peak. The tool grades stay on 20-80 for everyone.
 
 Pitchers work the same way. Each pitch in the arsenal gets its own grade (a 70 slider is
 a whiff pitch). **Control** is throwing strikes: walk rate runs from about 20% at a 20 to

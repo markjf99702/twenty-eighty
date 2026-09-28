@@ -5,7 +5,7 @@ import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeBar, PresentFuture } from "../components/Grade";
 import { ExtensionPanel } from "../components/Extension";
 import { RosterMoves, StatusBadges } from "../components/PlayerTable";
-import { LEVEL_NAMES, fixed, gradeWord, ip, pct, rate3, scout, whole } from "../format";
+import { GLOSSARY, LEVEL_NAMES, fixed, gradeWord, ip, pct, rate3, scout, warWord, whole } from "../format";
 import { useBasics } from "../settings";
 import { teamHref } from "../router";
 import { tradeFor } from "../tradePreset";
@@ -50,16 +50,27 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
           )}
         </div>
         <div class="ovr-block">
+          {p.proj !== null && (
+            <div>
+              <span class="k" title={GLOSSARY.Proj}>Proj WAR</span>
+              <span class={`war-big${p.proj < 0 ? " neg" : ""}`} title={GLOSSARY.Proj}>
+                {fixed(p.proj)}
+              </span>
+              <span class="word">{warWord(p.proj, p.pos)}</span>
+            </div>
+          )}
           <div>
             <span class="k">Now</span>
             <Grade g={p.ovr} large />
             {basics && <span class="word">{gradeWord(p.ovr)}</span>}
           </div>
-          <div>
-            <span class="k">Future</span>
-            <Grade g={p.fv} large />
-            {basics && <span class="word">{gradeWord(p.fv)}</span>}
-          </div>
+          {p.prospect && (
+            <div>
+              <span class="k">Future</span>
+              <Grade g={p.fv} large />
+              {basics && <span class="word">{gradeWord(p.fv)}</span>}
+            </div>
+          )}
         </div>
       </div>
 
@@ -520,20 +531,25 @@ function YourRead({ v }: { v: PlayerView }) {
     bump();
   };
   const a = sc.analytics;
+  // The same reads in wins a season, for players where that's the number to know.
+  const w = sc.war;
   return (
     <Section title="Your read" aside={sc.familiarity}>
       <div class="read-row">
         <div>
           <span class="k">Scouts</span>
           <Grade g={sc.scoutsGrade} large />
+          {w && <span class="war-small">{fixed(w.scouts)} WAR</span>}
         </div>
         <div>
           <span class="k">Analytics</span>
           {a ? <Grade g={a.grade} large /> : <span class="gc lg g50" title="No sample yet">—</span>}
+          {w && w.analytics !== null && <span class="war-small">{fixed(w.analytics)} WAR</span>}
         </div>
         <div>
           <span class="k">Your read</span>
           <Grade g={sc.blendGrade} large />
+          {w && <span class="war-small">{fixed(w.read)} WAR</span>}
         </div>
       </div>
       <div class="small dim">

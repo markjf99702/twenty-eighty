@@ -3,7 +3,7 @@ import type { League, Team } from "../league/types";
 import { budgetRoom, FREE_AGENT_YEARS, serviceYears } from "../org/contracts";
 import { gamesOut } from "../org/offers";
 import { surplusValue } from "../org/trades";
-import { overallGrade } from "../org/value";
+import { isProspect, overallGrade } from "../org/value";
 import { FIELD_POSITIONS, type FieldPosition, type Level, playerName, type Player } from "../players/types";
 import { belief, believedWar, warShift } from "../scouting/analytics";
 import { ANALYTICS_TIERS, perceive, uncertainty } from "../scouting/scouting";
@@ -151,16 +151,21 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
     const sigma = uncertainty(league, user, p);
     const c = confidenceOf(sigma);
     if (RANK[c] > RANK[confidence]) confidence = c;
-    const nowGrade = Math.round(clamp(50 + belief(season, user, p).value / 2, 20, 80));
-    const fv = Math.max(nowGrade, overallGrade(perceive(league, user, p), true));
-    const where = p.level === "MLB" ? "" : ` in ${LEVEL_WORDS[p.level]}`;
+    // A prospect in grades (what he'll become); anyone established in wins a season.
+    let read: string;
+    if (isProspect(p)) {
+      const nowGrade = Math.round(clamp(50 + belief(season, user, p).value / 2, 20, 80));
+      const fv = Math.max(nowGrade, overallGrade(perceive(league, user, p), true));
+      const where = p.level === "MLB" ? "" : ` in ${LEVEL_WORDS[p.level]}`;
+      read = `${nowGrade} now and ${fv} at his peak${where}`;
+    } else read = `about ${believedWar(season, user, p).toFixed(1)} WAR a season`;
     const seen = looks[p.id] ?? 0;
     const text =
       c === "high"
-        ? `We know ${playerName(p)} well: ${nowGrade} now and ${fv} at his peak${where}.`
+        ? `We know ${playerName(p)} well: ${read}.`
         : c === "medium"
-          ? `We've seen enough of ${playerName(p)} to be fairly sure: ${nowGrade} now, ${fv} at his peak${where}.`
-          : `Our read on ${playerName(p)} is thin (${seen ? `${seen} look${seen === 1 ? "" : "s"}` : "we haven't sent anyone"}): we have him at ${nowGrade} now and ${fv} at his peak${where}, give or take a lot. A look from a scout would firm it up.`;
+          ? `We've seen enough of ${playerName(p)} to be fairly sure: ${read}.`
+          : `Our read on ${playerName(p)} is thin (${seen ? `${seen} look${seen === 1 ? "" : "s"}` : "we haven't sent anyone"}): we have him at ${read}, give or take a lot. A look from a scout would firm it up.`;
     notes.push({ from: "scouting", text });
   }
 

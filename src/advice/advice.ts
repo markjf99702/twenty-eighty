@@ -1,4 +1,3 @@
-import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
 import { expectedGate, formFactor, referencePrice } from "../finance/finance";
 import { settingsOf } from "../league/settings";
@@ -69,8 +68,8 @@ const tag = (p: Player) => `${pos(p)} ${playerName(p)}`;
 const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
 const names = (ps: Player[]) => (ps.length <= 2 ? ps.map(tag).join(" and ") : `${ps.slice(0, -1).map(tag).join(", ")} and ${tag(ps.at(-1)!)}`);
 
-/** The user's read of a player now, on the 20-80 scale. */
-const ourNow = (season: Season, user: number, p: Player) => Math.round(clamp(50 + belief(season, user, p).value / 2, 20, 80));
+/** The user's read of what a player would give in the majors now, in wins (the 20-80 grade bunches up for big leaguers). */
+const ourWar = (season: Season, user: number, p: Player) => `about ${believedWar(season, user, p).toFixed(1)} WAR a season`;
 const ourFv = (league: League, user: number, p: Player) => overallGrade(perceive(league, user, p), true);
 
 function slash(b: BattingLine | undefined): string | null {
@@ -213,8 +212,8 @@ function callUps(season: Season, team: Team, day: number): void {
     urgent: false,
     title: `Time to call up ${playerName(pick.up)}?`,
     text:
-      `Our read has ${pick.up.level === "AAA" ? "Triple-A" : "Double-A"}'s ${tag(pick.up)} (Now ${ourNow(season, user, pick.up)}${upLine ? `, ${upLine}` : ""}) ` +
-      `well ahead of ${tag(pick.down)} (Now ${ourNow(season, user, pick.down)}${downLine ? `, ${downLine}` : ""}). Worth a look.`,
+      `Our read has ${pick.up.level === "AAA" ? "Triple-A" : "Double-A"}'s ${tag(pick.up)} (${ourWar(season, user, pick.up)}${upLine ? `; ${upLine} this year` : ""}) ` +
+      `well ahead of ${tag(pick.down)} (${ourWar(season, user, pick.down)}${downLine ? `; ${downLine} this year` : ""}). Worth a look.`,
     href: `#player-${pick.up.id}`,
   });
 }
@@ -265,7 +264,7 @@ function deadline(season: Season, team: Team, day: number): void {
       from: "scouting",
       urgent: lastWeek,
       title: `A trade could shore up ${spot.label}`,
-      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gb} games out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (Now ${ourNow(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
+      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gb} games out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
       href: there.length ? `#trades-block-${group.toLowerCase()}` : "#trades",
     });
   }
@@ -477,7 +476,7 @@ export function winterAdvice(league: League, season: Season, now: number): void 
         urgent: false,
         title: `Our biggest hole: ${spot.label}`,
         text:
-          `By our read ${spot.label} is the weakest spot on the club (${tag(spot.p)}, Now ${ourNow(season, user, spot.p)}). ` +
+          `By our read ${spot.label} is the weakest spot on the club (${tag(spot.p)}, ${ourWar(season, user, spot.p)}). ` +
           (fits.length
             ? `Best fits on the market: ${fits.map((p) => `${tag(p)} (about ${war(p).toFixed(1)} wins, asking ${money(asks.get(p.id)!.salary)} for ${asks.get(p.id)!.years} yr)`).join("; ")}. `
             : "Nobody on the market is a clear upgrade; a trade may be the way. ") +

@@ -215,6 +215,10 @@ export interface PlayerSummary {
   teamId: number | null;
   ovr: number;
   fv: number;
+  /** Projected WAR over a full season in his role, by your read (null for prospects below AAA). */
+  proj: number | null;
+  /** Rookie-eligible: his future value (FV) is the number to know. */
+  prospect: boolean;
   pitcher: boolean;
   /** Key present grades as your scouts see them: hitters Hit/Power/Eye/Run/Field/Arm, pitchers Stuff/Control/Command/Stamina. */
   grades: [string, number][];
@@ -323,6 +327,8 @@ export interface PlayerView {
     looksLeft: number;
     canLook: boolean;
     scoutsGrade: number;
+    /** The same reads in projected WAR a season, for players measured in wins (null for prospects below AAA). */
+    war: { scouts: number; analytics: number | null; read: number } | null;
     analytics: { grade: number; reliability: number; sample: number; basis: string; weight: number } | null;
     blendGrade: number;
   };

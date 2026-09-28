@@ -4,7 +4,7 @@ import type { DevRow, OffseasonPhase, OffseasonView, PlayerSummary, Status } fro
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeChips } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
-import { fixed, LEVEL_NAMES } from "../format";
+import { fixed, GLOSSARY, LEVEL_NAMES } from "../format";
 import { href, playerHref } from "../router";
 import { ConfidenceMeter, GoalList, JobOffers } from "./Owner";
 
@@ -227,7 +227,7 @@ function Tenders({ v }: { v: OffseasonView }) {
                   <th>Player</th>
                   <th class="num">Age</th>
                   <th class="num" title="Service time">Svc</th>
-                  <th class="num" title="Projected WAR over a full season">WAR</th>
+                  <th class="num" title={GLOSSARY.Proj}>Proj</th>
                   <th class="num">Award</th>
                   <th>Decision</th>
                 </tr>
@@ -428,8 +428,8 @@ function FreeAgency({ v, onWinter }: { v: OffseasonView; onWinter: (kind: Winter
     { key: "name", label: "Name", cls: "name", sort: (r) => r.player.name, asc: true, render: (r) => <a href={playerHref(r.player.id)}>{r.player.name}</a> },
     { key: "pos", label: "Pos", render: (r) => r.player.pos },
     { key: "age", label: "Age", cls: "num", sort: (r) => r.player.age, asc: true, render: (r) => r.player.age },
+    { key: "war", label: "Proj", title: GLOSSARY.Proj, cls: "num", sort: (r) => r.war, render: (r) => <span class={r.war < 0 ? "neg" : ""}>{fixed(r.war)}</span> },
     { key: "ovr", label: "Now", cls: "ctr", sort: (r) => r.player.ovr, render: (r) => <Grade g={r.player.ovr} /> },
-    { key: "war", label: "WAR", title: "Projected WAR over a full season", cls: "num", sort: (r) => r.war, render: (r) => fixed(r.war) },
     { key: "ask", label: "Asking", cls: "num", sort: (r) => r.askSalary, render: (r) => `${r.askYears} yr × ${$(r.askSalary)}` },
     { key: "floor", label: "Takes now", title: "The lowest annual salary he'd accept this week, at his asked-for years", cls: "num", sort: (r) => r.floor, render: (r) => $(r.floor) },
     { key: "offer", label: "Your offer", render: (r) => <OfferCell row={r} offer={offers.get(r.player.id)} /> },

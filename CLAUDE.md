@@ -109,6 +109,13 @@ club's ask the way `sellOffer` builds one (its favorites among the user's `chips
 its price to 1.35x plus 2). Keep it the club's ask: a package chosen to be cheapest by
 the user's read finds the AI's worst scouting misses and turns the button into an exploit.
 
+Which number leads for a player (src/org/value.ts): `measuredInWins` (MLB, AAA, or 45+
+days of service) shows projected WAR, `believedWar` rounded to a tenth (`proj` on
+PlayerSummary); `isProspect` (under `ROOKIE_DAYS`) shows FV. UI tables get both through
+`outlookColumns` (web/src/ui/components/Outlook.tsx), which drops a column no row uses.
+Staff text follows the same rule: wins a season for established players, grades for
+prospects.
+
 The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
 owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with
 plain view models built in `web/src/worker/views.ts`. Pages call it through `useApi`

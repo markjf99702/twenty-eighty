@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
 import type { BlockRow, OfferView, RoomMove, Status, TradeCheckView, TradeSide } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
-import { Grade } from "../components/Grade";
+import { Headline, NowGrade, outlookColumns } from "../components/Outlook";
 import { type Column, Table } from "../components/Table";
 import { StaffTake } from "../components/StaffTake";
 import { LEVEL_NAMES, statBrief } from "../format";
@@ -66,8 +66,7 @@ function SideTable({ side, picked, toggle, filter }: { side: TradeSide; picked: 
       sort: (p) => (p.status.fortyMan ? 1 : 0),
       render: (p) => (p.status.fortyMan ? <span class="on40">●</span> : ""),
     },
-    { key: "ovr", label: "Now", cls: "ctr", sort: (p) => p.ovr, render: (p) => <Grade g={p.ovr} /> },
-    { key: "fv", label: "FV", cls: "ctr", sort: (p) => p.fv, render: (p) => <Grade g={p.fv} /> },
+    ...outlookColumns(rows, (p) => p),
     { key: "contract", label: "Contract", render: (p) => <span class="dim">{p.contract?.label ?? "—"}</span> },
   ];
   return <Table columns={columns} rows={rows} rowKey={(p) => p.id} sortKey="surplus" limit={25} rowClass={(p) => (picked.has(p.id) ? "mine" : "")} />;
@@ -145,8 +144,7 @@ function MakeRoom({
       render: (p) => <span class={p.surplus < 0 ? "neg" : ""}>{money(p.surplus)}</span>,
     },
     { key: "lvl", label: "Lvl", render: (p) => LEVEL_NAMES[p.level] },
-    { key: "ovr", label: "Now", cls: "ctr", sort: (p) => p.ovr, render: (p) => <Grade g={p.ovr} /> },
-    { key: "fv", label: "FV", cls: "ctr", sort: (p) => p.fv, render: (p) => <Grade g={p.fv} /> },
+    ...outlookColumns(rows, (p) => p),
     { key: "opt", label: "Opt", title: "Option years left", cls: "num", sort: (p) => p.status.optionsLeft, render: (p) => p.status.optionsLeft },
     { key: "contract", label: "Contract", render: (p) => <span class="dim">{p.contract?.label ?? "—"}</span> },
   ];
@@ -207,8 +205,8 @@ function OfferSide({ label, players, total }: { label: string; players: OfferVie
           <span class="dim">
             {p.age} · {p.status.il ? p.status.il : LEVEL_NAMES[p.level]}
           </span>
-          <Grade g={p.ovr} />
-          <Grade g={p.fv} />
+          <Headline p={p} />
+          <NowGrade p={p} />
           <span class={`num${p.surplus < 0 ? " neg" : ""}`}>{money(p.surplus)}</span>
           <span class="dim contract">{p.contract?.label ?? ""}</span>
           <span class="line">{statBrief(p, basics) || "No stats yet this season."}</span>
@@ -363,7 +361,7 @@ function OnTheBlock({ slug, canTrade }: { slug: BlockSlug; canTrade: boolean }) 
       sort: (p) => p.surplus,
       render: (p) => <span class={p.surplus < 0 ? "neg" : ""}>{money(p.surplus)}</span>,
     },
-    { key: "ovr", label: "Now", cls: "ctr", sort: (p) => p.ovr, render: (p) => <Grade g={p.ovr} /> },
+    ...outlookColumns(rows, (p) => p),
     { key: "contract", label: "Contract", render: (p) => <span class="dim">{p.contract?.label ?? "—"}</span> },
     {
       key: "deal",

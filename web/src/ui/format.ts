@@ -128,8 +128,41 @@ export const GLOSSARY: Record<string, string> = {
   BsR: "Baserunning runs above average",
   Fld: "Fielding runs above average",
   Now: "Overall grade today on the 20-80 scouting scale (50 is an average big leaguer)",
-  FV: "Future value: the overall grade your scouts project at his peak",
+  FV: "Future value, for prospects: the overall grade your scouts project at his peak",
+  Proj: "Projected WAR over a full season in his role, by your read (scouts blended with analytics). About 2 is an average regular or mid-rotation starter; a good reliever is 0.5",
 };
+
+/** Projected WAR a season in words, on the scale of his role (relievers can't pile up wins the way everyday players can). */
+export function warWord(war: number, pos: string): string {
+  const tiers: [number, string][] =
+    pos === "RP"
+      ? [
+          [0.6, "Closer"],
+          [0.4, "Late-inning reliever"],
+          [0.2, "Middle reliever"],
+          [0, "Mop-up arm"],
+          [-Infinity, "Below replacement"],
+        ]
+      : pos === "SP"
+        ? [
+            [3.2, "Ace"],
+            [2.7, "No. 2 starter"],
+            [2.2, "Mid-rotation starter"],
+            [1.7, "Back-end starter"],
+            [0.8, "Spot starter"],
+            [-Infinity, "Depth arm"],
+          ]
+        : [
+            [4.5, "MVP candidate"],
+            [3.5, "All-Star"],
+            [2.5, "Above-average regular"],
+            [1.5, "Average regular"],
+            [0.8, "Role player"],
+            [0, "Bench player"],
+            [-Infinity, "Below replacement"],
+          ];
+  return tiers.find(([floor]) => war >= floor)![1];
+}
 
 /**
  * A player's numbers in one line: this season at his level, or last season

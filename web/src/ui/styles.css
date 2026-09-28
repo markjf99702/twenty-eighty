@@ -1371,6 +1371,22 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .choice .s { font-size: 13px; color: var(--ink-2); }
 .ovr-block .word { font-size: 12px; color: var(--ink-2); white-space: nowrap; }
 
+/* Projected WAR: the number that leads for big leaguers. */
+.war-big {
+  font-family: var(--display);
+  font-weight: 700;
+  font-size: 26px;
+  line-height: 1;
+  min-width: 44px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+  padding-top: 2px;
+}
+.war-small { font-size: 12.5px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.proj { font-variant-numeric: tabular-nums; }
+.headline { white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 600; }
+.headline .gc { margin-left: 2px; }
+
 /* ------------------------------------------------------------------ trades: making room */
 
 .room-head { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px 26px; margin-bottom: 10px; }

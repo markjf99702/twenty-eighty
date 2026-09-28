@@ -6,7 +6,7 @@ import { FIELD_POSITIONS, MINOR_LEVELS } from "../../../../src/players/types";
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
 import { dollars, gainText } from "../components/Extension";
 import { PlayerTable, type RosterView } from "../components/PlayerTable";
-import { Grade } from "../components/Grade";
+import { outlookColumns } from "../components/Outlook";
 import { type Column, Table } from "../components/Table";
 import { LEVEL_NAMES, signed } from "../format";
 import { go, playerHref } from "../router";
@@ -401,7 +401,7 @@ function Payroll({ d }: { d: TeamView }) {
     { key: "pos", label: "Pos", render: (r) => r.pos },
     { key: "age", label: "Age", cls: "num", sort: (r) => r.age, asc: true, render: (r) => r.age },
     { key: "lvl", label: "Lvl", render: (r) => (r.status.il ?? LEVEL_NAMES[r.level]) },
-    { key: "ovr", label: "Now", cls: "ctr", sort: (r) => r.ovr, render: (r) => <Grade g={r.ovr} /> },
+    ...outlookColumns(p.contracts, (r) => r),
     { key: "svc", label: "Svc", title: "Service time (years.days)", cls: "num", sort: (r) => Number(r.status.service), render: (r) => r.status.service },
     { key: "type", label: "Status", render: (r) => ({ "pre-arb": "Pre-arb", arb: "Arbitration", guaranteed: "Signed", minor: "Minors" })[r.contract!.type] },
     { key: "salary", label: "Salary", cls: "num", sort: (r) => r.contract!.salary, render: (r) => money(r.contract!.salary) },
@@ -471,7 +471,7 @@ function Extensions() {
     { key: "name", label: "Name", cls: "name", sort: (r) => r.player.name, asc: true, render: (r) => <a href={playerHref(r.player.id)}>{r.player.name}</a> },
     { key: "pos", label: "Pos", render: (r) => r.player.pos },
     { key: "age", label: "Age", cls: "num", sort: (r) => r.player.age, asc: true, render: (r) => r.player.age },
-    { key: "ovr", label: "Now", cls: "ctr", sort: (r) => r.player.ovr, render: (r) => <Grade g={r.player.ovr} /> },
+    ...outlookColumns(view.data ?? [], (r) => r.player),
     { key: "deal", label: "Contract", render: (r) => <span class="dim">{r.player.contract?.label ?? "—"}</span> },
     { key: "free", label: "FA after", title: "The last season before he can become a free agent", cls: "num", sort: (r) => r.freeAfter ?? 0, asc: true, render: (r) => r.freeAfter ?? "—" },
     {

@@ -24,12 +24,12 @@ import {
 import { unreadAdvice } from "../../../src/advice/advice";
 import { mood } from "../../../src/finance/owner";
 import { settingsOf } from "../../../src/league/settings";
-import { committed, payroll } from "../../../src/org/contracts";
+import { committed, payroll, warFromValue } from "../../../src/org/contracts";
 import { extensionCandidates, extensionGain, extensionOptions, serviceClock } from "../../../src/org/extensions";
 import { offerLive } from "../../../src/org/offers";
 import { surplusValue, TRADE_DEADLINE_DAY } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
-import { overallGrade } from "../../../src/org/value";
+import { isProspect, measuredInWins, overallGrade } from "../../../src/org/value";
 import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season";
 import type { GameResult } from "../../../src/sim/game";
 import { inningsPitched } from "../../../src/stats/lines";
@@ -417,6 +417,8 @@ function careerSnapshot(p: Player, year: number, prefer?: Level): StatSnapshot |
 }
 
 const toGrade = (v: number) => Math.round(Math.max(20, Math.min(80, 50 + v / 2)));
+/** A value on the `playerValue` scale as WAR over a full season in his role, to a tenth. */
+const wins = (p: Player, value: number) => Math.round(warFromValue(p, value) * 10) / 10;
 
 /** Scouting confidence from the typical error (grade points). */
 export function confidenceOf(sigma: number): Confidence {
@@ -468,6 +470,8 @@ export function playerSummary(
     teamId: p.teamId,
     ovr: read.now,
     fv: read.fv,
+    proj: measuredInWins(p) ? wins(p, read.belief.value) : null,
+    prospect: isProspect(p),
     pitcher: Boolean(p.pitching),
     grades,
     read: {
@@ -715,6 +719,13 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
       looksLeft: looksLeft(league, season.day),
       canLook: league.userTeamId !== null && p.teamId !== league.userTeamId && p.retired === undefined,
       scoutsGrade: toGrade(read.belief.scouts),
+      war: measuredInWins(p)
+        ? {
+            scouts: wins(p, read.belief.scouts),
+            analytics: read.belief.analytics ? wins(p, read.belief.analytics.value) : null,
+            read: wins(p, read.belief.value),
+          }
+        : null,
       analytics: read.belief.analytics
         ? {
             grade: toGrade(read.belief.analytics.value),
