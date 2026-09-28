@@ -313,6 +313,8 @@ function analytics(season: Season, team: Team, day: number): void {
   // Luck: a regular whose results are well off his underlying numbers (the better departments know to look).
   if (tier < 3) return;
   const mine = new Set(orgPlayers(league, team).map((p) => p.id));
+  // Once the deadline passes, nobody can cash in on a hot start until the winter.
+  const selling = day < TRADE_DEADLINE_DAY ? "his trade value may never be higher" : "don't pay for that ERA this winter";
   let best: { id: number; gap: number; text: string; title: string } | null = null;
   for (const p of stats.pitchers) {
     if (!mine.has(p.id) || p.IP < 50) continue;
@@ -321,7 +323,7 @@ function analytics(season: Season, team: Team, day: number): void {
     const name = playerName(league.players[p.id]!);
     best =
       gap < 0
-        ? { id: p.id, gap: Math.abs(gap), title: `${name}'s ERA is running ahead of him`, text: `${name} has a ${p.ERA.toFixed(2)} ERA, but he's pitched more like ${p.FIP.toFixed(2)} (FIP). Expect it to rise; his trade value may never be higher.` }
+        ? { id: p.id, gap: Math.abs(gap), title: `${name}'s ERA is running ahead of him`, text: `${name} has a ${p.ERA.toFixed(2)} ERA, but he's pitched more like ${p.FIP.toFixed(2)} (FIP). Expect it to rise; ${selling}.` }
         : { id: p.id, gap: Math.abs(gap), title: `${name} has pitched better than his ERA`, text: `${name}'s ${p.ERA.toFixed(2)} ERA hides how well he's pitched: a ${p.FIP.toFixed(2)} FIP. He should turn it around, so it's no time to give up on him.` };
   }
   for (const h of stats.hitters) {

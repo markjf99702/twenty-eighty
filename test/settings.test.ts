@@ -3,7 +3,7 @@ import { seasonAdvice, winterAdvice } from "../src/advice/advice";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { DIFFICULTY } from "../src/league/settings";
-import { evaluateTrade, surplusValue } from "../src/org/trades";
+import { evaluateTrade, surplusValue, TRADE_DEADLINE_DAY } from "../src/org/trades";
 import { advanceOffseason, beginOffseason, offerClock } from "../src/offseason/offseason";
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
 import { uncertainty } from "../src/scouting/scouting";
@@ -109,6 +109,19 @@ describe("staff advice", () => {
     winterAdvice(league, season, offerClock(league, season));
     expect(league.advice.some((a) => a.key.startsWith("draft:"))).toBe(true);
     expect(league.advice.some((a) => a.key.startsWith("fa:"))).toBe(true);
+  });
+
+  it("doesn't talk up trade value once the deadline has passed", () => {
+    const late = generateLeague({ seed: "advice" });
+    hireGm(late, 9);
+    late.scouting.analytics[9] = 5;
+    new Season(late, { minors: false }).simToEnd();
+    const after = late.advice.filter((a) => a.at > TRADE_DEADLINE_DAY && a.at < 1000);
+    expect(after.some((a) => a.key.startsWith("luck:"))).toBe(true);
+    for (const a of after) {
+      expect(a.text).not.toMatch(/trade/i);
+      expect(a.href).not.toBe("#trades");
+    }
   });
 
   it("stays quiet when advice is off", () => {
