@@ -1,5 +1,6 @@
 /** Number formatting and small lookups shared by the pages. */
 import type { Level } from "../../../src/players/types";
+import type { PlayerSummary } from "../api/protocol";
 
 export const LEVEL_NAMES: Record<Level, string> = {
   MLB: "Majors",
@@ -129,3 +130,27 @@ export const GLOSSARY: Record<string, string> = {
   Now: "Overall grade today on the 20-80 scouting scale (50 is an average big leaguer)",
   FV: "Future value: the overall grade your scouts project at his peak",
 };
+
+/**
+ * A player's numbers in one line: this season at his level, or last season
+ * when there's nothing yet. Basics shows the familiar stats; Full the modern ones.
+ */
+export function statBrief(p: PlayerSummary, basics: boolean): string {
+  const s = p.stats && (p.stats.bat?.PA || p.stats.pit?.IP) ? p.stats : p.last;
+  if (!s) return "";
+  const lvl = s.level === "MLB" ? "" : LEVEL_NAMES[s.level];
+  const when = s === p.stats ? (lvl ? `${lvl}: ` : "") : `${s.year}${lvl ? ` ${lvl}` : ""}: `;
+  const war = (x: number | null) => (x === null ? "" : `${x.toFixed(1)} WAR`);
+  if (s.bat && s.bat.PA) {
+    const b = s.bat;
+    const slash = [b.AVG, b.OBP, b.SLG].map((x) => (x === null ? "---" : x.toFixed(3).replace(/^0/, ""))).join("/");
+    const parts = [`${b.PA} PA`, slash, `${b.HR} HR`, basics ? (b.SB ? `${b.SB} SB` : "") : b.wRCplus !== null ? `${Math.round(b.wRCplus)} wRC+` : "", war(b.WAR)];
+    return when + parts.filter(Boolean).join(", ");
+  }
+  if (s.pit && s.pit.IP) {
+    const q = s.pit;
+    const parts = [basics ? `${q.W}-${q.L}` : "", `${q.ERA.toFixed(2)} ERA`, basics ? "" : `${q.FIP.toFixed(2)} FIP`, `${ip(q.IP)} IP`, q.SV ? `${q.SV} SV` : "", war(q.WAR)];
+    return when + parts.filter(Boolean).join(", ");
+  }
+  return "";
+}

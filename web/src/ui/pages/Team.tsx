@@ -10,6 +10,7 @@ import { Grade } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
 import { LEVEL_NAMES, signed } from "../format";
 import { go, playerHref } from "../router";
+import { tradeFor } from "../tradePreset";
 
 type Tab = "roster" | "depth" | "farm" | "payroll";
 
@@ -80,6 +81,11 @@ export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; st
               </option>
             ))}
           </select>
+          {d && !d.isUser && status.userTeamId !== null && (
+            <button type="button" class="btn" onClick={() => tradeFor(d.team.id)}>
+              Trade with the {d.team.nickname}
+            </button>
+          )}
           <Seg<Tab>
             label="View"
             value={tab}
@@ -167,10 +173,10 @@ function Roster({ d, year }: { d: TeamView; year: number }) {
       )}
       {d.isUser && <Flags d={d} />}
       <Section title="Position players" aside={`${hitters.length}`}>
-        <PlayerTable key={`h-${view}`} rows={hitters} pitchers={false} manage={d.isUser} view={view} sortKey={statSort} />
+        <PlayerTable key={`h-${view}`} rows={hitters} pitchers={false} manage={d.isUser} view={view} sortKey={statSort} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
       <Section title="Pitchers" aside={`${pitchers.length}`}>
-        <PlayerTable key={`p-${view}`} rows={pitchers} pitchers manage={d.isUser} view={view} sortKey={statSort} />
+        <PlayerTable key={`p-${view}`} rows={pitchers} pitchers manage={d.isUser} view={view} sortKey={statSort} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
       <Section title="Injured list" aside={`${d.injured.length}`}>
         {d.injured.some((p) => !p.pitcher) && <PlayerTable rows={d.injured.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} view={view} />}
@@ -199,10 +205,10 @@ function Farm({ d, year }: { d: TeamView; year: number }) {
       </div>
       {view !== "scouting" && <StatsKey minors recent={view === "recent"} />}
       <Section title="Position players">
-        <PlayerTable key={`h-${view}-${level}`} rows={rows.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} sortKey={sort} view={view} />
+        <PlayerTable key={`h-${view}-${level}`} rows={rows.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} sortKey={sort} view={view} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
       <Section title="Pitchers">
-        <PlayerTable key={`p-${view}-${level}`} rows={rows.filter((p) => p.pitcher)} pitchers manage={d.isUser} sortKey={sort} view={view} />
+        <PlayerTable key={`p-${view}-${level}`} rows={rows.filter((p) => p.pitcher)} pitchers manage={d.isUser} sortKey={sort} view={view} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
     </>
   );

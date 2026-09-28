@@ -1467,3 +1467,30 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
   cursor: pointer;
 }
 .drive-banner { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 16px; margin-bottom: 14px; }
+
+/* ------------------------------------------------------------------ trades: stats and the staff's take */
+
+.stat-brief { display: block; font-size: 12px; font-weight: 400; color: var(--ink-3); white-space: normal; min-width: 14em; max-width: 24em; line-height: 1.3; }
+.offer-player .line { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: -2px; }
+.staff-take {
+  display: grid;
+  gap: 6px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  border-left: 4px solid var(--warn);
+  background: var(--surface-2);
+}
+.staff-take.take { border-left-color: var(--accent); }
+.staff-take.pass { border-left-color: var(--alert); }
+.take-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+.take-head .k { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
+.take-head .verdict { font-family: var(--display); font-weight: 700; font-size: 17px; letter-spacing: 0.04em; text-transform: uppercase; color: var(--warn); }
+.take-head .verdict.take { color: var(--accent-text); }
+.take-head .verdict.pass { color: var(--alert); }
+.take-head .sure { font-size: 13px; color: var(--ink-3); }
+.take-head .sure.low { color: var(--warn); }
+.take-line { margin: 0; font-weight: 600; max-width: 75ch; }
+.take-notes { margin: 0; padding-left: 18px; display: grid; gap: 4px; font-size: 14px; max-width: 80ch; }
+.take-notes .who { color: var(--ink-3); font-size: 12.5px; }
+.trade-bar + .staff-take { margin-top: -6px; margin-bottom: 14px; }
+.head-actions { margin-top: 10px; }

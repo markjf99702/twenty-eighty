@@ -203,7 +203,14 @@ the GM:
   to the 40-man roster (a dot marks who's on it). A deal that would put you over 40
   still works: **Make room** lists your 40-man players, and whoever you mark to
   designate for assignment (or, in season, option to AAA to clear an active spot) goes
-  when the deal does. An offer that needs room loads into the builder to pick.
+  when the deal does. An offer that needs room loads into the builder to pick. Every
+  player in a deal shows his line this season (last season's early on). With staff
+  advice on, your staff weighs in on each offer and on the deal you're building: take
+  it, worth a look, or pass, with the value by your read, what it does to this season's
+  race, where the newcomers would play and who fills in, the money, and how well your
+  scouts know the players (so a thin scouting department is less sure, and says so).
+  To start a deal from another club, use **Trade with** on its page, **Trade for** on a
+  row of its roster, or **Trade for him** on a player's page.
 - **Extensions**: your players' pages show what each would sign for at every length,
   and what the deal is worth by your front office's read; the Payroll tab lists your
   best candidates, and your assistant GM brings one up in the winter and in spring. AI clubs deal with each

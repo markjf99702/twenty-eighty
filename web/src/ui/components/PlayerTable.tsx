@@ -8,6 +8,7 @@ import { useBasics } from "../settings";
 import { notify } from "./Common";
 import { Grade } from "./Grade";
 import { type Column, Table } from "./Table";
+import { tradeFor } from "../tradePreset";
 
 /** The Now grade, with a mark when analytics sees him noticeably differently than the scouts. */
 export function NowGrade({ p }: { p: PlayerSummary }) {
@@ -215,9 +216,11 @@ interface Props {
   empty?: string;
   sortKey?: string;
   view?: RosterView;
+  /** Another club's roster: each row can start a trade with it. */
+  tradeFrom?: number;
 }
 
-export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey, view = "scouting" }: Props) {
+export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey, view = "scouting", tradeFrom }: Props) {
   const basics = useBasics();
   const [open, setOpen] = useState<number | null>(null);
   const tools = pitchers ? PITCHER_TOOLS : HITTER_TOOLS;
@@ -301,6 +304,20 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
   );
   // The stat views trade salary and service time for width; the grades and option status stay.
   if (!scouting) columns = columns.filter((c) => c.key !== "pay" && c.key !== "svc");
+  if (tradeFrom !== undefined) {
+    columns = [
+      ...columns,
+      {
+        key: "trade",
+        label: "",
+        render: (p) => (
+          <button type="button" class="btn small" aria-label={`Trade for ${p.name}`} onClick={() => tradeFor(tradeFrom, [p.id])}>
+            Trade for
+          </button>
+        ),
+      },
+    ];
+  }
   if (manage) {
     columns.push({
       key: "moves",

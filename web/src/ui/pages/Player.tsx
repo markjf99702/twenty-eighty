@@ -8,6 +8,7 @@ import { RosterMoves, StatusBadges } from "../components/PlayerTable";
 import { LEVEL_NAMES, fixed, gradeWord, ip, pct, rate3, scout, whole } from "../format";
 import { useBasics } from "../settings";
 import { teamHref } from "../router";
+import { tradeFor } from "../tradePreset";
 
 const HANDS: Record<string, string> = { L: "left", R: "right", S: "both sides" };
 
@@ -40,6 +41,13 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
             </span>
             {v.velocity !== null && <span>Fastball {v.velocity.toFixed(0)} mph</span>}
           </div>
+          {v.team && status.userTeamId != null && v.team.id !== status.userTeamId && (
+            <div class="head-actions">
+              <button type="button" class="btn" onClick={() => tradeFor(v.team!.id, [p.id])}>
+                Trade for him
+              </button>
+            </div>
+          )}
         </div>
         <div class="ovr-block">
           <div>

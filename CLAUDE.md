@@ -98,7 +98,10 @@ Staff advice (src/advice/advice.ts): `seasonAdvice` runs at the end of `simDay` 
 `winterAdvice` when a winter phase opens (`advanceOffseason`, `beginOffseason`). Notes
 go into `league.advice` through `add`, which dedupes by `key` (so re-running a day adds
 nothing) and keeps the latest 60. Advice reads the user's beliefs, never the truth.
-Urgent notes can stop the sim (the worker's `staff` stop).
+Urgent notes can stop the sim (the worker's `staff` stop). The staff's take on a trade
+(src/advice/trades.ts, `tradeAdvice`) is computed on request rather than stored: the
+worker attaches it to offers and to a trade check, from the same beliefs, with its
+confidence from the scouting sigma of the players coming back.
 
 The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
 owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with

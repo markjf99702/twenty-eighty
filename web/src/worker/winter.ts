@@ -16,8 +16,10 @@ import { playerName, type Player } from "../../../src/players/types";
 import { believedWar, warShift } from "../../../src/scouting/analytics";
 import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
-import type { DevRow, HistoryView, OffseasonView, OfferView, TradeSide } from "../api/protocol";
+import type { DevRow, HistoryView, OffseasonView, OfferView, TradeAdviceView, TradeSide } from "../api/protocol";
 import { dateLabel, playerSummary, rosterActions, type StatsCache, teamRef } from "./views";
+import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
+import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
 
 const abbrev = (league: League, id: number | null) => (id === null ? "FA" : (league.teams[id]?.abbrev ?? "FA"));
 
@@ -175,6 +177,24 @@ export function tradeSide(season: Season, stats: StatsCache, team: Team, ctx?: R
   return { team: teamRef(team), players };
 }
 
+/** The staff's take on a trade, with each note signed by the person in the job (null with staff advice off). */
+export function tradeAdviceView(season: Season, give: number[], get: number[], fraction: number): TradeAdviceView | null {
+  const league = season.league;
+  if (!tradeAdviceOn(league)) return null;
+  const a = tradeAdvice(season, give, get, fraction);
+  if (!a) return null;
+  // One bullet per turn: a staff member's back-to-back points read as one paragraph.
+  const notes: TradeAdviceView["notes"] = [];
+  let last: string | null = null;
+  for (const n of a.notes) {
+    const who = `${staffName(league, n.from)}, ${STAFF_TITLES[n.from]}`;
+    if (who === last) notes.at(-1)!.text += ` ${n.text}`;
+    else notes.push({ who, text: n.text });
+    last = who;
+  }
+  return { ...a, notes };
+}
+
 /** Trade offers waiting on the user, with every player as the user's scouts see him. */
 export function offerViews(season: Season, stats: StatsCache): OfferView[] {
   const league = season.league;
@@ -202,6 +222,7 @@ export function offerViews(season: Season, stats: StatsCache): OfferView[] {
         get: o.get.map(row),
         value: { give: check.give, get: check.get },
         ...(check.over ? { over: check.over } : {}),
+        advice: tradeAdviceView(season, o.give, o.get, fraction),
       };
     });
 }

@@ -63,7 +63,7 @@ import type {
 } from "../api/protocol";
 import { clearSave, decodeLeague, encodeLeague, hasSave, readSave, writeSave } from "./storage";
 import { financeView, ownerView } from "./business";
-import { historyView, offerViews, offseasonView, tradeSide } from "./winter";
+import { historyView, offerViews, offseasonView, tradeAdviceView, tradeSide } from "./winter";
 import {
   boxScoreView,
   dashboardView,
@@ -661,7 +661,13 @@ const handlers: Handlers = {
     const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
     const check = evaluateTrade(s.league, mine, partner, give, get, fraction, (viewer, p) => warShift(s, viewer, p), moves);
     const after = rostersAfter(s.league, mine, give, get, moves);
-    const view = { ...check, fortyMan: after.fortyMan, active: c.offseason ? null : after.active, activeLimit: activeLimit(c) };
+    const view = {
+      ...check,
+      fortyMan: after.fortyMan,
+      active: c.offseason ? null : after.active,
+      activeLimit: activeLimit(c),
+      advice: execute ? null : tradeAdviceView(s, give, get, fraction),
+    };
     const problem = roomMoveProblem(c, mine, give, moves);
     if (problem) return { ...view, ok: false, over: undefined, reason: problem };
     if (!st.canTrade) return { ...view, ok: false, reason: st.tradeNote };

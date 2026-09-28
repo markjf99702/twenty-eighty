@@ -4,8 +4,11 @@ import type { OfferView, RoomMove, Status, TradeCheckView, TradeSide } from "../
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
 import { Grade } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
-import { LEVEL_NAMES } from "../format";
+import { StaffTake } from "../components/StaffTake";
+import { LEVEL_NAMES, statBrief } from "../format";
 import { go, playerHref } from "../router";
+import { useBasics } from "../settings";
+import { takePreset, tradeFor } from "../tradePreset";
 
 type Filter = "all" | "forty" | "mlb" | "farm";
 type Row = TradeSide["players"][number];
@@ -23,6 +26,7 @@ function shows(p: Row, filter: Filter): boolean {
 }
 
 function SideTable({ side, picked, toggle, filter }: { side: TradeSide; picked: Set<number>; toggle: (id: number) => void; filter: Filter }) {
+  const basics = useBasics();
   const rows = side.players.filter((p) => shows(p, filter));
   const columns: Column<Row>[] = [
     {
@@ -30,7 +34,19 @@ function SideTable({ side, picked, toggle, filter }: { side: TradeSide; picked: 
       label: "",
       render: (p) => <input type="checkbox" aria-label={`Include ${p.name}`} checked={picked.has(p.id)} onChange={() => toggle(p.id)} />,
     },
-    { key: "name", label: "Name", cls: "name", sort: (p) => p.name, asc: true, render: (p) => <a href={playerHref(p.id)}>{p.name}</a> },
+    {
+      key: "name",
+      label: "Name",
+      cls: "name",
+      sort: (p) => p.name,
+      asc: true,
+      render: (p) => (
+        <>
+          <a href={playerHref(p.id)}>{p.name}</a>
+          <span class="stat-brief">{statBrief(p, basics)}</span>
+        </>
+      ),
+    },
     { key: "pos", label: "Pos", render: (p) => p.pos },
     { key: "age", label: "Age", cls: "num", sort: (p) => p.age, asc: true, render: (p) => p.age },
     {
@@ -177,10 +193,8 @@ function MakeRoom({
   );
 }
 
-/** A deal to load into the builder once the page switches to its club (from an offer's Adjust). */
-let preset: { partner: number; give: number[]; get: number[] } | null = null;
-
 function OfferSide({ label, players, total }: { label: string; players: OfferView["give"]; total: number }) {
+  const basics = useBasics();
   return (
     <div class="offer-side">
       <div class="k">
@@ -197,6 +211,7 @@ function OfferSide({ label, players, total }: { label: string; players: OfferVie
           <Grade g={p.fv} />
           <span class={`num${p.surplus < 0 ? " neg" : ""}`}>{money(p.surplus)}</span>
           <span class="dim contract">{p.contract?.label ?? ""}</span>
+          <span class="line">{statBrief(p, basics) || "No stats yet this season."}</span>
         </div>
       ))}
     </div>
@@ -228,6 +243,7 @@ function Offers({ canTrade, onAdjust }: { canTrade: boolean; onAdjust: (o: Offer
               <span class="dim small">{o.expires}</span>
             </div>
             <p class="pitch">{o.pitch}</p>
+            {o.advice && <StaffTake advice={o.advice} />}
             <div class="grid-2">
               <OfferSide label="You send" players={o.give} total={o.value.give} />
               <OfferSide label="You get" players={o.get} total={o.value.get} />
@@ -273,8 +289,7 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
   const [check, setCheck] = useState<TradeCheckView | null>(null);
 
   useEffect(() => {
-    const p = preset && preset.partner === partner ? preset : null;
-    preset = null;
+    const p = takePreset(partner);
     setGive(new Set(p?.give ?? []));
     setGet(new Set(p?.get ?? []));
     setMoves(new Map());
@@ -286,10 +301,7 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
     if (deal.partner === partner) {
       setGive(new Set(deal.give));
       setGet(new Set(deal.get));
-    } else {
-      preset = deal;
-      go({ page: "trades", partnerId: deal.partner });
-    }
+    } else tradeFor(deal.partner, deal.get, deal.give);
     notify(
       room
         ? "The offer is loaded below: pick who to designate under Make room, then propose it."
@@ -410,6 +422,7 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
           Propose trade
         </button>
       </div>
+      {check?.advice && <StaffTake advice={check.advice} />}
 
       {sides.data && check && ((check.fortyMan ?? 0) > FORTY_MAN || (check.active ?? 0) > (check.activeLimit ?? Infinity) || roomMoves.length > 0) && (
         <MakeRoom side={sides.data.mine} give={give} moves={moves} setMove={setMove} check={check} />

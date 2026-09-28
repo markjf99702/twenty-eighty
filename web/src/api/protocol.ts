@@ -548,6 +548,16 @@ export interface TradeSide {
   players: (PlayerSummary & { surplus: number })[];
 }
 
+/** What the user's staff makes of a trade, by the club's own read (only as good as its departments). */
+export interface TradeAdviceView {
+  verdict: "take" | "consider" | "pass";
+  headline: string;
+  /** How sure the staff is about the players coming in. */
+  confidence: Confidence;
+  /** "Dana Wu, Scouting director" and what they say. */
+  notes: { who: string; text: string }[];
+}
+
 export interface OfferView {
   id: number;
   team: TeamRef;
@@ -561,6 +571,8 @@ export interface OfferView {
   value: { give: number; get: number };
   /** Taking it would put your 40-man this many over: designate someone in the builder. */
   over?: number;
+  /** The staff's take (null with staff advice off). */
+  advice: TradeAdviceView | null;
 }
 
 export type { RoomMove };
@@ -582,6 +594,8 @@ export interface TradeCheckView {
   moves?: string[];
   /** After a trade: a roster problem the user needs to fix (or the assistant will). */
   warning?: string;
+  /** The staff's take on the deal as it stands (null with staff advice off). */
+  advice?: TradeAdviceView | null;
 }
 
 export interface HistoryView {
