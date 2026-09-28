@@ -49,7 +49,13 @@ when the World Series ends it writes `season.postseason`, the result everything 
 (the winter, the owner, the books). Each club plays October with `playoffDepth`: its
 playoff roster (the user's `bracket.plan`, or the active roster), four starters, and a
 per-series rotation key so each series starts from the top. `runPostseason` plays it all
-at once (scripts, tests). Days past the regular season are dated from October 1.
+at once (scripts, tests). `Season.dateOf` dates the postseason window (after the last
+regular-season day, before the winter's day 218) from September 30; winter days keep the
+regular calendar (day 218 is Oct 30).
+
+Stops (the worker's `stopCheck`): trade offers stop the sim only if the staff's take
+(`tradeAdvice`) isn't "pass", unless the user picks every offer (`StopRules.offer`). The
+wire's headlines are `isHeadline` in web/src/worker/views.ts (the front office shows them).
 
 After the postseason, `beginOffseason` (src/offseason/offseason.ts) records careers,
 awards and history, develops and ages everyone (src/players/development.ts), retires

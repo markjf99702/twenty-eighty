@@ -305,6 +305,8 @@ export interface SeasonOptions {
 }
 
 const OPENING_DAY = { month: 2, day: 26 }; // March 26
+/** The winter's first day (the season in review, WINTER_DAYS.review in src/offseason/offseason.ts). */
+const WINTER_OPENS = 218;
 
 export class Season {
   schedule: Schedule;
@@ -424,9 +426,14 @@ export class Season {
     return this.league.players[id]!;
   }
 
-  /** Calendar date of a season day (the postseason, two days after the last game, opens October 1). */
+  /**
+   * Calendar date of a season day. The postseason (two days after the last
+   * game, and at most 31 days long) is dated from September 30, so a full
+   * World Series ends by the winter's first day (Oct 30); winter days keep the
+   * regular calendar.
+   */
   dateOf(day: number): Date {
-    if (day > this.totalDays) return new Date(Date.UTC(this.league.year, 9, 1 + day - (this.totalDays + 2)));
+    if (day > this.totalDays && day < WINTER_OPENS) return new Date(Date.UTC(this.league.year, 8, 30 + day - (this.totalDays + 2)));
     return new Date(Date.UTC(this.league.year, OPENING_DAY.month, OPENING_DAY.day + day));
   }
 

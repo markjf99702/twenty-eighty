@@ -317,7 +317,7 @@ export function Dashboard({ status }: { status: Status }) {
         <Section title="Your moves" aside={<a href={href({ page: "moves", mine: true })}>All</a>}>
           <Wire items={d.userNews} showClub={false} />
         </Section>
-        <Section title="Around the league" aside={<a href={href({ page: "moves", mine: false })}>Wire</a>}>
+        <Section title="Around the league" aside={<a href={href({ page: "moves", mine: false })}>All moves</a>}>
           <Wire items={d.news} />
         </Section>
       </div>

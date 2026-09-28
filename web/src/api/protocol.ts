@@ -90,8 +90,8 @@ export interface StopRules {
   streak: number;
   /** A big leaguer of the user's goes down for injured-list time. */
   injury: boolean;
-  /** A club makes the user a trade offer. */
-  offer: boolean;
+  /** A club makes the user a trade offer: only ones the staff doesn't pass on, any, or none. */
+  offer: "good" | "all" | "off";
   /** Stop with deadline day still to play. */
   deadline: boolean;
   /** A staff member sends an urgent note. */
@@ -844,7 +844,8 @@ export interface Api {
   team: { req: { teamId: number }; res: TeamView };
   player: { req: { playerId: number }; res: PlayerView };
   stats: { req: { level: Level; kind: "hitters" | "pitchers" }; res: StatsView };
-  transactions: { req: { teamId?: number; majorOnly?: boolean; limit?: number }; res: TransactionItem[] };
+  /** The wire: everything, big-league moves (no minor league shuffles), or just the headlines. */
+  transactions: { req: { teamId?: number; majorOnly?: boolean; headlines?: boolean; limit?: number }; res: TransactionItem[] };
   scores: { req: { day?: number }; res: ScoresView };
   boxScore: { req: { key: string }; res: BoxScoreView | null };
   rosterAction: { req: RosterAction; res: { ok: boolean; reason?: string } };

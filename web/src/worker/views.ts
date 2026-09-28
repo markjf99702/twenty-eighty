@@ -4,7 +4,7 @@
 import { MAX_OPTION_YEARS, MINOR_LEVELS, PITCH_NAMES, playerName, SERVICE_DAYS_PER_YEAR } from "../../../src/players/types";
 import type { FieldPosition, Level, MinorLevel, Player } from "../../../src/players/types";
 import { FIELD_POSITIONS, LEVELS } from "../../../src/players/types";
-import type { League, Team } from "../../../src/league/types";
+import type { League, Team, Transaction } from "../../../src/league/types";
 import { onTheClock as draftClock } from "../../../src/offseason/draft";
 import { teamName } from "../../../src/league/types";
 import { defenseGrade } from "../../../src/players/defense";
@@ -35,7 +35,7 @@ import type { GameResult } from "../../../src/sim/game";
 import { inningsPitched } from "../../../src/stats/lines";
 import { BAT_ROW, PIT_ROW, sumRows } from "../../../src/stats/recent";
 import { octoberStatus } from "./october";
-import { belief, warShift } from "../../../src/scouting/analytics";
+import { belief, believedWar, warShift } from "../../../src/scouting/analytics";
 import { looksLeft, perceive, staffCost, uncertainty } from "../../../src/scouting/scouting";
 import type {
   BoxScoreView,
@@ -755,13 +755,58 @@ function familiarityLabel(league: League, p: Player): string {
 /** Moves between affiliates: hidden unless the wire asks for minor league shuffles. */
 const SHUFFLES = new Set(["promote", "demote"]);
 
-export function transactions(season: Season, opts: { teamId?: number; majorOnly?: boolean; limit?: number }): TransactionItem[] {
+/** International bonuses this big ($M) make the news. */
+const HEADLINE_BONUS = 2;
+
+/**
+ * News, not roster shuffling: trades, extensions, big-league free-agent deals,
+ * first-round picks and big international bonuses, a top prospect's debut (by
+ * your scouts' future grade), injuries that change a season (two months, or
+ * three weeks for a star), waiver claims of players who help, and
+ * retirements after real careers. `debut` is each player's first call-up.
+ */
+function isHeadline(season: Season, t: Transaction, i: number, debut: Map<number, number>): boolean {
+  const league = season.league;
+  const p = league.players[t.playerId];
+  // What the player is worth a season by your read (regulars are about 2).
+  const war = () => (p ? believedWar(season, league.userTeamId, p) : 0);
+  switch (t.type) {
+    case "trade":
+    case "extension":
+      return true;
+    case "claim":
+      return war() >= 1;
+    case "sign": {
+      if (t.text.includes("minor league contract")) return false;
+      const bonus = /\(\$(\d+(?:\.\d+)?)M bonus\)/.exec(t.text);
+      return !bonus || Number(bonus[1]) >= HEADLINE_BONUS;
+    }
+    case "draft":
+      return /in round 1,/.test(t.text);
+    case "injury": {
+      const out = /out about (\d+) day/.exec(t.text);
+      const days = out ? Number(out[1]) : 0;
+      return days >= 60 || (days >= 21 && war() >= 3.5);
+    }
+    case "call-up":
+      return !!p && debut.get(p.id) === i && isProspect(p) && overallGrade(perceive(league, league.userTeamId, p), true) >= 55;
+    case "retire":
+      return !!p && p.service >= 5 * SERVICE_DAYS_PER_YEAR;
+    default:
+      return false;
+  }
+}
+
+export function transactions(season: Season, opts: { teamId?: number; majorOnly?: boolean; headlines?: boolean; limit?: number }): TransactionItem[] {
   const league = season.league;
   const out: TransactionItem[] = [];
+  const debut = new Map<number, number>();
+  if (opts.headlines) league.transactions.forEach((t, i) => t.type === "call-up" && !debut.has(t.playerId) && debut.set(t.playerId, i));
   for (let i = league.transactions.length - 1; i >= 0 && out.length < (opts.limit ?? 200); i--) {
     const t = league.transactions[i]!;
     if (opts.teamId !== undefined && t.teamId !== opts.teamId) continue;
     if (opts.majorOnly && SHUFFLES.has(t.type)) continue;
+    if (opts.headlines && !isHeadline(season, t, i, debut)) continue;
     out.push({ date: dateLabel(season, t.day), year: t.year, teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
   }
   return out;
@@ -899,7 +944,7 @@ export function dashboardView(season: Season, stats: StatsCache, boxes: Map<stri
     leaders,
     injured: hurt.map((id) => playerSummary(league.players[id]!, season, stats)),
     prospects: prospects.map((p) => playerSummary(p, season, stats)),
-    news: transactions(season, { majorOnly: true, limit: 14 }),
+    news: transactions(season, { headlines: true, limit: 14 }),
     userNews: transactions(season, { teamId: team.id, majorOnly: true, limit: 14 }),
   };
 }

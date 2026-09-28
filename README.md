@@ -165,11 +165,15 @@ the GM:
   along day by day, so you can watch the standings and stop (the button or Esc) when
   you see a losing streak; the speed can change mid-sim and is remembered. **Stops**
   pause the sim by themselves when your club loses a set number in a row, a big
-  leaguer goes down for injured-list time, a club makes you a trade offer, it's
-  trade deadline day (with the day still to play), or your staff has something urgent,
-  and a note says why it stopped.
+  leaguer goes down for injured-list time, a club makes you a trade offer your staff
+  doesn't pass on (or any offer, if you'd rather), it's trade deadline day (with the day
+  still to play), or your staff has something urgent, and a note says why it stopped.
+  Offers that don't stop the sim still wait on the trade desk.
 - **Front office**: record, division race, recent games, club leaders, injuries, your top
-  prospects, and the transaction wire.
+  prospects, your moves, and the league's headlines: trades, extensions, big free-agent
+  deals, top picks and top prospects' debuts, injuries that change a season. The full
+  wire (every big-league move, or everything down to minor league shuffles) is a click
+  away.
 - **My club**: the active roster, injured list and every affiliate, with each player's
   present grades, projected WAR (for big leaguers and anyone close) or future value (for
   prospects), the overall Now grade, 40-man status, options left and service

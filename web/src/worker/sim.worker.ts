@@ -6,6 +6,7 @@
 import { bestTicketPrice } from "../../../src/finance/finance";
 import { acceptJob, hireGm } from "../../../src/finance/owner";
 import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
+import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
 import { generateLeague } from "../../../src/league/generate";
 import { answerOffer } from "../../../src/org/offers";
 import { TRADE_DEADLINE_DAY } from "../../../src/org/trades";
@@ -104,7 +105,16 @@ let stopRequested = false;
 /** Minimum wall-clock time per simulated day (the user's sim speed). */
 let msPerDay = 0;
 /** When a running sim stops by itself. */
-let stops: StopRules = { streak: 0, injury: false, offer: true, deadline: true, staff: true };
+let stops: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true };
+
+/** What the user's staff makes of an offer ("Take it", "Worth a look", "Pass"); null with staff advice off. */
+function offerVerdict(s: Season, o: League["tradeOffers"][number]): "take" | "consider" | "pass" | null {
+  if (!tradeAdviceOn(s.league)) return null;
+  const fraction = Math.max(0, 1 - s.day / s.totalDays);
+  return tradeAdvice(s, o.give, o.get, fraction)?.verdict ?? null;
+}
+
+const VERDICT_LINE = { take: "Your staff says take it.", consider: "Your staff thinks it's worth a look.", pass: "Your staff would pass." } as const;
 
 /** What the day just played changed that the user asked to be stopped for. */
 function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: number }): StopNote | null {
@@ -116,9 +126,13 @@ function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak:
     const urgent = league.advice.slice(before.notes).find((a) => a.urgent);
     if (urgent) return { kind: "staff", text: `${STAFF_TITLES[urgent.from]}: ${urgent.title}. ${urgent.text}`, href: urgent.href ?? "#staff" };
   }
-  if (stops.offer) {
-    const o = league.tradeOffers.find((x) => x.status === "open" && !before.offers.has(x.id));
-    if (o) return { kind: "offer", text: `Trade offer. ${o.pitch}`, href: "#trades" };
+  if (stops.offer !== "off") {
+    // New offers; unless the user wants every one, only those the staff doesn't pass on (all of them with advice off).
+    for (const o of league.tradeOffers.filter((x) => x.status === "open" && !before.offers.has(x.id))) {
+      const verdict = offerVerdict(s, o);
+      if (stops.offer === "good" && verdict === "pass") continue;
+      return { kind: "offer", text: `Trade offer. ${o.pitch}${verdict ? ` ${VERDICT_LINE[verdict]}` : ""}`, href: "#trades" };
+    }
   }
   if (stops.injury) {
     for (const t of league.transactions.slice(before.tx)) {

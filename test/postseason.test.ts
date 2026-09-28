@@ -111,8 +111,12 @@ describe("October, a game at a time", () => {
       expect(s.mvp).not.toBeNull();
       expect(league.players[s.mvp!.playerId]!.teamId).toBe(s.winner);
     }
-    // October is October.
+    // October is October: it opens Sep 30 and the World Series is over before the winter opens (Oct 30).
     const first = season.dateOf(bracket.series[0]!.games[0]!.day);
-    expect(first.getUTCMonth()).toBe(9);
+    expect([first.getUTCMonth(), first.getUTCDate()]).toEqual([8, 30]);
+    const last = season.dateOf(bracket.series.at(-1)!.games.at(-1)!.day);
+    expect(last.getUTCMonth()).toBe(9);
+    expect(last.getTime()).toBeLessThanOrEqual(season.dateOf(218).getTime());
+    expect([season.dateOf(218).getUTCMonth(), season.dateOf(218).getUTCDate()]).toEqual([9, 30]);
   });
 });

@@ -43,12 +43,16 @@ const PACE_KEY = "twenty-eighty.pace";
 const paceMs = (p: Pace) => PACES.find((x) => x.key === p)!.ms;
 
 const STOPS_KEY = "twenty-eighty.stops";
-const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: true, deadline: true, staff: true };
+const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true };
 
 function storedStops(): StopRules {
   try {
     const raw = localStorage.getItem(STOPS_KEY);
-    return raw ? { ...DEFAULT_STOPS, ...(JSON.parse(raw) as Partial<StopRules>) } : DEFAULT_STOPS;
+    if (!raw) return DEFAULT_STOPS;
+    const saved = JSON.parse(raw) as Partial<Omit<StopRules, "offer">> & { offer?: StopRules["offer"] | boolean };
+    // Offers used to be on or off: on now means the ones the staff likes.
+    const offer = saved.offer === true ? "good" : saved.offer === false ? "off" : (saved.offer ?? DEFAULT_STOPS.offer);
+    return { ...DEFAULT_STOPS, ...saved, offer };
   } catch {
     return DEFAULT_STOPS;
   }
@@ -553,7 +557,7 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
       window.removeEventListener("keydown", close);
     };
   }, [open]);
-  const count = (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer ? 1 : 0) + (stops.deadline ? 1 : 0) + (stops.staff ? 1 : 0);
+  const count = (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer !== "off" ? 1 : 0) + (stops.deadline ? 1 : 0) + (stops.staff ? 1 : 0);
   const set = (patch: Partial<StopRules>) => onChange({ ...stops, ...patch });
   return (
     <div class="stops" ref={ref}>
@@ -587,8 +591,19 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
             <span>A big leaguer of ours gets hurt badly enough for the injured list</span>
           </label>
           <label>
-            <input type="checkbox" checked={stops.offer} onChange={(e) => set({ offer: (e.target as HTMLInputElement).checked })} />
-            <span>A club makes us a trade offer</span>
+            <input type="checkbox" checked={stops.offer !== "off"} onChange={(e) => set({ offer: (e.target as HTMLInputElement).checked ? "good" : "off" })} />
+            <span>
+              A club makes us an offer{" "}
+              <select
+                aria-label="Which trade offers"
+                value={stops.offer === "all" ? "all" : "good"}
+                disabled={stops.offer === "off"}
+                onChange={(e) => set({ offer: (e.target as HTMLSelectElement).value as StopRules["offer"] })}
+              >
+                <option value="good">my staff likes</option>
+                <option value="all">of any kind</option>
+              </select>
+            </span>
           </label>
           <label>
             <input type="checkbox" checked={stops.deadline} onChange={(e) => set({ deadline: (e.target as HTMLInputElement).checked })} />
