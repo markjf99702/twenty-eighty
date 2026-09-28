@@ -43,12 +43,11 @@ export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: L
   const slots: LineupSlot[] = [];
   const used = new Set<number>();
 
+  // The best bench player not already in the lineup (the caller marks whoever plays as used).
   const takeBench = (score: (id: number) => number): number | undefined => {
     const candidates = bench.filter((id) => !used.has(id));
     if (candidates.length === 0) return undefined;
-    const best = candidates.reduce((a, b) => (score(b) > score(a) ? b : a));
-    used.add(best);
-    return best;
+    return candidates.reduce((a, b) => (score(b) > score(a) ? b : a));
   };
 
   // With nobody left on the bench, a hole goes to the last man in the bullpen.
@@ -57,24 +56,32 @@ export function buildLineup(league: League, depth: DepthChart, rng: Rng, opts: L
     return arm ?? -1;
   };
 
+  const missing = (id: number) => id < 0 || out(id);
+  // Regulars who can't play: the bench has to cover them whatever else happens, so a
+  // healthy regular gets a day off only while there's a spare bench player beyond them.
+  let holes = FIELD_POSITIONS.filter((pos) => missing(depth.starters[pos])).length + (missing(depth.dh) ? 1 : 0);
+  const spare = () => bench.filter((id) => !used.has(id)).length - holes;
+
   for (const pos of FIELD_POSITIONS) {
     let id = depth.starters[pos];
+    if (missing(id)) holes--;
     // (A player listed at two spots plays the first; the second goes to the bench.)
-    const sits = id < 0 || out(id) || used.has(id) || (allowRest && rng.chance(REST_RATE[pos]));
-    if (sits) {
+    const forced = missing(id) || used.has(id);
+    if (forced || (allowRest && rng.chance(REST_RATE[pos]) && spare() > 0)) {
       const sub = takeBench((b) => defenseGrade(players[b]!, pos) + 3 * hitterQuality(players[b]!));
       if (sub !== undefined) id = sub;
     }
-    if (id < 0 || used.has(id)) id = emergency();
+    if (missing(id) || used.has(id)) id = emergency();
     used.add(id);
     slots.push({ id, pos });
   }
   let dh = depth.dh;
-  if (dh < 0 || out(dh) || used.has(dh) || (allowRest && rng.chance(REST_RATE.DH))) {
+  if (missing(dh)) holes--;
+  if (missing(dh) || used.has(dh) || (allowRest && rng.chance(REST_RATE.DH) && spare() > 0)) {
     const sub = takeBench((b) => hitterQuality(players[b]!));
     if (sub !== undefined) dh = sub;
   }
-  if (dh < 0 || used.has(dh)) dh = emergency();
+  if (missing(dh) || used.has(dh)) dh = emergency();
   used.add(dh);
   slots.push({ id: dh, pos: "DH" });
 
