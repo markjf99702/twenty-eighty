@@ -103,6 +103,12 @@ Urgent notes can stop the sim (the worker's `staff` stop). The staff's take on a
 worker attaches it to offers and to a trade check, from the same beliefs, with its
 confidence from the scouting sigma of the players coming back.
 
+The market as the user sees it (src/org/market.ts): `onTheBlock` lists sellers'
+veterans (the offers' seller rules plus rebuilding clubs), and `askingPrice` is the
+club's ask the way `sellOffer` builds one (its favorites among the user's `chips`, from
+its price to 1.35x plus 2). Keep it the club's ask: a package chosen to be cheapest by
+the user's read finds the AI's worst scouting misses and turns the button into an exploit.
+
 The browser UI never touches the engine from the page: `web/src/worker/sim.worker.ts`
 owns the League and Season and answers typed requests (`web/src/api/protocol.ts`) with
 plain view models built in `web/src/worker/views.ts`. Pages call it through `useApi`

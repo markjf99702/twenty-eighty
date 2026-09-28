@@ -17,13 +17,18 @@ export type Route =
   | { page: "moves"; mine: boolean }
   | { page: "playoffs" }
   | { page: "winter" }
-  | { page: "trades"; partnerId: number | null }
+  | { page: "trades"; partnerId: number | null; block?: BlockSlug }
   | { page: "history" }
   | { page: "scouting" }
   | { page: "finances"; teamId: number | null }
   | { page: "owner" }
   | { page: "staff" }
   | { page: "office" };
+
+/** Filters for the list of players on the block: everyone, or one spot (#trades-block-rp). */
+export const BLOCK_SLUGS = ["all", "sp", "rp", "c", "1b", "2b", "3b", "ss", "lf", "cf", "rf", "dh"] as const;
+export type BlockSlug = (typeof BLOCK_SLUGS)[number];
+const blockSlug = (x: string | undefined): BlockSlug => BLOCK_SLUGS.find((s) => s === x) ?? "all";
 
 export function parse(hash: string): Route {
   const parts = hash.replace(/^#/, "").split("-");
@@ -51,7 +56,7 @@ export function parse(hash: string): Route {
     case "winter":
       return { page: "winter" };
     case "trades":
-      return { page: "trades", partnerId: n(a) };
+      return a === "block" ? { page: "trades", partnerId: null, block: blockSlug(b) } : { page: "trades", partnerId: n(a) };
     case "history":
       return { page: "history" };
     case "scouting":
@@ -92,6 +97,7 @@ export function href(r: Route): string {
     case "winter":
       return "#winter";
     case "trades":
+      if (r.block) return r.block === "all" ? "#trades-block" : `#trades-block-${r.block}`;
       return r.partnerId === null ? "#trades" : `#trades-${r.partnerId}`;
     case "history":
       return "#history";

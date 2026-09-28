@@ -5,6 +5,7 @@ import { settingsOf } from "../league/settings";
 import type { AdviceNote, League, Team } from "../league/types";
 import { budgetRoom, FREE_AGENT_YEARS, orgPlayers, payroll, serviceYears } from "../org/contracts";
 import { extensionCandidates } from "../org/extensions";
+import { onTheBlock } from "../org/market";
 import { gamesOut } from "../org/offers";
 import { rosterProblems } from "../org/roster";
 import { TRADE_DEADLINE_DAY } from "../org/trades";
@@ -247,15 +248,25 @@ function deadline(season: Season, team: Team, day: number): void {
       href: "#trades",
     });
   } else if (gb <= 3) {
+    const key = `buy${suffix}:${league.year}`;
+    if (league.advice.some((a) => a.key === key)) return;
     const spot = weakestSpot(season, team);
     if (!spot) return;
+    // Who's available there, best fit first by our read.
+    const group = spot.pitcher ?? spot.hitterPos!;
+    const there = onTheBlock(season, user).filter((b) => b.group === group);
+    const fits = there.filter((b) => b.fit >= 0.3).slice(0, 3);
+    const of = (b: (typeof fits)[number]) => `${tag(b.player)} of the ${b.team.nickname}`;
+    const market = fits.length
+      ? ` On the block, the best ${fits.length === 1 ? "fit is" : "fits are"} ${fits.length <= 2 ? fits.map(of).join(" and ") : `${fits.slice(0, -1).map(of).join(", ")} and ${of(fits.at(-1)!)}`}.`
+      : " Nobody on the block there is a clear upgrade, but any club will listen on its players.";
     add(league, day, {
-      key: `buy${suffix}:${league.year}`,
+      key,
       from: "scouting",
       urgent: lastWeek,
       title: `A trade could shore up ${spot.label}`,
-      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gb} games out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (Now ${ourNow(season, user, spot.p)}). That's where a trade helps most. ${when}`,
-      href: "#trades",
+      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gb} games out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (Now ${ourNow(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
+      href: there.length ? `#trades-block-${group.toLowerCase()}` : "#trades",
     });
   }
 }

@@ -63,7 +63,7 @@ import type {
 } from "../api/protocol";
 import { clearSave, decodeLeague, encodeLeague, hasSave, readSave, writeSave } from "./storage";
 import { financeView, ownerView } from "./business";
-import { historyView, offerViews, offseasonView, tradeAdviceView, tradeSide } from "./winter";
+import { askingView, blockView, historyView, offerViews, offseasonView, tradeAdviceView, tradeSide } from "./winter";
 import {
   boxScoreView,
   dashboardView,
@@ -681,6 +681,16 @@ const handlers: Handlers = {
 
   offers() {
     return offerViews(requireSeason(), stats);
+  },
+
+  onTheBlock() {
+    return blockView(requireSeason(), stats);
+  },
+
+  askingPrice({ partnerId, get }) {
+    const s = requireSeason();
+    const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
+    return askingView(s, partnerId, get, fraction);
   },
 
   extension({ playerId }) {

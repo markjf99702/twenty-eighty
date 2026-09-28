@@ -323,7 +323,7 @@ function Page({
     case "winter":
       return <Winter status={status} onWinter={onWinter} onStatus={onStatus} />;
     case "trades":
-      return <Trades partnerId={route.partnerId} status={status} />;
+      return <Trades partnerId={route.partnerId} block={route.block} status={status} />;
     case "history":
       return <History status={status} />;
     case "scouting":

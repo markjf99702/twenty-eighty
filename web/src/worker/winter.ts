@@ -5,6 +5,7 @@ import type { League, Team } from "../../../src/league/types";
 import { payroll } from "../../../src/org/contracts";
 import { orgPlayers } from "../../../src/org/contracts";
 import type { RosterContext } from "../../../src/org/roster";
+import { askingPrice, onTheBlock } from "../../../src/org/market";
 import { offerLive } from "../../../src/org/offers";
 import { evaluateTrade, surplusValue } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
@@ -16,7 +17,7 @@ import { playerName, type Player } from "../../../src/players/types";
 import { believedWar, warShift } from "../../../src/scouting/analytics";
 import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
-import type { DevRow, HistoryView, OffseasonView, OfferView, TradeAdviceView, TradeSide } from "../api/protocol";
+import type { AskingView, BlockRow, DevRow, HistoryView, OffseasonView, OfferView, TradeAdviceView, TradeSide } from "../api/protocol";
 import { dateLabel, playerSummary, rosterActions, type StatsCache, teamRef } from "./views";
 import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
@@ -175,6 +176,43 @@ export function tradeSide(season: Season, stats: StatsCache, team: Team, ctx?: R
     }))
     .sort((a, b) => b.surplus - a.surplus);
   return { team: teamRef(team), players };
+}
+
+/** Who clubs out of the race are shopping, best fit for the user's club first. */
+export function blockView(season: Season, stats: StatsCache): BlockRow[] {
+  const league = season.league;
+  const user = league.userTeamId;
+  if (user === null) return [];
+  return onTheBlock(season, user).map((b) => ({
+    ...playerSummary(b.player, season, stats),
+    surplus: surplusValue(b.player, 1, warShift(season, user, b.player)),
+    club: teamRef(b.team),
+    gamesOut: b.gamesOut,
+    group: b.group,
+    fit: Math.round(b.fit * 10) / 10,
+  }));
+}
+
+const labeled = (p: Player) => `${p.pitching ? (p.role === "SP" ? "SP" : "RP") : p.position} ${playerName(p)}`;
+const listOf = (ps: Player[]) => {
+  const names = ps.map(labeled);
+  return names.length <= 2 ? names.join(" and ") : `${names.slice(0, -1).join(", ")} and ${names.at(-1)}`;
+};
+
+/** What a club would want from the user's system for these players of theirs. */
+export function askingView(season: Season, partnerId: number, get: number[], fraction: number): AskingView {
+  const league = season.league;
+  const user = league.userTeamId;
+  if (user === null) return { ok: false, reason: "Trades are for the club you run." };
+  const partner = league.teams[partnerId]!;
+  const a = askingPrice(season, league.teams[user]!, partner, get, fraction);
+  if (!a.ok) return a;
+  const who = get.length === 1 ? playerName(league.players[get[0]!]!) : "them";
+  const club = `The ${partner.nickname}`;
+  if (a.give.length === 0) {
+    return { ok: true, give: [], text: `${club} would let ${who} go for nothing: by their read his contract costs more than he's worth.` };
+  }
+  return { ok: true, give: a.give.map((p) => p.id), text: `${club} would want ${listOf(a.give)} for ${who}.` };
 }
 
 /** The staff's take on a trade, with each note signed by the person in the job (null with staff advice off). */

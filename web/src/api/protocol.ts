@@ -5,6 +5,7 @@
 import type { GameSettings } from "../../../src/league/settings";
 import type { DepthChart, TransactionType } from "../../../src/league/types";
 import type { OffseasonPhase } from "../../../src/offseason/types";
+import type { Group } from "../../../src/org/market";
 import type { RoomMove } from "../../../src/org/trades";
 import type { CareerLine, ContractType, FieldPosition, Level, MinorLevel, PitchType } from "../../../src/players/types";
 import type { HitterRow, PitcherRow } from "../../../src/season/season";
@@ -575,7 +576,26 @@ export interface OfferView {
   advice: TradeAdviceView | null;
 }
 
-export type { RoomMove };
+export type { Group, RoomMove };
+
+/** A veteran a club out of the race is shopping, as your front office sees him. */
+export interface BlockRow extends PlayerSummary {
+  surplus: number;
+  club: TeamRef;
+  /** His club's games behind the last playoff spot (null in the winter). */
+  gamesOut: number | null;
+  group: Group;
+  /** Wins a season he'd add over who plays there now, by your read. */
+  fit: number;
+}
+
+export interface AskingView {
+  ok: boolean;
+  reason?: string;
+  /** What they'd want from your system (empty: they'd let him go for nothing). */
+  give?: number[];
+  text?: string;
+}
 
 export interface TradeCheckView {
   ok: boolean;
@@ -765,6 +785,8 @@ export interface Api {
   tradeSides: { req: { partnerId: number }; res: { mine: TradeSide; theirs: TradeSide } };
   trade: { req: { partnerId: number; give: number[]; get: number[]; moves?: RoomMove[]; execute: boolean }; res: TradeCheckView };
   offers: { req: void; res: OfferView[] };
+  onTheBlock: { req: void; res: BlockRow[] };
+  askingPrice: { req: { partnerId: number; get: number[] }; res: AskingView };
   extension: { req: { playerId: number }; res: ExtensionView | null };
   signExtension: { req: { playerId: number; years: number }; res: { ok: boolean; reason?: string } };
   extensionCandidates: { req: void; res: ExtensionCandidateView[] };

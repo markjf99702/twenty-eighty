@@ -41,8 +41,8 @@ const OFFER_DAYS = 3;
 const OFFER_GAP = 14;
 const MAX_OPEN = 2;
 /** Games behind the last playoff spot: buyers are this close, sellers this far out. */
-const BUYER_GB = 4;
-const SELLER_GB = 7;
+export const BUYER_GB = 4;
+export const SELLER_GB = 7;
 
 type Side = { buyers: Team[]; sellers: Team[] };
 
@@ -72,7 +72,7 @@ export function raceSides(season: Season): Side {
 const salaryOf = (p: Player) => (p.contract && p.contract.type !== "minor" ? p.contract.salary : 0);
 
 /** Young players a club would part with: not among its 20 best big leaguers, healthy, 26 or younger. */
-function chips(league: League, team: Team): Player[] {
+export function chips(league: League, team: Team): Player[] {
   const core = new Set(
     orgPlayers(league, team)
       .filter((p) => p.level === "MLB")
@@ -131,11 +131,12 @@ const freshness = (times: number) => 1 / (1 + 2 * times);
  * of its top eight relievers. This is what makes clubs ask about different
  * players: each goes after the hole it has.
  */
-function upgrade(league: League, team: Team, p: Player, seen: WarShift): number {
+export function upgrade(league: League, team: Team, p: Player, seen: WarShift): number {
   const war = (q: Player) => seasonWar(q) + seen(team.id, q);
   const d = team.depth;
   let slots: number[];
-  if (p.pitching) slots = canStart(p) && p.role === "SP" ? d.rotation : d.bullpen.slice(0, 8);
+  // A pitcher who can start is valued as a starter, so he's measured against the rotation.
+  if (p.pitching) slots = canStart(p) ? d.rotation : d.bullpen.slice(0, 8);
   else slots = [p.position === "DH" || p.position === "P" ? d.dh : d.starters[p.position], d.dh];
   const incumbents = slots.filter((id) => id >= 0 && id !== p.id).map((id) => league.players[id]!);
   if (incumbents.length === 0) return war(p);

@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "preact/hooks";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
-import type { OfferView, RoomMove, Status, TradeCheckView, TradeSide } from "../../api/protocol";
+import type { BlockRow, OfferView, RoomMove, Status, TradeCheckView, TradeSide } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
 import { Grade } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
 import { StaffTake } from "../components/StaffTake";
 import { LEVEL_NAMES, statBrief } from "../format";
-import { go, playerHref } from "../router";
+import { BLOCK_SLUGS, type BlockSlug, go, playerHref } from "../router";
 import { useBasics } from "../settings";
 import { takePreset, tradeFor } from "../tradePreset";
 
@@ -277,7 +277,139 @@ function Offers({ canTrade, onAdjust }: { canTrade: boolean; onAdjust: (o: Offer
   );
 }
 
-export function Trades({ partnerId, status }: { partnerId: number | null; status: Status }) {
+const BLOCK_LABELS: Record<BlockSlug, string> = {
+  all: "Everyone",
+  sp: "Starting pitchers",
+  rp: "Relievers",
+  c: "Catchers",
+  "1b": "First basemen",
+  "2b": "Second basemen",
+  "3b": "Third basemen",
+  ss: "Shortstops",
+  lf: "Left fielders",
+  cf: "Center fielders",
+  rf: "Right fielders",
+  dh: "Designated hitters",
+};
+
+/** Veterans that clubs out of the race are shopping, best fit for your club first. */
+function OnTheBlock({ slug, canTrade }: { slug: BlockSlug; canTrade: boolean }) {
+  const basics = useBasics();
+  const view = useApi("onTheBlock", undefined);
+  const [asking, setAsking] = useState<number | null>(null);
+  if (view.error) return <ErrorNote error={view.error} />;
+  if (!view.data) return <Loading />;
+  const all = view.data;
+  const inSlug = (p: BlockRow, s: BlockSlug) => s === "all" || p.group.toLowerCase() === s;
+  const rows = all.filter((p) => inSlug(p, slug));
+  const clubs = new Set(all.map((p) => p.club.id)).size;
+
+  const ask = async (p: BlockRow) => {
+    if (asking !== null) return;
+    setAsking(p.id);
+    try {
+      const a = await call("askingPrice", { partnerId: p.club.id, get: [p.id] });
+      if (!a.ok) notify(a.reason ?? "They wouldn't say.", true);
+      else {
+        tradeFor(p.club.id, [p.id], a.give ?? []);
+        if (a.text) notify(`${a.text} It's loaded in the builder: change it or propose it.`);
+      }
+    } finally {
+      setAsking(null);
+    }
+  };
+
+  const columns: Column<BlockRow>[] = [
+    {
+      key: "name",
+      label: "Name",
+      cls: "name",
+      sort: (p) => p.name,
+      asc: true,
+      render: (p) => (
+        <>
+          <a href={playerHref(p.id)}>{p.name}</a>
+          <span class="stat-brief">{statBrief(p, basics)}</span>
+        </>
+      ),
+    },
+    { key: "pos", label: "Pos", render: (p) => p.pos },
+    { key: "age", label: "Age", cls: "num", sort: (p) => p.age, asc: true, render: (p) => p.age },
+    {
+      key: "club",
+      label: "Club",
+      sort: (p) => p.club.abbrev,
+      asc: true,
+      render: (p) => (
+        <span title={`${p.club.city} ${p.club.nickname}`}>
+          <a href={`#team-${p.club.id}`}>{p.club.abbrev}</a>
+          {p.gamesOut !== null && <span class="dim small"> {p.gamesOut} GB</span>}
+        </span>
+      ),
+    },
+    {
+      key: "fit",
+      label: "Fit",
+      title: "Wins a season he'd add over who plays there for you now, by your read",
+      cls: "num",
+      sort: (p) => p.fit,
+      render: (p) => <span class={p.fit >= 0.5 ? "up" : p.fit < 0 ? "neg" : "dim"}>{`${p.fit > 0 ? "+" : ""}${p.fit.toFixed(1)}`}</span>,
+    },
+    {
+      key: "surplus",
+      label: "Value",
+      title: "Surplus value by your read: projected wins over his years of control at $8M a win, minus salary",
+      cls: "num",
+      sort: (p) => p.surplus,
+      render: (p) => <span class={p.surplus < 0 ? "neg" : ""}>{money(p.surplus)}</span>,
+    },
+    { key: "ovr", label: "Now", cls: "ctr", sort: (p) => p.ovr, render: (p) => <Grade g={p.ovr} /> },
+    { key: "contract", label: "Contract", render: (p) => <span class="dim">{p.contract?.label ?? "—"}</span> },
+    {
+      key: "deal",
+      label: "",
+      render: (p) => (
+        <span class="block-actions">
+          <button type="button" class="btn small" disabled={!canTrade} aria-label={`Trade for ${p.name}`} onClick={() => tradeFor(p.club.id, [p.id])}>
+            Trade for
+          </button>
+          <button type="button" class="btn small ghost" disabled={!canTrade || asking !== null} onClick={() => ask(p)}>
+            {asking === p.id ? "Asking…" : "What would they want?"}
+          </button>
+        </span>
+      ),
+    },
+  ];
+
+  return (
+    <Section
+      title="On the block"
+      aside={
+        <select class="sel" aria-label="Show" value={slug} onChange={(e) => go({ page: "trades", partnerId: null, block: (e.target as HTMLSelectElement).value as BlockSlug })}>
+          {BLOCK_SLUGS.map((s) => (
+            <option key={s} value={s}>
+              {BLOCK_LABELS[s]} ({all.filter((p) => inSlug(p, s)).length})
+            </option>
+          ))}
+        </select>
+      }
+    >
+      <p class="block-about">
+        {all.length === 0
+          ? "Nobody is shopping players yet. Clubs put their veterans on the block once they fall out of the race."
+          : `${plural(clubs, "club")} out of the race ${clubs === 1 ? "is" : "are"} shopping these veterans. Fit is how many wins a season each would add over who plays there for you now, by your read. Any club will listen on anyone, though: pick a club above to build any deal.`}
+      </p>
+      {all.length > 0 &&
+        (rows.length === 0 ? (
+          <p class="dim">Nobody at that spot is on the block right now.</p>
+        ) : (
+          <Table columns={columns} rows={rows} rowKey={(p) => p.id} sortKey="fit" limit={25} />
+        ))}
+    </Section>
+  );
+}
+
+export function Trades({ partnerId, block, status }: { partnerId: number | null; block?: BlockSlug; status: Status }) {
   const user = status.userTeamId ?? null;
   const partners = (status.teams ?? []).filter((t) => t.id !== user).sort((a, b) => a.city.localeCompare(b.city));
   const partner = partnerId ?? partners[0]?.id ?? 0;
@@ -288,13 +420,19 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
   const [moves, setMoves] = useState<Map<number, Move>>(new Map());
   const [check, setCheck] = useState<TradeCheckView | null>(null);
 
+  // A new club clears the deal; a deal sent from elsewhere (an offer, a roster, the block) loads it.
+  const shown = useRef<number | null>(null);
   useEffect(() => {
+    if (block) return;
     const p = takePreset(partner);
-    setGive(new Set(p?.give ?? []));
-    setGet(new Set(p?.get ?? []));
-    setMoves(new Map());
-    setCheck(null);
-  }, [partner]);
+    if (p || shown.current !== partner) {
+      setGive(new Set(p?.give ?? []));
+      setGet(new Set(p?.get ?? []));
+      setMoves(new Map());
+      setCheck(null);
+    }
+    shown.current = partner;
+  }, [partner, block]);
 
   const adjust = (o: OfferView, room: boolean) => {
     const deal = { partner: o.team.id, give: o.give.map((p) => p.id), get: o.get.map((p) => p.id) };
@@ -344,6 +482,22 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
     update(next);
   };
 
+  const [asking, setAsking] = useState(false);
+  const askThem = async () => {
+    setAsking(true);
+    try {
+      const a = await call("askingPrice", { partnerId: partner, get: [...get] });
+      if (!a.ok) notify(a.reason ?? "They wouldn't say.", true);
+      else {
+        setGive(new Set(a.give ?? []));
+        setMoves(new Map());
+        if (a.text) notify(a.text);
+      }
+    } finally {
+      setAsking(false);
+    }
+  };
+
   const propose = async () => {
     const res = await call("trade", { partnerId: partner, give: [...give], get: [...get], moves: roomMoves, execute: true });
     if (res.done) {
@@ -372,21 +526,37 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
     />
   );
 
-  return (
+  const head = (
     <>
       <div class="page-head">
         <div>
           <div class="eyebrow">Trade desk</div>
-          <h1>Make a deal</h1>
+          <h1>{block ? "On the block" : "Make a deal"}</h1>
           <div class="sub">Clubs value players by surplus: projected wins over the years they control him, minus what they'll pay him.</div>
         </div>
-        <select class="sel" aria-label="Trade partner" value={partner} onChange={(e) => go({ page: "trades", partnerId: Number((e.target as HTMLSelectElement).value) })}>
+        <select class="sel" aria-label="Trade partner" value={block ? "" : partner} onChange={(e) => go({ page: "trades", partnerId: Number((e.target as HTMLSelectElement).value) })}>
+          {block && (
+            <option value="" disabled>
+              Pick a club
+            </option>
+          )}
           {partners.map((t) => (
             <option key={t.id} value={t.id}>
               {t.city} {t.nickname}
             </option>
           ))}
         </select>
+      </div>
+      <div class="desk-switch">
+        <Seg<"desk" | "block">
+          label="Trade desk"
+          value={block ? "block" : "desk"}
+          options={[
+            ["desk", "Make a deal"],
+            ["block", "On the block"],
+          ]}
+          onChange={(v) => go(v === "block" ? { page: "trades", partnerId: null, block: "all" } : { page: "trades", partnerId: shown.current ?? partner })}
+        />
       </div>
       {!status.canTrade && <div class="note warn">{status.tradeNote}</div>}
       {status.canTrade && status.deadline && (
@@ -396,6 +566,20 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
             : `The trade deadline is ${status.deadline.date}, ${status.deadline.daysLeft} day${status.deadline.daysLeft === 1 ? "" : "s"} away.`}
         </div>
       )}
+    </>
+  );
+  if (block) {
+    return (
+      <>
+        {head}
+        <OnTheBlock slug={block} canTrade={Boolean(status.canTrade)} />
+      </>
+    );
+  }
+
+  return (
+    <>
+      {head}
       <Offers canTrade={Boolean(status.canTrade)} onAdjust={adjust} />
 
       <div class="trade-bar">
@@ -418,9 +602,16 @@ export function Trades({ partnerId, status }: { partnerId: number | null; status
             <span class="no">{check.reason}</span>
           )}
         </div>
-        <button type="button" class="btn primary" disabled={!check?.ok || !status.canTrade} onClick={propose}>
-          Propose trade
-        </button>
+        <span class="trade-bar-actions">
+          {get.size > 0 && (
+            <button type="button" class="btn" disabled={!status.canTrade || asking} onClick={askThem} title="Fill your side with what they'd ask for">
+              {asking ? "Asking…" : "What would they want?"}
+            </button>
+          )}
+          <button type="button" class="btn primary" disabled={!check?.ok || !status.canTrade} onClick={propose}>
+            Propose trade
+          </button>
+        </span>
       </div>
       {check?.advice && <StaffTake advice={check.advice} />}
 

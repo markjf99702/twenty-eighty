@@ -210,7 +210,14 @@ the GM:
   race, where the newcomers would play and who fills in, the money, and how well your
   scouts know the players (so a thin scouting department is less sure, and says so).
   To start a deal from another club, use **Trade with** on its page, **Trade for** on a
-  row of its roster, or **Trade for him** on a player's page.
+  row of its roster, or **Trade for him** on a player's page. **On the block** lists
+  the veterans that clubs out of the race are shopping (in the winter, the weakest
+  clubs), by position, with how many wins each would add over who plays there for you
+  now by your read. **What would they want?** asks the club for its price: the young
+  players of yours it likes best, up to what it wants for him. That's their ask, not a
+  bargain; it loads into the builder to haggle from, with your staff's take. When your
+  staff says a trade could shore up a spot, it names the best fits on the block and
+  links to them.
 - **Extensions**: your players' pages show what each would sign for at every length,
   and what the deal is worth by your front office's read; the Payroll tab lists your
   best candidates, and your assistant GM brings one up in the winter and in spring. AI clubs deal with each

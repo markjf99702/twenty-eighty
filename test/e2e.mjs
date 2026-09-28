@@ -72,6 +72,12 @@ await fits('a player page');
 await page.goto(base + '#trades');
 await page.waitForSelector('.trade-bar');
 await fits('the trade desk');
+await page.locator('.desk-switch button', { hasText: 'On the block' }).click();
+await page.waitForSelector('.block-about');
+assert.equal(await page.evaluate(() => location.hash), '#trades-block', 'the block has its own link');
+await fits('the players on the block');
+await page.locator('.desk-switch button', { hasText: 'Make a deal' }).click();
+await page.waitForSelector('.trade-bar');
 
 // The league saves itself: a reload comes back to the same club.
 await page.reload();

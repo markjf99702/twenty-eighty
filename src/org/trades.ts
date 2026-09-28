@@ -218,6 +218,11 @@ export type WarShift = (viewer: number, p: Player) => number;
  * making `moves` to open room on its 40-man. Each side values the players
  * through its own scouts (`seen`); the values returned are the user's view.
  */
+/** What an AI club wants back for players it values at `value`: fair value plus an edge (set by the difficulty). */
+export function asking(league: League, value: number): number {
+  return value + Math.max(1, dials(league).tradeMargin * Math.abs(value));
+}
+
 export function evaluateTrade(
   league: League,
   userTeam: Team,
@@ -248,9 +253,7 @@ export function evaluateTrade(
   // The other club judges with its own scouts.
   const theirIn = value(partner.id, give);
   const theirOut = value(partner.id, get);
-  // What an AI club wants on top of fair value before it says yes (set by the difficulty).
-  const margin = dials(league).tradeMargin;
-  const want = theirOut + Math.max(1, margin * Math.abs(theirOut));
+  const want = asking(league, theirOut);
   if (theirIn < want) {
     const short = Math.round((want - theirIn) * 10) / 10;
     return { ...base, ok: false, reason: `${partner.nickname} want more: about $${short}M more in surplus value.` };
