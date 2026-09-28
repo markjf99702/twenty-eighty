@@ -209,20 +209,26 @@ function sellOffer(league: League, user: Team, sellers: Team[], rng: Rng, now: n
   return got ? { partner: seller, give: got.map((x) => x.p), get: [t.p], kind: "sell" } : null;
 }
 
-function pitch(d: Draft, inSeason: boolean): string {
+/** Before June the standings don't say much: clubs are adding or listening, not racing. */
+const EARLY_SEASON_DAY = 68;
+
+function pitch(d: Draft, inSeason: boolean, now: number): string {
   const club = `The ${d.partner.nickname}`;
+  const early = inSeason && now < EARLY_SEASON_DAY;
   if (d.kind === "buy") {
     const target = d.give[0]!;
-    return inSeason
-      ? `${club} are chasing a playoff spot and want ${labeled(target)}. They'll send ${list(d.get)}.`
-      : `${club} want ${labeled(target)} and are offering ${list(d.get)}.`;
+    if (!inSeason) return `${club} want ${labeled(target)} and are offering ${list(d.get)}.`;
+    return early
+      ? `${club} are looking to add and want ${labeled(target)}. They'll send ${list(d.get)}.`
+      : `${club} are chasing a playoff spot and want ${labeled(target)}. They'll send ${list(d.get)}.`;
   }
   const vet = d.get[0]!;
   const c = vet.contract;
   const rental = inSeason && c && (c.type !== "guaranteed" || c.years <= 1) && c.type !== "pre-arb" ? " (a rental: his contract is up after the season)" : "";
-  return inSeason
-    ? `${club} are out of the race and shopping ${labeled(vet)}${rental}. They want ${list(d.give)}.`
-    : `${club} would move ${labeled(vet)} for ${list(d.give)}.`;
+  if (!inSeason) return `${club} would move ${labeled(vet)} for ${list(d.give)}.`;
+  return early
+    ? `${club} are listening on ${labeled(vet)}${rental}. They want ${list(d.give)}.`
+    : `${club} are out of the race and shopping ${labeled(vet)}${rental}. They want ${list(d.give)}.`;
 }
 
 /** Whether an offer still stands: open, this season, in time, and everyone still where they were. */
@@ -280,7 +286,7 @@ export function proposeToUser(
       give,
       get,
       kind: d.kind,
-      pitch: pitch(d, inSeason),
+      pitch: pitch(d, inSeason, now),
       year: league.year,
       made: now,
       expires,

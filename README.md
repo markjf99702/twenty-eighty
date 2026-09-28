@@ -158,8 +158,8 @@ the GM:
   the winter they size up tender decisions, the draft board, free agents who'd fill the
   biggest hole, and international targets. The advice comes from your own scouts and
   analysts, so it's only as good as they are.
-- **Scoreboard sims**: play a day, a week, a month or the rest of the season, then the
-  postseason. A full season with all four affiliates takes about 15-20 seconds, running in
+- **Scoreboard sims**: play a day, a week, a month or the rest of the season, then
+  October. A full season with all four affiliates takes about 15-20 seconds, running in
   a Web Worker so the page stays responsive. Set the speed to **Steady** (about a month
   in 12 seconds) or **Slow** (about a week in 8) and whatever page you're on follows
   along day by day, so you can watch the standings and stop (the button or Esc) when
@@ -186,8 +186,15 @@ the GM:
   by position, and stats by level.
 - **Stats**: sortable leaderboards for every level, with qualified/club/position filters
   and the season's own run environment (wOBA weights, FIP constant, runs per win).
-- **Scores and box scores**, **standings** with the wild-card race, and the **postseason**
-  bracket.
+- **Scores and box scores**, and **standings** with the wild-card race.
+- **October, game by game**: twelve clubs, best-of-3 Wild Card Series, then best-of-5,
+  best-of-7 and the World Series. Play your club's next game, finish a round, or run to
+  the end. You set a 26-man playoff roster from your 40-man (at most 13 pitchers) and the
+  rotation order; each series starts from the top with whoever is rested, and the other
+  starters work in relief. The October page shows your next game with both probable
+  starters, your series game by game with a line on each (walk-offs, comebacks,
+  shutouts, a starter's gem, a two-homer night) and a box score, the bracket as it fills
+  in, and MVPs for the League Championship Series and the World Series.
 - **The offseason**, a phase at a time: the season in review (awards, who developed,
   who retired), the tender deadline for your arbitration cases, the draft (pick when
   you're on the clock), eight weeks of free agency (make offers; players take the best

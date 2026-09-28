@@ -8,11 +8,12 @@ export function History({ status }: { status: Status }) {
   if (view.error) return <ErrorNote error={view.error} />;
   if (!view.data) return <Loading />;
   const seasons = view.data.seasons;
+  const first = seasons.length ? Math.min(...seasons.map((s) => s.year)) : status.year;
   return (
     <>
       <div class="page-head">
         <div>
-          <div class="eyebrow">Since {status.seed}</div>
+          <div class="eyebrow">Since {first}</div>
           <h1>League history</h1>
         </div>
       </div>

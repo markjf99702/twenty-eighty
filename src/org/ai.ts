@@ -2,6 +2,7 @@ import type { Rng } from "../core/rng";
 import type { Team } from "../league/types";
 import { IL_THRESHOLD_DAYS } from "../players/injuries";
 import { generateHitter, generatePitcher } from "../players/generate";
+import { uniqueNames } from "../players/names";
 import { type FieldPosition, type Level, MINOR_LEVELS, type MinorLevel, type Player } from "../players/types";
 import {
   activateFromIl,
@@ -238,6 +239,7 @@ function signFiller(ctx: RosterContext, team: Team, level: MinorLevel, pitcher: 
     : generateHitter(rng, { id, position: rng.pick(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"] as const), value, age });
   p.teamId = team.id;
   p.level = level;
+  uniqueNames(ctx.league, [p], "filler");
   ctx.league.players.push(p);
   team.rosters[level].push(p.id);
   logTransaction(ctx.league, ctx.day, team, p, "promote", `Signed ${p.firstName} ${p.lastName} to a minor league contract (${level})`);
@@ -275,6 +277,7 @@ function balanceMinors(ctx: RosterContext, team: Team, opts: AiOptions): void {
           const p = generateHitter(opts.rng, { id, position: "C", value: -45, age: opts.rng.int(20, 26) });
           p.teamId = team.id;
           p.level = level;
+          uniqueNames(ctx.league, [p], "filler");
           ctx.league.players.push(p);
           team.rosters[level].push(p.id);
           logTransaction(ctx.league, ctx.day, team, p, "promote", `Signed C ${p.firstName} ${p.lastName} to a minor league contract (${level})`);

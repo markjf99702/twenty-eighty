@@ -96,6 +96,13 @@ export function Winter({ status, onWinter, onStatus }: { status: Status; onWinte
         ))}
       </ol>
 
+      {v.payroll.fortyMan > 40 && v.phase !== "spring" && (
+        <div class="note warn">
+          You're at {v.payroll.fortyMan} on the 40-man roster: players on the 60-day injured list come back onto it after the World
+          Series. Get down to 40 by spring training by designating someone on <a href={href({ page: "team", teamId: status.userTeamId ?? null, tab: "roster" })}>your
+          roster</a>, or the weakest will be designated for assignment then. Until there's room, you can't sign a free agent.
+        </div>
+      )}
       {status.owner && <OwnerDesk phase={v.phase} onStatus={onStatus} />}
       {v.phase === "review" && !status.owner?.fired && <Review v={v} />}
       {(v.phase === "review" || v.phase === "tenders") && !status.owner?.fired && <Tenders v={v} />}

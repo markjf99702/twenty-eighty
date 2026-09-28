@@ -7,6 +7,7 @@ import { logTransaction } from "../org/roster";
 import { peakValue } from "../org/value";
 import { carryReport, valueShift } from "../scouting/scouting";
 import { generateHitter, generatePitcher } from "../players/generate";
+import { uniqueNames } from "../players/names";
 import { type FieldPosition, playerName, type Player } from "../players/types";
 import type { Season } from "../season/season";
 import type { DraftState } from "./types";
@@ -59,10 +60,12 @@ export function draftOrder(season: Season): number[] {
 }
 
 export function createDraft(league: League, season: Season, rng: Rng): DraftState {
+  const pool = draftClass(rng, Math.round(league.teams.length * DRAFT_ROUNDS * 1.5));
+  uniqueNames(league, pool, `draft:${league.year}`);
   return {
     order: draftOrder(season),
     rounds: DRAFT_ROUNDS,
-    pool: draftClass(rng, Math.round(league.teams.length * DRAFT_ROUNDS * 1.5)),
+    pool,
     picks: [],
   };
 }

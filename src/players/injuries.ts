@@ -84,9 +84,14 @@ export function rollInjury(p: Player, day: number, rng: Rng): Injury {
   return { name: type.name, days, daysLeft: days, startDay: day };
 }
 
-/** "Hamstring strain" -> "hamstring strain", but "Torn UCL (...)" keeps its acronym. */
+/**
+ * "Hamstring strain" -> "a hamstring strain", "Oblique strain" -> "an oblique
+ * strain", but no article for plurals and conditions ("back spasms", "arm
+ * fatigue", "elbow inflammation"). "Torn UCL (...)" keeps its acronym.
+ */
 export function injuryPhrase(name: string): string {
   const lower = name.charAt(0).toLowerCase() + name.slice(1);
+  if (/s$|fatigue$|inflammation$|soreness$|tightness$/.test(lower)) return lower;
   return /^[aeiou]/i.test(lower) ? `an ${lower}` : `a ${lower}`;
 }
 

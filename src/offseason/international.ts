@@ -5,6 +5,7 @@ import { logTransaction } from "../org/roster";
 import { overallGrade } from "../org/value";
 import { rawness } from "../league/generate";
 import { generateHitter, generatePitcher } from "../players/generate";
+import { uniqueNames } from "../players/names";
 import { type FieldPosition, playerName, type Player } from "../players/types";
 import type { Season } from "../season/season";
 import { valueShift } from "../scouting/scouting";
@@ -47,6 +48,7 @@ export function bonusAsk(p: Player): number {
 export function openInternational(league: League, season: Season, rng: Rng): InternationalState {
   const pool: Player[] = [];
   for (let i = 0; i < INTERNATIONAL_POOL_SIZE; i++) pool.push(prospect(rng, -(i + 1)));
+  uniqueNames(league, pool, `intl:${league.year}`);
   // Worse teams get bigger pools: $5.0M to $7.5M.
   const worstFirst = [...season.records].sort((a, b) => a.w - a.l - (b.w - b.l)).map((r) => r.teamId);
   const pools = league.teams.map((t) => {

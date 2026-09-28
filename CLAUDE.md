@@ -43,6 +43,14 @@ the rule-checked functions in src/org/roster.ts, never by editing arrays directl
 the transaction log and 40-man/IL bookkeeping stay consistent. `new Season(league,
 { minors: false })` skips affiliate games (calibration and most tests use this).
 
+The postseason (src/season/postseason.ts) is played a day at a time: `startPostseason`
+seeds `season.bracket` (saved), `playPostseasonDay`/`playPostseason(step)` play it on, and
+when the World Series ends it writes `season.postseason`, the result everything else reads
+(the winter, the owner, the books). Each club plays October with `playoffDepth`: its
+playoff roster (the user's `bracket.plan`, or the active roster), four starters, and a
+per-series rotation key so each series starts from the top. `runPostseason` plays it all
+at once (scripts, tests). Days past the regular season are dated from October 1.
+
 After the postseason, `beginOffseason` (src/offseason/offseason.ts) records careers,
 awards and history, develops and ages everyone (src/players/development.ts), retires
 some, re-centers the grades and rolls contracts; `advanceOffseason` then steps through

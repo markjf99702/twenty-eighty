@@ -3,6 +3,9 @@
  * last names stay plausible together, and the regional mix loosely follows a
  * modern big-league clubhouse.
  */
+import { Rng } from "../core/rng";
+import type { League } from "../league/types";
+import type { Player } from "./types";
 
 interface NamePool {
   weight: number;
@@ -108,6 +111,24 @@ const REAL_NAME_BLOCKLIST = new Set([
   "Adam Jones", "Chris Davis", "Ryan Howard", "David Wright", "Josh Hamilton", "Matt Kemp",
   "Adrián González", "Carlos Martínez", "Kenta Maeda", "Kodai Senga", "Hyun-woo Kim", "Ji-ho Park",
   "Dylan Moore", "Wade Miller", "Will Smith", "Chase Anderson", "Jake Cronenworth", "Max Scherzer",
+  // Legends, and the stars of the day.
+  "Nolan Ryan", "Babe Ruth", "Willie Mays", "Hank Aaron", "Mike Trout", "Derek Jeter", "Ken Griffey", "Tony Gwynn",
+  "Joe Morgan", "Frank Thomas", "Randy Johnson", "Chipper Jones", "Andruw Jones", "Mariano Rivera", "Jim Thome", "Jim Palmer",
+  "Tom Seaver", "Bob Gibson", "Ernie Banks", "Mickey Mantle", "Ted Williams", "Cal Ripken", "Mike Schmidt", "George Brett",
+  "Johnny Bench", "Reggie Jackson", "Ozzie Smith", "Kirby Puckett", "Roberto Clemente", "Frank Robinson", "Jackie Robinson",
+  "Brooks Robinson", "Craig Biggio", "Jeff Bagwell", "Barry Larkin", "Tim Raines", "Rickey Henderson", "Dave Winfield",
+  "Eddie Murray", "Paul Molitor", "Wade Boggs", "Tony Pérez", "Juan Marichal", "Orlando Cepeda", "Luis Aparicio",
+  "Roberto Alomar", "Sandy Koufax", "Greg Maddux", "Tom Glavine", "John Smoltz", "Roy Halladay", "Mike Mussina",
+  "Larry Walker", "Scott Rolen", "Todd Helton", "Joe Mauer", "Adrián Beltré", "Mike Piazza", "Gary Carter", "Jim Rice",
+  "Andre Dawson", "Jack Morris", "Alan Trammell", "Dale Murphy", "Don Mattingly", "Mark McGwire", "Roger Clemens",
+  "Barry Bonds", "Alex Rodríguez", "Albert Pujols", "Ichiro Suzuki", "Hideki Matsui", "Yu Darvish", "Masahiro Tanaka",
+  "Seiya Suzuki", "Shota Imanaga", "Shohei Ohtani", "Hyun-jin Ryu", "Chan-ho Park", "Ha-seong Kim", "Jung-hoo Lee",
+  "Mookie Betts", "Freddie Freeman", "Corey Seager", "Paul Goldschmidt", "Nolan Arenado", "Manny Machado", "Pete Alonso",
+  "Matt Olson", "Kyle Schwarber", "José Abreu", "Gerrit Cole", "Clayton Kershaw", "Justin Verlander", "Jacob deGrom",
+  "Chris Sale", "Zack Wheeler", "Blake Snell", "Corbin Burnes", "Spencer Strider", "Tyler Glasnow", "Luis Robert",
+  "Bobby Witt", "Gunnar Henderson", "Adley Rutschman", "Julio Urías", "Carlos Correa", "Alex Bregman", "George Springer",
+  "Marcus Semien", "Trea Turner", "Bo Bichette", "Vladimir Guerrero", "Fernando Tatis", "Yordan Álvarez", "Rafael Devers",
+  "Xander Bogaerts", "Ryan Braun", "David Price", "Paul Skenes", "Jackson Holliday", "Elly De La Cruz", "Juan Pierre",
 ]);
 
 export interface GeneratedName {
@@ -119,12 +140,38 @@ export interface GeneratedName {
 
 const ORIGINS = ["US", "LATIN", "ASIA", "OTHER"] as const;
 
-export function randomName(rng: { next(): number; pick<T>(xs: readonly T[]): T; weightedIndex(ws: readonly number[]): number }): GeneratedName {
-  const i = rng.weightedIndex(POOLS.map((p) => p.weight));
+type NameRng = { next(): number; pick<T>(xs: readonly T[]): T; weightedIndex(ws: readonly number[]): number };
+
+function fromPool(rng: NameRng, i: number): GeneratedName {
   const pool = POOLS[i]!;
   for (;;) {
     const first = rng.pick(pool.first);
     const last = rng.pick(pool.last);
     if (!REAL_NAME_BLOCKLIST.has(`${first} ${last}`)) return { first, last, origin: ORIGINS[i]! };
+  }
+}
+
+export function randomName(rng: NameRng): GeneratedName {
+  return fromPool(rng, rng.weightedIndex(POOLS.map((p) => p.weight)));
+}
+
+/**
+ * Give a new player whose name an active player already has (or another new
+ * one does) a different name from the same pool, so no two players in the
+ * league share one. Each re-draw has its own seed, so it doesn't disturb any
+ * other random stream.
+ */
+export function uniqueNames(league: League, fresh: readonly Player[], context: string): void {
+  const own = new Set(fresh);
+  const taken = new Set<string>();
+  for (const p of league.players) if (!own.has(p) && p.retired === undefined) taken.add(`${p.firstName} ${p.lastName}`);
+  for (const p of fresh) {
+    for (let tries = 0; taken.has(`${p.firstName} ${p.lastName}`) && tries < 50; tries++) {
+      const pool = Math.max(0, POOLS.findIndex((x) => x.last.includes(p.lastName)));
+      const n = fromPool(new Rng(`${league.seed}:name:${context}:${p.id}:${tries}`), pool);
+      p.firstName = n.first;
+      p.lastName = n.last;
+    }
+    taken.add(`${p.firstName} ${p.lastName}`);
   }
 }

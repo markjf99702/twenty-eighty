@@ -9,6 +9,7 @@ import { autoDepthChart } from "../org/depth";
 import { defaultScouting } from "../scouting/scouting";
 import { playerValue } from "../org/value";
 import { generateHitter, generatePitcher } from "../players/generate";
+import { uniqueNames } from "../players/names";
 import type { FieldPosition, Level, MinorLevel, Player, ToolGrade } from "../players/types";
 import { FIELD_POSITIONS, MAX_OPTION_YEARS, MINOR_LEVELS, SERVICE_DAYS_PER_YEAR } from "../players/types";
 import { DEFAULT_STRUCTURE, FRANCHISES, type FranchiseSeed } from "./franchises";
@@ -350,6 +351,7 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     settings: { ...DEFAULT_SETTINGS },
     advice: [],
   };
+  uniqueNames(league, players, "start");
   recenterGrades(league);
   for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));
   league.scouting = defaultScouting(league, rng.fork("scouting"));
