@@ -1,3 +1,5 @@
+import type { PriorCareer } from "./prior";
+
 export type Hand = "L" | "R";
 export type BatSide = "L" | "R" | "S";
 
@@ -213,6 +215,8 @@ export interface Player {
   // --- Career ------------------------------------------------------------------
   /** Current contract (null for free agents and retired players). */
   contract: Contract | null;
+  /** Big-league totals from before the league's first season (generated; absent for everyone else). */
+  prior?: PriorCareer;
   /** Season-by-season lines at every level. */
   career: CareerLine[];
   /** Awards won, e.g. "2027 Continental League MVP". */

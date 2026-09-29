@@ -2,6 +2,7 @@
  * Messages between the UI and the simulation worker, and the view models the
  * worker sends back. Everything here is plain, structured-cloneable data.
  */
+import type { PriorCareer } from "../../../src/players/prior";
 import type { GameSettings } from "../../../src/league/settings";
 import type { DepthChart, TransactionType } from "../../../src/league/types";
 import type { OffseasonPhase } from "../../../src/offseason/types";
@@ -98,10 +99,12 @@ export interface StopRules {
   staff: boolean;
   /** The All-Star Game has been played. */
   allStar: boolean;
+  /** One of the user's players has a moment: a no-hitter, a cycle, a milestone, a record. */
+  moments: boolean;
 }
 
 export interface StopNote {
-  kind: "streak" | "injury" | "offer" | "deadline" | "staff" | "allstar";
+  kind: "streak" | "injury" | "offer" | "deadline" | "staff" | "allstar" | "moment";
   text: string;
   /** Where to look (a route hash). */
   href?: string;
@@ -315,6 +318,8 @@ export interface PlayerView {
   stats: StatLine[];
   transactions: { date: string; text: string }[];
   career: CareerLine[];
+  /** His big-league career before the league's first season, in total (generated). */
+  prior: PriorCareer | null;
   careerTeams: Record<number, string>;
   awards: string[];
   draft: string | null;
@@ -556,6 +561,8 @@ export interface OffseasonView {
     awards: AwardRow[];
     executives: ExecutiveRow[];
     allStar: AllStarLine | null;
+    /** This winter's Hall of Fame vote: who got in, and how many were on the ballot (null if no one was). */
+    hall: { elected: { playerId: number; name: string; vote: number }[]; candidates: number } | null;
     finish: string | null;
     record: string | null;
     risers: DevRow[];
@@ -769,6 +776,61 @@ export interface AllStarPitchRow {
   SO: number;
 }
 
+/** A no-hitter, a cycle, a milestone, a record: `mine` if it's the user's club. */
+export interface MomentView {
+  year: number;
+  date: string;
+  kind: string;
+  text: string;
+  playerId: number;
+  team: string;
+  mine: boolean;
+  /** The box score, while it's still kept. */
+  box: string | null;
+}
+
+export interface RecordRowView {
+  value: string;
+  name: string;
+  playerId: number | null;
+  legendId: number | null;
+  /** The season, or a career's span. */
+  when: string;
+  team: string;
+  active: boolean;
+  live: boolean;
+  mine: boolean;
+}
+
+/** The record book: season or career records, league-wide or for one club; or the moments. */
+export interface RecordsView {
+  /** "League" or the club's name. */
+  scope: string;
+  teams: { id: number; name: string }[];
+  since: number;
+  categories: { stat: string; label: string; pitching: boolean; rows: RecordRowView[] }[];
+  moments: MomentView[];
+}
+
+export interface HallPlaque {
+  name: string;
+  playerId: number | null;
+  legendId: number | null;
+  pos: string;
+  years: string;
+  team: string;
+  line: string;
+  inducted: number;
+  vote: number;
+  /** Played for the user's club (in the league's seasons), or is the club's legend. */
+  mine: boolean;
+}
+
+export interface HallView {
+  members: HallPlaque[];
+  ballot: { year: number; entries: { playerId: number; name: string; pos: string; line: string; vote: number; ballot: number; elected: boolean; dropped: boolean }[] } | null;
+}
+
 /** This season's All-Star Game: the box score, both rosters and the user's All-Stars. */
 export interface AllStarView {
   year: number;
@@ -920,6 +982,9 @@ export interface Api {
   setPace: { req: { msPerDay: number }; res: { ok: boolean } };
   setStops: { req: StopRules; res: { ok: boolean } };
   allStar: { req: void; res: AllStarView | null };
+  records: { req: { kind: "season" | "career" | "moments"; teamId: number | null }; res: RecordsView };
+  hall: { req: void; res: HallView };
+  moments: { req: { limit: number }; res: MomentView[] };
   playoffs: { req: void; res: Status };
   /** Play October on: through the user's next game, to the end of the round, or to the end. */
   playPostseason: { req: { step: "game" | "round" | "all" }; res: { status: Status; games: { recap: string; after: string; mine: boolean }[] } };

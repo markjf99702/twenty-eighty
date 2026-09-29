@@ -17,6 +17,8 @@ export type Route =
   | { page: "moves"; mine: boolean }
   | { page: "playoffs" }
   | { page: "allstar" }
+  | { page: "records"; kind: "season" | "career" | "moments"; teamId: number | null }
+  | { page: "hall" }
   | { page: "winter" }
   | { page: "trades"; partnerId: number | null; block?: BlockSlug }
   | { page: "history" }
@@ -54,6 +56,12 @@ export function parse(hash: string): Route {
       return { page: "playoffs" };
     case "allstar":
       return { page: "allstar" };
+    case "records": {
+      const kind = a === "career" || a === "moments" ? a : "season";
+      return { page: "records", kind, teamId: n(b) };
+    }
+    case "hall":
+      return { page: "hall" };
     case "office":
       return { page: "office" };
     case "winter":
@@ -97,6 +105,10 @@ export function href(r: Route): string {
       return "#playoffs";
     case "allstar":
       return "#allstar";
+    case "records":
+      return r.kind === "season" && r.teamId === null ? "#records" : `#records-${r.kind}${r.teamId === null ? "" : `-${r.teamId}`}`;
+    case "hall":
+      return "#hall";
     case "office":
       return "#office";
     case "winter":

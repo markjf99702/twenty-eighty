@@ -174,6 +174,20 @@ function Review({ v }: { v: OffseasonView }) {
           )}
         </div>
       )}
+      {r.hall && (
+        <div class="note">
+          <b>Hall of Fame:</b>{" "}
+          {r.hall.elected.length === 0
+            ? `the writers elected no one from a ballot of ${r.hall.candidates}.`
+            : r.hall.elected.map((e, i) => (
+                <span key={e.playerId}>
+                  {i > 0 ? (i === r.hall!.elected.length - 1 ? " and " : ", ") : ""}
+                  <a href={playerHref(e.playerId)}>{e.name}</a> ({e.vote.toFixed(1)}%)
+                </span>
+              ))}
+          {r.hall.elected.length > 0 && (r.hall.elected.length === 1 ? " is in." : " are in.")} <a href={href({ page: "hall" })}>The ballot</a>
+        </div>
+      )}
       <AwardsBlock awards={r.awards} executives={r.executives} allStar={r.allStar} />
       <div class="grid-2">
         <DevTable rows={r.risers} title="Winter risers" />

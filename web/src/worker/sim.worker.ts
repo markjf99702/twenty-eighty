@@ -58,6 +58,7 @@ import {
 } from "../../../src/season/postseason";
 import { playoffPlanView, postseasonView } from "./october";
 import { allStarLine, allStarView } from "./allstar";
+import { hallView, momentViews, recordsView } from "./records";
 import { Season } from "../../../src/season/season";
 import type {
   Api,
@@ -107,7 +108,7 @@ let stopRequested = false;
 /** Minimum wall-clock time per simulated day (the user's sim speed). */
 let msPerDay = 0;
 /** When a running sim stops by itself. */
-let stops: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true, allStar: true };
+let stops: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true, allStar: true, moments: true };
 
 /** What the user's staff makes of an offer ("Take it", "Worth a look", "Pass"); null with staff advice off. */
 function offerVerdict(s: Season, o: League["tradeOffers"][number]): "take" | "consider" | "pass" | null {
@@ -119,7 +120,7 @@ function offerVerdict(s: Season, o: League["tradeOffers"][number]): "take" | "co
 const VERDICT_LINE = { take: "Your staff says take it.", consider: "Your staff thinks it's worth a look.", pass: "Your staff would pass." } as const;
 
 /** What the day just played changed that the user asked to be stopped for. */
-function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: number; allStar: boolean }): StopNote | null {
+function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: number; allStar: boolean; moments: number }): StopNote | null {
   const league = s.league;
   const user = league.userTeamId;
   if (user === null) return null;
@@ -146,6 +147,10 @@ function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak:
   const streak = s.records[user]!.streak;
   if (stops.streak > 0 && streak === -stops.streak && before.streak !== streak) {
     return { kind: "streak", text: `The ${team.nickname} have lost ${stops.streak} straight.`, href: "#home" };
+  }
+  if (stops.moments) {
+    const m = league.moments.slice(before.moments).find((x) => x.teamId === user);
+    if (m) return { kind: "moment", text: m.text, href: m.box ? `#box-${m.box}` : `#player-${m.playerId}` };
   }
   if (stops.allStar && s.allStar && !before.allStar) {
     const line = allStarLine(league, { leagues: s.allStar.leagues, score: s.allStar.score, host: s.allStar.host, mvp: s.allStar.mvp, note: s.allStar.mvpNote })!;
@@ -452,6 +457,7 @@ const handlers: Handlers = {
           start,
           notes: s.league.advice.length,
           allStar: s.allStar !== null,
+          moments: s.league.moments.length,
         };
         s.simDay();
         progress(s.day - start, target - start);
@@ -808,6 +814,18 @@ const handlers: Handlers = {
     if (res.ok && accept) stats.clear();
     persistSoon();
     return res.ok && accept ? { ...res, warning: rosterWarning(userTeam()) } : res;
+  },
+
+  records({ kind, teamId }) {
+    return recordsView(requireSeason(), kind, teamId, boxes);
+  },
+
+  hall() {
+    return hallView(requireSeason());
+  },
+
+  moments({ limit }) {
+    return momentViews(requireSeason(), limit, boxes);
   },
 
   allStar() {

@@ -1,3 +1,4 @@
+import { MomentList } from "./Records";
 import { useApi } from "../../api/client";
 import type { GameItem, Status, TransactionItem } from "../../api/protocol";
 import { ErrorNote, Loading, Section } from "../components/Common";
@@ -117,6 +118,18 @@ export function Wire({ items, showClub = true }: { items: TransactionItem[]; sho
         </div>
       ))}
     </div>
+  );
+}
+
+/** The latest moments around the league: no-hitters, cycles, milestones, records. */
+function MomentsCard() {
+  const view = useApi("moments", { limit: 6 });
+  const moments = view.data ?? [];
+  if (moments.length === 0) return null;
+  return (
+    <Section title="Around the league" aside={<a href={href({ page: "records", kind: "moments", teamId: null })}>Record book</a>}>
+      <MomentList moments={moments} />
+    </Section>
   );
 }
 
@@ -272,6 +285,7 @@ export function Dashboard({ status }: { status: Status }) {
       </div>
 
       {status.settings?.advice !== false && <StaffCard />}
+      <MomentsCard />
       {status.owner && <Boardroom />}
 
       <div class="grid-2">

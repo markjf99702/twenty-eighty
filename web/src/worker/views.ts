@@ -736,6 +736,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
       .reverse()
       .map((t) => ({ date: `${dateLabel(season, t.day)}${t.year !== league.year ? ` ${t.year + (t.day > 280 ? 1 : 0)}` : ""}`, text: t.text })),
     career: p.career,
+    prior: p.prior ?? null,
     careerTeams,
     awards: condenseAwards(p.awards),
     draft,

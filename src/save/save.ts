@@ -20,7 +20,7 @@ import { migrateLeague } from "./migrate";
  */
 
 export const SAVE_FORMAT = "twenty-eighty-save";
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 
 interface PackedBook {
   keys: string[];
@@ -55,6 +55,8 @@ export interface SeasonState {
   /** The postseason as it's played (absent in saves made before it was played game by game). */
   bracket?: Bracket | null;
   allStar?: AllStarGame | null;
+  /** Hitting streaks in progress (absent in saves made before moments were kept). */
+  streaks?: [number, number][];
   levels: Record<Level, LevelState>;
 }
 
@@ -132,6 +134,7 @@ export function saveGame(league: League, season: Season | null): SaveGame {
       postseason: season.postseason,
       bracket: season.bracket,
       allStar: season.allStar,
+      streaks: [...season.streaks],
       levels,
     };
   }
@@ -156,6 +159,7 @@ export function loadGame(save: SaveGame): { league: League; season: Season | nul
   season.postseason = s.postseason;
   season.bracket = s.bracket ?? null;
   season.allStar = s.allStar ?? null;
+  for (const [id, n] of s.streaks ?? []) season.streaks.set(id, n);
   for (const level of LEVELS) {
     const ls = season.levels[level];
     const st = s.levels[level];

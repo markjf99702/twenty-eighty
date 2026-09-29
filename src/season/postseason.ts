@@ -9,6 +9,7 @@ import { believedWar } from "../scouting/analytics";
 import type { GameResult } from "../sim/game";
 import { simulateGame } from "../sim/game";
 import { inningsPitched } from "../stats/lines";
+import { noteMoments } from "./moments";
 import type { GameSummary, Season, TeamRecord } from "./season";
 
 /**
@@ -368,6 +369,7 @@ function playGame(season: Season, b: Bracket, s: LiveSeries): PostGame {
   const homeWon = result.score[1] > result.score[0];
   s.wins[(homeWon ? home.id : away.id) === s.higher ? 0 : 1]++;
   tallyGame(s, result);
+  noteMoments(season, result, day, `in Game ${g + 1} of the ${s.round}`);
   const game: PostGame = {
     day,
     awayId: away.id,

@@ -1,3 +1,6 @@
+import type { HallOfFame } from "../offseason/hall";
+import type { Moment } from "../season/moments";
+import type { Legend } from "./legends";
 import type { GmState, Owner, TeamFinance } from "../finance/types";
 import type { OffseasonState } from "../offseason/types";
 import type { GameSettings } from "./settings";
@@ -133,6 +136,12 @@ export interface League {
   settings: GameSettings;
   /** Notes from the user's staff, newest last. */
   advice: AdviceNote[];
+  /** No-hitters, cycles, streaks, milestones and records, newest last. */
+  moments: Moment[];
+  /** The greats who played before the first simulated season. */
+  legends: Legend[];
+  /** The Hall of Fame: its members and each winter's ballot. */
+  hall: HallOfFame;
 }
 
 /** A note from someone on the user's staff. */

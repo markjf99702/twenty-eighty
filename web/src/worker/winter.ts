@@ -24,6 +24,16 @@ import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
 
 const abbrev = (league: League, id: number | null) => (id === null ? "FA" : (league.teams[id]?.abbrev ?? "FA"));
 
+/** The Hall of Fame vote held this winter. */
+function hallResult(league: League, year: number): NonNullable<OffseasonView["review"]>["hall"] {
+  const b = league.hall.ballots.find((x) => x.year === year);
+  if (!b) return null;
+  return {
+    elected: b.entries.filter((e) => e.elected).map((e) => ({ playerId: e.playerId, name: playerName(league.players[e.playerId]!), vote: e.vote })),
+    candidates: b.entries.length,
+  };
+}
+
 export function offseasonView(season: Season, stats: StatsCache): OffseasonView | null {
   const league = season.league;
   const w = league.offseason;
@@ -51,6 +61,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
       awards: awardRows(league, h.awards),
       executives: executiveRows(league, h),
       allStar: allStarLine(league, h.allStar),
+      hall: hallResult(league, h.year),
       finish: mine?.finish ?? null,
       record: mine ? `${mine.w}-${mine.l}` : null,
       risers: dev(w.development.risers),

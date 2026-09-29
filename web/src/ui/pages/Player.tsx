@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
+import type { PriorCareer } from "../../../../src/players/prior";
 import type { CareerLine, PlayerView, StatLine, Status } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeBar, PresentFuture } from "../components/Grade";
@@ -222,9 +223,9 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
         {v.stats.length === 0 ? <div class="empty">No games yet this season.</div> : pitcher ? <PitchingStats rows={v.stats} /> : <HittingStats rows={v.stats} />}
       </Section>
 
-      {v.career.length > 0 && (
+      {(v.career.length > 0 || v.prior) && (
         <Section title="Career">
-          <Career lines={v.career} teams={v.careerTeams} pitcher={pitcher} />
+          <Career lines={v.career} prior={v.prior} teams={v.careerTeams} pitcher={pitcher} />
         </Section>
       )}
 
@@ -373,17 +374,29 @@ function PitchingStats({ rows }: { rows: StatLine[] }) {
   );
 }
 
-function Career({ lines, teams, pitcher }: { lines: CareerLine[]; teams: Record<number, string>; pitcher: boolean }) {
+/** "2014–2025" for a prior career (his big-league seasons before the league's first). */
+const priorSpan = (prior: PriorCareer) => (prior.seasons > 1 ? `${prior.from}–${prior.from + prior.seasons - 1}` : `${prior.from}`);
+
+function Career({ lines, prior, teams, pitcher }: { lines: CareerLine[]; prior: PriorCareer | null; teams: Record<number, string>; pitcher: boolean }) {
   const team = (id: number | null) => (id === null ? "—" : (teams[id] ?? "—"));
   const mlb = lines.filter((l) => l.level === "MLB");
+  const seasons = mlb.length + (prior ? 1 : 0);
+  const before = (
+    <>
+      <td class="num">{prior ? priorSpan(prior) : ""}</td>
+      <td>MLB</td>
+      <td class="dim">Before the league</td>
+    </>
+  );
   if (pitcher) {
     const rows = lines.filter((l) => l.pit);
+    const q = prior?.pit;
     const tot = mlb.reduce(
       (a, l) => {
         const x = l.pit!;
         return { G: a.G + x.G, W: a.W + x.W, L: a.L + x.L, SV: a.SV + x.SV, outs: a.outs + x.outs, ER: a.ER + x.ER, SO: a.SO + x.SO, BB: a.BB + x.BB, WAR: a.WAR + x.WAR };
       },
-      { G: 0, W: 0, L: 0, SV: 0, outs: 0, ER: 0, SO: 0, BB: 0, WAR: 0 },
+      q ? { G: q.G, W: q.W, L: q.L, SV: q.SV, outs: q.outs, ER: q.ER, SO: q.SO, BB: q.BB, WAR: q.WAR } : { G: 0, W: 0, L: 0, SV: 0, outs: 0, ER: 0, SO: 0, BB: 0, WAR: 0 },
     );
     return (
       <div class="tbl-wrap">
@@ -406,6 +419,23 @@ function Career({ lines, teams, pitcher }: { lines: CareerLine[]; teams: Record<
             </tr>
           </thead>
           <tbody>
+            {q && (
+              <tr class="prior-row">
+                {before}
+                <td class="num">{q.G}</td>
+                <td class="num">{q.GS}</td>
+                <td class="num">
+                  {q.W}-{q.L}
+                </td>
+                <td class="num">{q.SV}</td>
+                <td class="num">{ip(q.outs / 3)}</td>
+                <td class="num">{q.outs ? fixed((27 * q.ER) / q.outs, 2) : "—"}</td>
+                <td />
+                <td class="num">{q.SO}</td>
+                <td class="num">{q.BB}</td>
+                <td class="num">{fixed(q.WAR)}</td>
+              </tr>
+            )}
             {rows.map((l) => (
               <tr key={`${l.year}-${l.level}`}>
                 <td class="num">{l.year}</td>
@@ -425,7 +455,7 @@ function Career({ lines, teams, pitcher }: { lines: CareerLine[]; teams: Record<
                 <td class="num">{fixed(l.pit!.WAR)}</td>
               </tr>
             ))}
-            {mlb.length > 1 && (
+            {seasons > 1 && (
               <tr>
                 <td class="name" colSpan={3}>
                   Major league totals
@@ -450,12 +480,13 @@ function Career({ lines, teams, pitcher }: { lines: CareerLine[]; teams: Record<
     );
   }
   const rows = lines.filter((l) => l.bat);
+  const b = prior?.bat;
   const tot = mlb.reduce(
     (a, l) => {
       const x = l.bat!;
       return { G: a.G + x.G, PA: a.PA + x.PA, AB: a.AB + x.AB, H: a.H + x.H, HR: a.HR + x.HR, RBI: a.RBI + x.RBI, SB: a.SB + x.SB, WAR: a.WAR + x.WAR };
     },
-    { G: 0, PA: 0, AB: 0, H: 0, HR: 0, RBI: 0, SB: 0, WAR: 0 },
+    b ? { G: b.G, PA: b.PA, AB: b.AB, H: b.H, HR: b.HR, RBI: b.RBI, SB: b.SB, WAR: b.WAR } : { G: 0, PA: 0, AB: 0, H: 0, HR: 0, RBI: 0, SB: 0, WAR: 0 },
   );
   return (
     <div class="tbl-wrap">
@@ -478,6 +509,21 @@ function Career({ lines, teams, pitcher }: { lines: CareerLine[]; teams: Record<
           </tr>
         </thead>
         <tbody>
+          {b && (
+            <tr class="prior-row">
+              {before}
+              <td class="num">{b.G}</td>
+              <td class="num">{b.PA}</td>
+              <td class="num">{rate3(b.AB ? b.H / b.AB : 0)}</td>
+              <td class="num">{b.HR}</td>
+              <td class="num">{b.RBI}</td>
+              <td class="num">{b.SB}</td>
+              <td class="num">{b.BB}</td>
+              <td />
+              <td />
+              <td class="num">{fixed(b.WAR)}</td>
+            </tr>
+          )}
           {rows.map((l) => (
             <tr key={`${l.year}-${l.level}`}>
               <td class="num">{l.year}</td>
@@ -495,7 +541,7 @@ function Career({ lines, teams, pitcher }: { lines: CareerLine[]; teams: Record<
               <td class="num">{fixed(l.bat!.WAR)}</td>
             </tr>
           ))}
-          {mlb.length > 1 && (
+          {seasons > 1 && (
             <tr>
               <td class="name" colSpan={3}>
                 Major league totals

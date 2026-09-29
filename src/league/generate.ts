@@ -1,3 +1,6 @@
+import { foundingHall } from "../offseason/hall";
+import { generateLegends } from "./legends";
+import { generatePriors } from "../players/prior";
 import { clampGrade } from "../core/grades";
 import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
@@ -350,11 +353,17 @@ export function generateLeague(opts: GenerateLeagueOptions): League {
     tradeOffers: [],
     settings: { ...DEFAULT_SETTINGS },
     advice: [],
+    moments: [],
+    legends: [],
+    hall: { members: [], ballots: [] },
   };
   uniqueNames(league, players, "start");
   recenterGrades(league);
   for (const t of teams) t.depth = autoDepthChart(t.rosters.MLB.map((pid) => players[pid]!));
   league.scouting = defaultScouting(league, rng.fork("scouting"));
   assignInitialContracts(league, rng.fork("contracts"));
+  generatePriors(league.players, league.year, rng.fork("prior"));
+  league.legends = generateLegends(league);
+  league.hall = foundingHall(league.legends);
   return league;
 }

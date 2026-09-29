@@ -46,6 +46,7 @@ import { batRow, pitRow, RECENT_GAMES, RecentLog } from "../stats/recent";
 import { RunTracker } from "../stats/runExpectancy";
 import type { Bracket, PostseasonResult } from "./postseason";
 import { type AllStarGame, playAllStarGame } from "./allstar";
+import { closeStreaks, noteMoments, watch } from "./moments";
 import { buildSchedule, type Schedule } from "./schedule";
 import { StaffTracker } from "./staff";
 
@@ -318,6 +319,8 @@ export class Season {
   bracket: Bracket | null = null;
   /** The All-Star Game, once it's been played at the break. */
   allStar: AllStarGame | null = null;
+  /** Hitting streaks in progress: consecutive games with a hit, by player. */
+  streaks = new Map<number, number>();
   /** Called with every finished game (the UI keeps recent box scores). */
   onGame?: (level: Level, result: GameResult, day: number) => void;
   readonly levels: Record<Level, LevelSeason>;
@@ -630,6 +633,7 @@ export class Season {
     this.heal();
     this.manageRosters();
     if (day === this.schedule.allStarDay && !this.allStar) this.allStar = playAllStarGame(this);
+    watch(this);
 
     const out: GameSummary[] = [];
     const levels: Level[] = this.simulateMinors ? [...LEVELS] : ["MLB"];
@@ -645,6 +649,7 @@ export class Season {
         this.staff.record(result.pitchCounts, day);
         this.applyInjuries(result, level);
         const summary = ls.absorb(result, day);
+        if (level === "MLB") noteMoments(this, result, day);
         this.onGame?.(level, result, day);
         if (level === "MLB") {
           bookGate(home, fans);
@@ -653,6 +658,7 @@ export class Season {
         }
       }
     }
+    if (day === this.schedule.days.length - 1) closeStreaks(this);
     this.accrueService();
     accrueDay(this);
     ownerCheckIn(this);

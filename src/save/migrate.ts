@@ -1,3 +1,6 @@
+import { generateLegends } from "../league/legends";
+import { foundingHall } from "../offseason/hall";
+import { generatePriors } from "../players/prior";
 import { Rng } from "../core/rng";
 import type { League } from "../league/types";
 import { createFinance } from "../finance/finance";
@@ -11,7 +14,8 @@ import { defaultScouting } from "../scouting/scouting";
  * league history: those start fresh, with contracts assigned the way a new
  * universe's are. Version 2 predates scouting departments; version 3
  * predates finances and owners; version 4, trade offers; version 5, settings
- * and staff advice.
+ * and staff advice; version 6, moments, legends and the Hall of Fame (with
+ * veterans' careers from before the first season).
  */
 export function migrateLeague(league: League, fromVersion: number): void {
   if (fromVersion < 2) {
@@ -56,5 +60,13 @@ export function migrateLeague(league: League, fromVersion: number): void {
     const l = league as Partial<League> & League;
     l.settings ??= { ...DEFAULT_SETTINGS };
     l.advice ??= [];
+  }
+  if (fromVersion < 7) {
+    // The league gets a past: veterans' careers before the first season, the legends and their records, the Hall of Fame.
+    const l = league as Partial<League> & League;
+    l.moments ??= [];
+    generatePriors(league.players, league.offseason ? league.year + 1 : league.year, new Rng(`${league.seed}:prior`));
+    l.legends ??= generateLegends(league);
+    l.hall ??= foundingHall(l.legends);
   }
 }

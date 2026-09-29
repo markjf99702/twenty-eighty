@@ -53,6 +53,19 @@ and never absorbed into stats, fatigue or injuries. Season awards are `seasonAwa
 `executiveAwards` in src/offseason/history.ts; `mainPosition` (allstar.ts) is a player's
 most-played position from his fielding line.
 
+The league's past: `generatePriors` (src/players/prior.ts) gives veterans `p.prior`, a
+generated big-league career before the first season (rates fit by scripts/prior-fit.ts);
+`generateLegends` (src/league/legends.ts) makes `league.legends`, who hold the seeded
+records and are the founding `league.hall` members. `careerTotals` (src/stats/career.ts)
+adds prior + MLB career lines + the live season; the record book is `seasonRecords` /
+`careerRecords` (src/stats/records.ts; share a `careerTable` when building several boards).
+`noteMoments` (src/season/moments.ts) runs after every MLB game (and postseason game, with
+a context) and appends to `league.moments`; `watch(season)` caches the career bases and the
+record marks per Season object (a WeakMap, rebuilt after a reload) and `season.streaks`
+(saved) holds hitting streaks, closed by `closeStreaks` on the last day. The Hall vote is
+`holdHallVote` (src/offseason/hall.ts) in `beginOffseason`. Save version 7 migrates older
+leagues by generating all of it.
+
 The postseason (src/season/postseason.ts) is played a day at a time: `startPostseason`
 seeds `season.bracket` (saved), `playPostseasonDay`/`playPostseason(step)` play it on, and
 when the World Series ends it writes `season.postseason`, the result everything else reads

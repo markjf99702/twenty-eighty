@@ -49,6 +49,23 @@ describe("a simulated season", () => {
     expect(g.mvp).not.toBeNull();
   });
 
+  it("notices the season's moments", () => {
+    const league = season.league;
+    const moments = league.moments.filter((m) => m.year === league.year);
+    expect(moments.length).toBeGreaterThan(5);
+    for (const m of moments) {
+      expect(m.text).toContain(league.players[m.playerId]!.lastName);
+      expect(m.day).toBeLessThan(season.totalDays);
+    }
+    // A no-hitter is nine innings without a hit.
+    for (const m of moments.filter((x) => x.kind === "no-hitter" || x.kind === "perfect-game")) {
+      const g = season.games.find((x) => x.day === m.day && `${m.day}-${x.homeId}` === m.box)!;
+      expect(g.hits).toContain(0);
+    }
+    // Streaks still going at the end of the season were closed out.
+    expect(season.streaks.size).toBe(0);
+  });
+
   it("looks like modern MLB", () => {
     expect(m["R/G"]).toBeGreaterThan(3.9);
     expect(m["R/G"]).toBeLessThan(4.9);

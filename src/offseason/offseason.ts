@@ -1,3 +1,4 @@
+import { holdHallVote } from "./hall";
 import { winterAdvice } from "../advice/advice";
 import { clamp } from "../core/math";
 import { closeBooks, priceTickets } from "../finance/finance";
@@ -197,6 +198,7 @@ export function beginOffseason(league: League, season: Season): OffseasonState {
   clearAmateurLooks(league);
   recordCareers(league, season);
   recordHistory(league, season, seasonAwards(league, season));
+  holdHallVote(league, winterRng(league, "hall"));
   // The owner reviews the season, then the books close and next year's budgets are set.
   reviewSeason(league, season);
   closeBooks(league, season);

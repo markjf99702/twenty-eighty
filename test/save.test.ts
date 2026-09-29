@@ -24,6 +24,9 @@ describe("save and load", () => {
     expect(a.H).toBe(b.H);
     expect(a.HR).toBe(b.HR);
     expect(restored.league.transactions.length).toBe(original.league.transactions.length);
+    // Hitting streaks and the moments carry on as if nothing happened.
+    expect([...restored.streaks].sort()).toEqual([...original.streaks].sort());
+    expect(restored.league.moments).toEqual(original.league.moments);
     // Recent-form logs come back too, capped at the last 15 games per player.
     const someone = [...original.levels.MLB.recentBat.rows.keys()][0]!;
     expect(restored.levels.MLB.recentBat.rows.get(someone)).toEqual(original.levels.MLB.recentBat.rows.get(someone));

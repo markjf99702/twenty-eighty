@@ -18,6 +18,8 @@ import { StatsPage } from "./pages/Stats";
 import { TeamPage } from "./pages/Team";
 import { History } from "./pages/History";
 import { AllStar } from "./pages/AllStar";
+import { Hall } from "./pages/Hall";
+import { Records } from "./pages/Records";
 import { Scouting } from "./pages/Scouting";
 import { Finances } from "./pages/Finances";
 import { Owner } from "./pages/Owner";
@@ -44,7 +46,7 @@ const PACE_KEY = "twenty-eighty.pace";
 const paceMs = (p: Pace) => PACES.find((x) => x.key === p)!.ms;
 
 const STOPS_KEY = "twenty-eighty.stops";
-const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true, allStar: true };
+const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true, allStar: true, moments: true };
 
 function storedStops(): StopRules {
   try {
@@ -296,7 +298,7 @@ export function App() {
             <span class="t">{stopNote.text}</span>
             {stopNote.href && (
               <a class="btn small" href={stopNote.href} onClick={() => setStopNote(null)}>
-                {stopNote.kind === "offer" || stopNote.kind === "deadline" ? "Trade desk" : stopNote.kind === "injury" ? "See him" : stopNote.kind === "staff" ? "Take a look" : stopNote.kind === "allstar" ? "Box score" : "Your club"}
+                {stopNote.kind === "offer" || stopNote.kind === "deadline" ? "Trade desk" : stopNote.kind === "injury" ? "See him" : stopNote.kind === "staff" ? "Take a look" : stopNote.kind === "allstar" ? "Box score" : stopNote.kind === "moment" ? "Take a look" : "Your club"}
               </a>
             )}
             <button type="button" class="btn ghost small" aria-label="Dismiss" onClick={() => setStopNote(null)}>
@@ -345,6 +347,10 @@ function Page({
       return <Postseason status={status} />;
     case "allstar":
       return <AllStar />;
+    case "records":
+      return <Records kind={route.kind} teamId={route.teamId} />;
+    case "hall":
+      return <Hall />;
     case "office":
       return <Office status={status} onStatus={onStatus} />;
     case "winter":
@@ -561,7 +567,7 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
     };
   }, [open]);
   const count =
-    (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer !== "off" ? 1 : 0) + (stops.deadline ? 1 : 0) + (stops.staff ? 1 : 0) + (stops.allStar ? 1 : 0);
+    (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer !== "off" ? 1 : 0) + (stops.deadline ? 1 : 0) + (stops.staff ? 1 : 0) + (stops.allStar ? 1 : 0) + (stops.moments ? 1 : 0);
   const set = (patch: Partial<StopRules>) => onChange({ ...stops, ...patch });
   return (
     <div class="stops" ref={ref}>
@@ -616,6 +622,10 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
           <label>
             <input type="checkbox" checked={stops.allStar} onChange={(e) => set({ allStar: (e.target as HTMLInputElement).checked })} />
             <span>The All-Star Game has been played (mid-July)</span>
+          </label>
+          <label>
+            <input type="checkbox" checked={stops.moments} onChange={(e) => set({ moments: (e.target as HTMLInputElement).checked })} />
+            <span>One of my players has a moment: a no-hitter, a cycle, a milestone, a record</span>
           </label>
           <label>
             <input type="checkbox" checked={stops.staff} onChange={(e) => set({ staff: (e.target as HTMLInputElement).checked })} />
@@ -676,6 +686,7 @@ function Rail({ status, route }: { status: Status; route: Route }) {
         ]
       : []),
     { to: { page: "history" }, label: "History", on: route.page === "history" },
+    { to: { page: "records", kind: "season", teamId: null }, label: "Record book", on: route.page === "records" || route.page === "hall" },
     ...(status.phase === "done" || status.phase === "postseason" || status.phase === "offseason"
       ? [{ to: { page: "playoffs" } as Route, label: "Postseason", on: route.page === "playoffs" }]
       : []),

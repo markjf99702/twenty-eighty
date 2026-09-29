@@ -20,10 +20,13 @@ be wrong, the owner has goals, and 29 other front offices are doing the same thi
 - **Two grades for every tool**, now and at his peak, on the 20-80 scale. Your scouts see them with an
   error that shrinks with a bigger scouting budget and more looks.
 - **Sim a day, a week, a month or the rest of the season** at a pace you can watch, with stops for a
-  losing streak, an injury, a trade offer, the deadline or the All-Star Game.
+  losing streak, an injury, a trade offer, the deadline, the All-Star Game or a moment of your own.
 - **An All-Star Game and a trophy case**: a mid-July break, both leagues' All-Stars in a box
   score, and each winter an MVP, Cy Young, Rookie and Reliever of the Year, Gold Gloves and
   Silver Sluggers at every position, and an Executive of the Year (maybe you).
+- **A past, a record book and a Hall of Fame**: veterans arrive with the careers their service time
+  implies, legends from before the first season hold the records, and moments (no-hitters, cycles,
+  hitting streaks, milestones, records falling) are noticed as they happen.
 - **The moves a real GM makes**: call-ups and options, the 40-man roster, trades (clubs call you too),
   the draft, free agency, international signings, arbitration and contract extensions.
 - **An owner with goals and a budget**, ticket prices and a club's books. Fall far enough short and
@@ -170,14 +173,37 @@ the GM:
   pause the sim by themselves when your club loses a set number in a row, a big
   leaguer goes down for injured-list time, a club makes you a trade offer your staff
   doesn't pass on (or any offer, if you'd rather), it's trade deadline day (with the day
-  still to play), the All-Star Game has been played, or your staff has something urgent,
-  and a note says why it stopped.
+  still to play), the All-Star Game has been played, one of your players has a moment
+  (a no-hitter, a cycle, a milestone, a record), or your staff has something urgent, and
+  a note says why it stopped.
   Offers that don't stop the sim still wait on the trade desk.
 - **Front office**: record, division race, recent games, club leaders, injuries, your top
   prospects, your moves, and the league's headlines: trades, extensions, big free-agent
   deals, top picks and top prospects' debuts, injuries that change a season. The full
   wire (every big-league move, or everything down to minor league shuffles) is a click
-  away. For two weeks after the All-Star Game, its score, MVP and your All-Stars.
+  away. For two weeks after the All-Star Game, its score, MVP and your All-Stars. **Around
+  the league** lists the latest moments.
+- **Moments**, noticed game by game: no-hitters and perfect games (combined ones too; nine
+  innings or more without a hit), cycles, four-homer games, 17-strikeout games, hitting
+  streaks from 25 games on, career milestones (300/400/500 homers, 2,000 hits, 200 wins,
+  2,500 strikeouts, 300 saves and up), 50-homer and 20-win seasons, and records tied or
+  broken, in October too.
+- **The league's past.** Veterans arrive with big-league careers from before the first
+  season, as long as their service time says, drawn from their grades as they were at
+  each age (a gentle aging curve back from today) at rates fit to the engine's own
+  seasons (`scripts/prior-fit.ts`); a player's page shows them as one "before the league"
+  line. Two dozen fictional **legends** played before that: they hold the records (set just
+  above what the engine's best seasons reach, so one falls now and then) and they're the
+  Hall of Fame's first members.
+- **Record book**: the ten best single seasons and careers in home runs, RBI, hits, steals,
+  average, WAR and the longest hitting streak, and wins, strikeouts, saves, ERA and WAR,
+  league-wide or for one club, legends and this season (still being played, with an
+  asterisk) included; and every moment, year by year.
+- **Hall of Fame**: each winter the writers vote on players who retired two winters before
+  with ten or more seasons and a real case. They weigh WAR, MVPs, Cy Youngs and All-Star
+  teams, and the round numbers (500 homers, 3,000 hits, 300 wins, 3,000 strikeouts, saves);
+  75% gets a player in, under 5% or ten years on the ballot and he's off. The season review
+  names the new class; the Hall shows the ballot and every member's plaque.
 - **The All-Star Game**: the schedule breaks for four days from July 14 (no series runs
   across it), and the game is on the second. The fans vote in the starters at each
   position (first-half WAR, with a thumb on the scale for homers and average), the best
