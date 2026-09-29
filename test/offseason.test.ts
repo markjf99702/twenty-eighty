@@ -29,7 +29,14 @@ describe("the offseason", () => {
     const h = league.history[0]!;
     expect(h.year).toBe(year);
     expect(h.champion).toBe(season.postseason!.champion);
-    expect(h.awards.map((a) => a.name).sort()).toEqual(["Cy Young", "Cy Young", "MVP", "MVP", "Rookie of the Year", "Rookie of the Year"]);
+    const count = (name: string) => h.awards.filter((a) => a.name === name).length;
+    for (const name of ["MVP", "Cy Young", "Rookie of the Year", "Reliever of the Year"]) expect(count(name)).toBe(2);
+    // A Gold Glove at each fielding position and a Silver Slugger at each lineup spot, in each league.
+    expect(count("Gold Glove")).toBe(16);
+    expect(count("Silver Slugger")).toBe(18);
+    for (const a of h.awards.filter((x) => x.name === "Gold Glove")) expect(league.players[a.playerId]!.awards).toContain(`${year} ${league.structure.leagues[a.league]} Gold Glove (${a.pos})`);
+    expect(h.executives).toHaveLength(2);
+    expect(h.allStar?.score[0]).not.toBe(h.allStar?.score[1]);
     const regular = league.players.find((p) => p.career.some((c) => c.year === year && (c.bat?.PA ?? 0) > 500))!;
     expect(regular).toBeDefined();
   });

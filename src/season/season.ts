@@ -45,6 +45,7 @@ import {
 import { batRow, pitRow, RECENT_GAMES, RecentLog } from "../stats/recent";
 import { RunTracker } from "../stats/runExpectancy";
 import type { Bracket, PostseasonResult } from "./postseason";
+import { type AllStarGame, playAllStarGame } from "./allstar";
 import { buildSchedule, type Schedule } from "./schedule";
 import { StaffTracker } from "./staff";
 
@@ -315,6 +316,8 @@ export class Season {
   postseason: PostseasonResult | null = null;
   /** The postseason while it's being played, game by game (kept once it's over). */
   bracket: Bracket | null = null;
+  /** The All-Star Game, once it's been played at the break. */
+  allStar: AllStarGame | null = null;
   /** Called with every finished game (the UI keeps recent box scores). */
   onGame?: (level: Level, result: GameResult, day: number) => void;
   readonly levels: Record<Level, LevelSeason>;
@@ -626,6 +629,7 @@ export class Season {
     const day = this.day;
     this.heal();
     this.manageRosters();
+    if (day === this.schedule.allStarDay && !this.allStar) this.allStar = playAllStarGame(this);
 
     const out: GameSummary[] = [];
     const levels: Level[] = this.simulateMinors ? [...LEVELS] : ["MLB"];

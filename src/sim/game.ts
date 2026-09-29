@@ -58,6 +58,8 @@ export interface TeamGameSetup {
   fatigue?: ReadonlyMap<number, number>;
   /** Ballpark when this club is home (defaults to the MLB park). */
   park?: Park;
+  /** An exhibition (the All-Star Game): pitchers work an inning or two and the reserves take over from the sixth. */
+  exhibition?: boolean;
 }
 
 /** League-wide baserunning tallies, used to calibrate the running game. */
@@ -975,7 +977,9 @@ export class GameSim {
       this.injure(s.id);
       pull = true;
     } else if (s.pitches >= s.limit) pull = true;
-    else if (s.starter) {
+    else if (field.setup.exhibition) {
+      if (inningStart && s.outs >= (s.starter ? 6 : 3)) pull = true;
+    } else if (s.starter) {
       if (s.runs >= 6 && s.pitches >= 40) pull = true;
       else if (s.runs >= 5 && this.inning <= 5 && s.pitches >= 60) pull = true;
       else if (inningStart && s.pitches >= s.limit - 7) pull = true;
@@ -1156,6 +1160,7 @@ export class GameSim {
 
   private considerDefensiveSubs(): void {
     const field = this.fieldingSide;
+    if (field.setup.exhibition) return this.exhibitionSubs(field);
     const lead = this.fieldingLead;
     if (this.inning < 8 || lead < 1 || lead > 3 || field.defensiveSubs >= 2 || field.bench.length === 0) return;
     const players = this.env.league.players;
@@ -1179,6 +1184,16 @@ export class GameSim {
       this.substitute(field, slot, best, "DEF");
       field.defensiveSubs++;
     }
+  }
+
+  /** In an exhibition the reserves come in for the starters in the sixth, a position at a time. */
+  private exhibitionSubs(field: Side): void {
+    if (this.inning !== 6) return;
+    field.order.forEach((entry, slot) => {
+      if (entry.sub) return;
+      const sub = this.bestSub(field, entry.pos, entry.pos === "DH" ? "bat" : "defense");
+      if (sub !== undefined && this.canPlay(sub, entry.pos)) this.substitute(field, slot, sub, "DEF");
+    });
   }
 
   // -------------------------------------------------------------------------

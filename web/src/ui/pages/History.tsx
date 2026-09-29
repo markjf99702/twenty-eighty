@@ -1,13 +1,16 @@
+import { useState } from "preact/hooks";
 import { useApi } from "../../api/client";
+import { AwardsBlock } from "../components/Awards";
 import type { Status } from "../../api/protocol";
 import { ErrorNote, Loading, Section } from "../components/Common";
-import { playerHref } from "../router";
 
 export function History({ status }: { status: Status }) {
   const view = useApi("history", undefined);
+  const [year, setYear] = useState<number | null>(null);
   if (view.error) return <ErrorNote error={view.error} />;
   if (!view.data) return <Loading />;
   const seasons = view.data.seasons;
+  const shown = seasons.find((s) => s.year === year) ?? seasons[0];
   const first = seasons.length ? Math.min(...seasons.map((s) => s.year)) : status.year;
   return (
     <>
@@ -45,28 +48,19 @@ export function History({ status }: { status: Status }) {
               </table>
             </div>
           </Section>
-          <Section title="Awards">
-            <div class="tbl-wrap">
-              <table class="tbl">
-                <tbody>
-                  {seasons.flatMap((s) =>
-                    s.awards.map((a) => (
-                      <tr key={`${s.year}-${a.name}-${a.league}`}>
-                        <td class="num">{s.year}</td>
-                        <td class="nowrap">
-                          {a.league} {a.name}
-                        </td>
-                        <td class="name">
-                          <a href={playerHref(a.playerId)}>{a.player}</a> <span class="muted">{a.team}</span>
-                        </td>
-                        <td class="dim wrap">{a.note}</td>
-                      </tr>
-                    )),
-                  )}
-                </tbody>
-              </table>
-            </div>
-          </Section>
+          <div class="history-awards">
+            <label class="year-pick">
+              <span class="k">Awards for</span>{" "}
+              <select value={shown?.year} onChange={(e) => setYear(Number((e.target as HTMLSelectElement).value))}>
+                {seasons.map((s) => (
+                  <option key={s.year} value={s.year}>
+                    {s.year}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {shown && <AwardsBlock awards={shown.awards} executives={shown.executives} allStar={shown.allStar} />}
+          </div>
         </>
       )}
     </>

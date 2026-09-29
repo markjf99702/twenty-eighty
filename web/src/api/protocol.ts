@@ -96,10 +96,12 @@ export interface StopRules {
   deadline: boolean;
   /** A staff member sends an urgent note. */
   staff: boolean;
+  /** The All-Star Game has been played. */
+  allStar: boolean;
 }
 
 export interface StopNote {
-  kind: "streak" | "injury" | "offer" | "deadline" | "staff";
+  kind: "streak" | "injury" | "offer" | "deadline" | "staff" | "allstar";
   text: string;
   /** Where to look (a route hash). */
   href?: string;
@@ -551,7 +553,9 @@ export interface OffseasonView {
   year: number;
   review?: {
     champion: string | null;
-    awards: { name: string; league: string; playerId: number; player: string; team: string; note: string }[];
+    awards: AwardRow[];
+    executives: ExecutiveRow[];
+    allStar: AllStarLine | null;
     finish: string | null;
     record: string | null;
     risers: DevRow[];
@@ -703,8 +707,85 @@ export interface HistoryView {
     champion: string;
     runnerUp: string | null;
     mine: { record: string; finish: string } | null;
-    awards: { name: string; league: string; playerId: number; player: string; team: string; note: string }[];
+    awards: AwardRow[];
+    executives: ExecutiveRow[];
+    allStar: AllStarLine | null;
   }[];
+}
+
+/** A season award: `pos` for Gold Gloves and Silver Sluggers, `mine` if he played for the user's club. */
+export interface AwardRow {
+  name: string;
+  league: string;
+  pos: string | null;
+  playerId: number;
+  player: string;
+  team: string;
+  note: string;
+  mine: boolean;
+}
+
+/** Executive of the Year: `mine` when it's the user. */
+export interface ExecutiveRow {
+  league: string;
+  team: string;
+  note: string;
+  mine: boolean;
+}
+
+/** The All-Star Game in a line: "Continental 5, Federal 3 in Kansas City", and its MVP. */
+export interface AllStarLine {
+  text: string;
+  mvp: { playerId: number; name: string; team: string; note: string } | null;
+}
+
+export interface AllStarBatRow {
+  playerId: number;
+  name: string;
+  team: string;
+  pos: string;
+  /** In the starting lineup (the rest came off the bench). */
+  starter: boolean;
+  mine: boolean;
+  AB: number;
+  R: number;
+  H: number;
+  HR: number;
+  RBI: number;
+  BB: number;
+  SO: number;
+}
+
+export interface AllStarPitchRow {
+  playerId: number;
+  name: string;
+  team: string;
+  mine: boolean;
+  IP: string;
+  H: number;
+  R: number;
+  ER: number;
+  BB: number;
+  SO: number;
+}
+
+/** This season's All-Star Game: the box score, both rosters and the user's All-Stars. */
+export interface AllStarView {
+  year: number;
+  /** The season day it was played, and its date. */
+  day: number;
+  date: string;
+  /** Where it was played. */
+  where: string;
+  /** [away, home] */
+  leagues: [string, string];
+  score: [number, number];
+  innings: number;
+  lineScore: [number[], number[]];
+  mvp: AllStarLine["mvp"];
+  sides: { league: string; batting: AllStarBatRow[]; pitching: AllStarPitchRow[]; unused: { playerId: number; name: string; team: string; pos: string; mine: boolean }[] }[];
+  /** The user's All-Stars, by name. */
+  mine: { playerId: number; name: string }[];
 }
 
 // ---------------------------------------------------------------------------
@@ -838,6 +919,7 @@ export interface Api {
   /** Change the pace of a running (or the next) sim. */
   setPace: { req: { msPerDay: number }; res: { ok: boolean } };
   setStops: { req: StopRules; res: { ok: boolean } };
+  allStar: { req: void; res: AllStarView | null };
   playoffs: { req: void; res: Status };
   /** Play October on: through the user's next game, to the end of the round, or to the end. */
   playPostseason: { req: { step: "game" | "round" | "all" }; res: { status: Status; games: { recap: string; after: string; mine: boolean }[] } };

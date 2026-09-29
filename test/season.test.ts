@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import { leagueMetrics } from "../src/calibration/report";
 import { generateLeague } from "../src/league/generate";
+import { allStarIds } from "../src/season/allstar";
 import { runPostseason } from "../src/season/postseason";
+import { ALL_STAR_BREAK } from "../src/season/schedule";
 import { Season } from "../src/season/season";
 
 // A full 2,430-game season takes a few seconds; the realism checks below
@@ -15,6 +17,36 @@ describe("a simulated season", () => {
   it("plays every scheduled game", () => {
     expect(season.games).toHaveLength(2430);
     for (const r of season.records) expect(r.w + r.l).toBe(162);
+  });
+
+  it("breaks for the All-Star Game in mid-July, with no series across the break", () => {
+    const { start, days } = ALL_STAR_BREAK;
+    expect(season.schedule.allStarDay).toBe(start + 1);
+    for (let d = start; d < start + days; d++) expect(season.schedule.days[d]).toHaveLength(0);
+    expect(season.dateOf(start).toISOString().slice(5, 10)).toBe("07-14");
+    // Every series ends before the break: nobody plays the same club on both sides of it.
+    const last = new Map(season.schedule.days[start - 1]!.map((g) => [g.home, g.away]));
+    for (const g of season.schedule.days[start + days]!) expect(last.get(g.home)).not.toBe(g.away);
+  });
+
+  it("plays the All-Star Game at the break without touching anyone's stats", () => {
+    const g = season.allStar!;
+    expect(g).not.toBeNull();
+    const league = season.league;
+    for (const r of g.rosters) {
+      const ids = allStarIds(r);
+      expect(r.lineup).toHaveLength(9);
+      expect(new Set(r.lineup.map((s) => s.pos)).size).toBe(9);
+      // Every club in the league sends someone.
+      const clubs = new Set(ids.map((id) => league.players[id]!.teamId));
+      expect(clubs.size).toBe(league.teams.filter((t) => t.league === r.league).length);
+      for (const id of ids) expect(league.players[id]!.awards.some((a) => a.endsWith("All-Star"))).toBe(true);
+    }
+    // Pitchers work an inning or two; the reserves get in.
+    for (const side of g.pitching) for (const p of side) expect(p.outs).toBeLessThanOrEqual(6);
+    for (const side of g.batting) expect(side.length).toBeGreaterThan(9);
+    expect(g.score[0]).not.toBe(g.score[1]);
+    expect(g.mvp).not.toBeNull();
   });
 
   it("looks like modern MLB", () => {

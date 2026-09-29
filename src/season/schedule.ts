@@ -19,7 +19,12 @@ export interface ScheduledGame {
 
 export interface Schedule {
   days: ScheduledGame[][];
+  /** The All-Star Game's day, in the middle of a four-day break (absent in schedules made before there was one). */
+  allStarDay?: number;
 }
+
+/** The All-Star break: four days without games from mid-July (day 110 is July 14), the game on the second. */
+export const ALL_STAR_BREAK = { start: 110, days: 4 } as const;
 
 interface Series {
   home: number;
@@ -96,9 +101,14 @@ export function buildSchedule(league: League, rng: Rng, offDayRate = 0.14): Sche
   const days: ScheduledGame[][] = [];
   let totalLeft = all.reduce((sum, s) => sum + s.games, 0);
 
+  const breakEnd = ALL_STAR_BREAK.start + ALL_STAR_BREAK.days;
   for (let day = 0; totalLeft > 0 && day < 400; day++) {
     const games: ScheduledGame[] = [];
     const playing = new Set<number>();
+    if (day >= ALL_STAR_BREAK.start && day < breakEnd) {
+      days.push(games);
+      continue;
+    }
 
     for (const [teamId, a] of active) {
       if (playing.has(teamId)) continue;
@@ -116,9 +126,11 @@ export function buildSchedule(league: League, rng: Rng, offDayRate = 0.14): Sche
     for (const id of free) {
       if (playing.has(id)) continue;
       if (!late && rng.chance(offDayRate)) continue;
+      // No series runs into the break.
+      const fits = (s: Series) => day >= ALL_STAR_BREAK.start || day + s.games <= ALL_STAR_BREAK.start;
       const options = remaining.get(id)!.filter((s) => {
         const other = s.home === id ? s.away : s.home;
-        return !playing.has(other) && free.includes(other);
+        return !playing.has(other) && free.includes(other) && fits(s);
       });
       if (options.length === 0) continue;
       options.sort((x, y) => {
@@ -149,5 +161,5 @@ export function buildSchedule(league: League, rng: Rng, offDayRate = 0.14): Sche
     }
     days.push(games);
   }
-  return { days };
+  return { days, allStarDay: days.length > breakEnd ? ALL_STAR_BREAK.start + 1 : undefined };
 }

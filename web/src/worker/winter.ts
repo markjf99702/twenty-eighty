@@ -18,21 +18,11 @@ import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
 import type { AskingView, BlockRow, DevRow, HistoryView, OffseasonView, OfferView, TradeAdviceView, TradeSide } from "../api/protocol";
 import { dateLabel, playerSummary, rosterActions, type StatsCache, teamRef } from "./views";
+import { allStarLine, awardRows, executiveRows } from "./allstar";
 import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
 
 const abbrev = (league: League, id: number | null) => (id === null ? "FA" : (league.teams[id]?.abbrev ?? "FA"));
-
-function awardRows(league: League, awards: League["history"][number]["awards"]) {
-  return awards.map((a) => ({
-    name: a.name,
-    league: league.structure.leagues[a.league]!.replace(" League", ""),
-    playerId: a.playerId,
-    player: playerName(league.players[a.playerId]!),
-    team: abbrev(league, a.teamId),
-    note: a.note,
-  }));
-}
 
 export function offseasonView(season: Season, stats: StatsCache): OffseasonView | null {
   const league = season.league;
@@ -59,6 +49,8 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
     view.review = {
       champion: h.champion >= 0 ? `${league.teams[h.champion]!.city} ${league.teams[h.champion]!.nickname}` : null,
       awards: awardRows(league, h.awards),
+      executives: executiveRows(league, h),
+      allStar: allStarLine(league, h.allStar),
       finish: mine?.finish ?? null,
       record: mine ? `${mine.w}-${mine.l}` : null,
       risers: dev(w.development.risers),
@@ -288,6 +280,8 @@ export function historyView(league: League): HistoryView {
         runnerUp: ws ? name(ws.teamId) : null,
         mine: mine ? { record: `${mine.w}-${mine.l}`, finish: mine.finish } : null,
         awards: awardRows(league, h.awards),
+        executives: executiveRows(league, h),
+        allStar: allStarLine(league, h.allStar),
       };
     }),
   };

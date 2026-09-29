@@ -70,6 +70,35 @@ export const teamRef = (t: Team): TeamRef => ({
   division: t.division,
 });
 
+/**
+ * A career's honors, one line per kind with the years: "3× Continental League
+ * All-Star (2026, 2027, 2029)", biggest honors first.
+ */
+export function condenseAwards(awards: string[]): string[] {
+  const years = new Map<string, number[]>();
+  for (const a of awards) {
+    const m = /^(\d{4}) (.+)$/.exec(a);
+    if (!m) continue;
+    const list = years.get(m[2]!) ?? [];
+    list.push(Number(m[1]));
+    years.set(m[2]!, list);
+  }
+  const order: [string, number][] = [
+    ["All-Star Game MVP", 4],
+    ["MVP", 0],
+    ["Cy Young", 1],
+    ["Rookie of the Year", 2],
+    ["Reliever of the Year", 3],
+    ["Gold Glove", 5],
+    ["Silver Slugger", 6],
+    ["All-Star", 7],
+  ];
+  const rank = (what: string) => order.find(([k]) => what.includes(k))?.[1] ?? 99;
+  return [...years.entries()]
+    .sort((a, b) => rank(a[0]) - rank(b[0]) || a[1][0]! - b[1][0]!)
+    .map(([what, ys]) => (ys.length === 1 ? `${ys[0]} ${what}` : `${ys.length}× ${what} (${ys.join(", ")})`));
+}
+
 export function dateLabel(season: Season, day: number): string {
   return season.dateOf(day).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
@@ -708,7 +737,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
       .map((t) => ({ date: `${dateLabel(season, t.day)}${t.year !== league.year ? ` ${t.year + (t.day > 280 ? 1 : 0)}` : ""}`, text: t.text })),
     career: p.career,
     careerTeams,
-    awards: p.awards,
+    awards: condenseAwards(p.awards),
     draft,
     surplus: team ? surplusValue(p, 1, warShift(season, league.userTeamId, p)) : null,
     retired: p.retired ?? null,

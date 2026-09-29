@@ -1,3 +1,4 @@
+import type { AllStarGame } from "../season/allstar";
 import { Rng, type RngState } from "../core/rng";
 import type { League } from "../league/types";
 import { LEVELS, type Level } from "../players/types";
@@ -53,6 +54,7 @@ export interface SeasonState {
   postseason: PostseasonResult | null;
   /** The postseason as it's played (absent in saves made before it was played game by game). */
   bracket?: Bracket | null;
+  allStar?: AllStarGame | null;
   levels: Record<Level, LevelState>;
 }
 
@@ -129,6 +131,7 @@ export function saveGame(league: League, season: Season | null): SaveGame {
       seasonService: [...season.seasonService],
       postseason: season.postseason,
       bracket: season.bracket,
+      allStar: season.allStar,
       levels,
     };
   }
@@ -152,6 +155,7 @@ export function loadGame(save: SaveGame): { league: League; season: Season | nul
   for (const [id, days] of s.seasonService) season.seasonService.set(id, days);
   season.postseason = s.postseason;
   season.bracket = s.bracket ?? null;
+  season.allStar = s.allStar ?? null;
   for (const level of LEVELS) {
     const ls = season.levels[level];
     const st = s.levels[level];

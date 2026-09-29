@@ -43,6 +43,16 @@ the rule-checked functions in src/org/roster.ts, never by editing arrays directl
 the transaction log and 40-man/IL bookkeeping stay consistent. `new Season(league,
 { minors: false })` skips affiliate games (calibration and most tests use this).
 
+The schedule (src/season/schedule.ts) breaks for four days from `ALL_STAR_BREAK.start`
+(day 110, July 14), with no series crossing it; `schedule.allStarDay` is the second day
+(absent in schedules saved before the break existed, which then have no game). On that
+day `simDay` calls `playAllStarGame` (src/season/allstar.ts): `pickAllStars` per league,
+then `simulateGame` with `exhibition: true` (pitchers pulled after an inning, two for the
+starter; reserves in from the sixth). The result is kept on `season.allStar` and saved,
+and never absorbed into stats, fatigue or injuries. Season awards are `seasonAwards` and
+`executiveAwards` in src/offseason/history.ts; `mainPosition` (allstar.ts) is a player's
+most-played position from his fielding line.
+
 The postseason (src/season/postseason.ts) is played a day at a time: `startPostseason`
 seeds `season.bracket` (saved), `playPostseasonDay`/`playPostseason(step)` play it on, and
 when the World Series ends it writes `season.postseason`, the result everything else reads

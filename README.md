@@ -20,7 +20,10 @@ be wrong, the owner has goals, and 29 other front offices are doing the same thi
 - **Two grades for every tool**, now and at his peak, on the 20-80 scale. Your scouts see them with an
   error that shrinks with a bigger scouting budget and more looks.
 - **Sim a day, a week, a month or the rest of the season** at a pace you can watch, with stops for a
-  losing streak, an injury, a trade offer or the deadline.
+  losing streak, an injury, a trade offer, the deadline or the All-Star Game.
+- **An All-Star Game and a trophy case**: a mid-July break, both leagues' All-Stars in a box
+  score, and each winter an MVP, Cy Young, Rookie and Reliever of the Year, Gold Gloves and
+  Silver Sluggers at every position, and an Executive of the Year (maybe you).
 - **The moves a real GM makes**: call-ups and options, the 40-man roster, trades (clubs call you too),
   the draft, free agency, international signings, arbitration and contract extensions.
 - **An owner with goals and a budget**, ticket prices and a club's books. Fall far enough short and
@@ -167,13 +170,22 @@ the GM:
   pause the sim by themselves when your club loses a set number in a row, a big
   leaguer goes down for injured-list time, a club makes you a trade offer your staff
   doesn't pass on (or any offer, if you'd rather), it's trade deadline day (with the day
-  still to play), or your staff has something urgent, and a note says why it stopped.
+  still to play), the All-Star Game has been played, or your staff has something urgent,
+  and a note says why it stopped.
   Offers that don't stop the sim still wait on the trade desk.
 - **Front office**: record, division race, recent games, club leaders, injuries, your top
   prospects, your moves, and the league's headlines: trades, extensions, big free-agent
   deals, top picks and top prospects' debuts, injuries that change a season. The full
   wire (every big-league move, or everything down to minor league shuffles) is a click
-  away.
+  away. For two weeks after the All-Star Game, its score, MVP and your All-Stars.
+- **The All-Star Game**: the schedule breaks for four days from July 14 (no series runs
+  across it), and the game is on the second. The fans vote in the starters at each
+  position (first-half WAR, with a thumb on the scale for homers and average), the best
+  of the rest fill out the bench and the staff (seven starters, five relievers), and
+  every club sends someone. It's played at a host club's park, which rotates, as an
+  exhibition: pitchers work an inning or two and the reserves take over in the sixth. The
+  box score, the MVP and who else was named are on their own page; it counts toward no
+  one's stats, wear or injuries, only the record ("2026 Federal League All-Star").
 - **My club**: the active roster, injured list and every affiliate, with each player's
   present grades, projected WAR (for big leaguers and anyone close) or future value (for
   prospects), the overall Now grade (on tables with prospects in them; a table of big
@@ -237,7 +249,15 @@ the GM:
   best candidates, and your assistant GM brings one up in the winter and in spring. AI clubs deal with each
   other from late May, busiest in the last three weeks before the deadline, and those
   trades show up on the wire. **Payroll** shows every contract, your budget and future
-  commitments; **History** keeps champions and award winners.
+  commitments; **History** keeps champions, and each season's awards and All-Star Game.
+- **Awards**, voted each winter in both leagues. The voters start from WAR and lean the
+  way real ones do: MVP voters like homers, RBI and a contender; Cy Young voters like
+  innings and ERA; Reliever of the Year goes to the saves. A Gold Glove at each fielding
+  position goes to the regular with the most fielding runs (a little reputation helps),
+  a Silver Slugger at each lineup spot (DH too) to the best bat. Executive of the Year
+  goes to the front office that most outran its payroll and last season, with a bonus
+  for October. A player's page folds his honors into one line each ("3× All-Star (2026,
+  2027, 2029)").
 - **Finances**: this season's books (gate, concessions, media, sponsorship, national
   money, postseason gates; payroll, dead money, departments, operations, bonuses),
   ticket pricing with a projection of crowds and gate at every price, fan interest,

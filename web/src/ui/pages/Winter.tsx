@@ -1,3 +1,4 @@
+import { AwardsBlock } from "../components/Awards";
 import { useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
 import type { DevRow, OffseasonPhase, OffseasonView, PlayerSummary, Status } from "../../api/protocol";
@@ -173,25 +174,7 @@ function Review({ v }: { v: OffseasonView }) {
           )}
         </div>
       )}
-      <Section title="Awards">
-        <div class="tbl-wrap">
-          <table class="tbl">
-            <tbody>
-              {r.awards.map((a) => (
-                <tr key={`${a.name}-${a.league}`}>
-                  <td class="nowrap">
-                    {a.league} {a.name}
-                  </td>
-                  <td class="name">
-                    <a href={playerHref(a.playerId)}>{a.player}</a> <span class="muted">{a.team}</span>
-                  </td>
-                  <td class="dim wrap">{a.note}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </Section>
+      <AwardsBlock awards={r.awards} executives={r.executives} allStar={r.allStar} />
       <div class="grid-2">
         <DevTable rows={r.risers} title="Winter risers" />
         <DevTable rows={r.fallers} title="Aging and slumping" />

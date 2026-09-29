@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
-import { transactions } from "../web/src/worker/views";
+import { condenseAwards, transactions } from "../web/src/worker/views";
 
 const league = generateLeague({ seed: "wire" });
 hireGm(league, 5);
@@ -33,5 +33,17 @@ describe("the wire's headlines", () => {
       const days = Number(/out about (\d+) day/.exec(h.text)![1]);
       expect(days).toBeGreaterThanOrEqual(21);
     }
+  });
+});
+
+describe("a player's honors", () => {
+  it("fold into one line per award, biggest first", () => {
+    const awards = ["2026 Federal League All-Star", "2027 Federal League All-Star", "2027 All-Star Game MVP", "2027 Federal League Gold Glove (SS)", "2028 Federal League MVP"];
+    expect(condenseAwards(awards)).toEqual([
+      "2028 Federal League MVP",
+      "2027 All-Star Game MVP",
+      "2027 Federal League Gold Glove (SS)",
+      "2× Federal League All-Star (2026, 2027)",
+    ]);
   });
 });

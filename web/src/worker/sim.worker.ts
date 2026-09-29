@@ -45,7 +45,8 @@ import { makePick, simDraft } from "../../../src/offseason/draft";
 import { validateOffer } from "../../../src/offseason/freeAgency";
 import { signInternational } from "../../../src/offseason/international";
 import { advanceOffseason, beginOffseason, offerClock, WINTER_DAYS, winterContext, winterWeek } from "../../../src/offseason/offseason";
-import { FIELD_POSITIONS, MINOR_LEVELS, type Level } from "../../../src/players/types";
+import { FIELD_POSITIONS, MINOR_LEVELS, type Level, playerName } from "../../../src/players/types";
+import { allStarIds } from "../../../src/season/allstar";
 import { deserialize, loadGame, saveGame, serialize } from "../../../src/save/save";
 import {
   defaultPlayoffRoster,
@@ -56,6 +57,7 @@ import {
   stillAlive,
 } from "../../../src/season/postseason";
 import { playoffPlanView, postseasonView } from "./october";
+import { allStarLine, allStarView } from "./allstar";
 import { Season } from "../../../src/season/season";
 import type {
   Api,
@@ -105,7 +107,7 @@ let stopRequested = false;
 /** Minimum wall-clock time per simulated day (the user's sim speed). */
 let msPerDay = 0;
 /** When a running sim stops by itself. */
-let stops: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true };
+let stops: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true, allStar: true };
 
 /** What the user's staff makes of an offer ("Take it", "Worth a look", "Pass"); null with staff advice off. */
 function offerVerdict(s: Season, o: League["tradeOffers"][number]): "take" | "consider" | "pass" | null {
@@ -117,7 +119,7 @@ function offerVerdict(s: Season, o: League["tradeOffers"][number]): "take" | "co
 const VERDICT_LINE = { take: "Your staff says take it.", consider: "Your staff thinks it's worth a look.", pass: "Your staff would pass." } as const;
 
 /** What the day just played changed that the user asked to be stopped for. */
-function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: number }): StopNote | null {
+function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: number; allStar: boolean }): StopNote | null {
   const league = s.league;
   const user = league.userTeamId;
   if (user === null) return null;
@@ -144,6 +146,13 @@ function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak:
   const streak = s.records[user]!.streak;
   if (stops.streak > 0 && streak === -stops.streak && before.streak !== streak) {
     return { kind: "streak", text: `The ${team.nickname} have lost ${stops.streak} straight.`, href: "#home" };
+  }
+  if (stops.allStar && s.allStar && !before.allStar) {
+    const line = allStarLine(league, { leagues: s.allStar.leagues, score: s.allStar.score, host: s.allStar.host, mvp: s.allStar.mvp, note: s.allStar.mvpNote })!;
+    const mine = s.allStar.rosters.flatMap(allStarIds).filter((id) => league.players[id]!.teamId === user);
+    const yours = mine.length ? ` Your All-Stars: ${mine.map((id) => playerName(league.players[id]!)).join(", ")}.` : " None of your players made it.";
+    const mvp = line.mvp ? ` MVP: ${line.mvp.name} (${line.mvp.team}), ${line.mvp.note}.` : "";
+    return { kind: "allstar", text: `The All-Star Game: ${line.text}.${mvp}${yours}`, href: "#allstar" };
   }
   if (stops.deadline && s.day === TRADE_DEADLINE_DAY && before.start < TRADE_DEADLINE_DAY) {
     return { kind: "deadline", text: "It's trade deadline day: today is the last day to make a trade.", href: "#trades" };
@@ -442,6 +451,7 @@ const handlers: Handlers = {
           streak: user !== null ? s.records[user]!.streak : 0,
           start,
           notes: s.league.advice.length,
+          allStar: s.allStar !== null,
         };
         s.simDay();
         progress(s.day - start, target - start);
@@ -798,6 +808,10 @@ const handlers: Handlers = {
     if (res.ok && accept) stats.clear();
     persistSoon();
     return res.ok && accept ? { ...res, warning: rosterWarning(userTeam()) } : res;
+  },
+
+  allStar() {
+    return allStarView(requireSeason());
   },
 
   history() {

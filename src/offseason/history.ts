@@ -1,5 +1,8 @@
-import type { Award, League, SeasonHistory } from "../league/types";
-import { LEVELS, playerName, type Player } from "../players/types";
+import type { Award, ExecutiveAward, League, SeasonHistory } from "../league/types";
+import { payroll } from "../org/contracts";
+import { defenseGrade } from "../players/defense";
+import { FIELD_POSITIONS, LEVELS, playerName, type Player } from "../players/types";
+import { mainPosition } from "../season/allstar";
 import type { Season } from "../season/season";
 
 /**
@@ -77,7 +80,12 @@ export function recordCareers(league: League, season: Season): void {
   }
 }
 
-/** MVP (best WAR), Cy Young (best pitcher WAR) and Rookie of the Year in each league. */
+/**
+ * The season's awards in each league, as the voters see it: WAR first, with
+ * the traditional numbers and a contender's glow tipping close calls. MVP, Cy
+ * Young, Rookie of the Year, Reliever of the Year (saves count), and a Gold
+ * Glove and a Silver Slugger at each position (DH included for the bats).
+ */
 export function seasonAwards(league: League, season: Season): Award[] {
   const stats = season.stats("MLB");
   const awards: Award[] = [];
@@ -86,37 +94,88 @@ export function seasonAwards(league: League, season: Season): Award[] {
   // Rookies: under 45 days of big-league service before this season.
   const rookie = (id: number) => league.players[id]!.service - (season.seasonService.get(id) ?? 0) < 45;
   const f3 = (x: number) => x.toFixed(3).replace(/^0/, "");
+  const contenders = new Set(season.postseason?.seeds?.flat() ?? []);
+  const glow = (id: number) => (contenders.has(teamOf(id)) ? 0.5 : 0);
+  const at = new Map(stats.hitters.map((h) => [h.id, mainPosition(season.fielding.lines.get(h.id), league.players[h.id]!)]));
 
   league.structure.leagues.forEach((_name, lg) => {
-    const hitters = stats.hitters.filter((h) => inLeague(h.id, lg));
+    const hitters = stats.hitters.filter((h) => inLeague(h.id, lg) && !league.players[h.id]!.pitching);
     const pitchers = stats.pitchers.filter((p) => inLeague(p.id, lg));
-    const hitterNote = (h: (typeof hitters)[number]) => `${f3(h.AVG)}/${f3(h.OBP)}/${f3(h.SLG)}, ${h.line.HR} HR, ${round1(h.WAR)} WAR`;
+    const slash = (h: (typeof hitters)[number]) => `${f3(h.AVG)}/${f3(h.OBP)}/${f3(h.SLG)}`;
+    const hitterNote = (h: (typeof hitters)[number]) => `${slash(h)}, ${h.line.HR} HR, ${round1(h.WAR)} WAR`;
     const pitcherNote = (p: (typeof pitchers)[number]) => `${p.line.W}-${p.line.L}, ${p.ERA.toFixed(2)} ERA, ${p.line.SO} K, ${round1(p.WAR)} WAR`;
+    const push = (name: Award["name"], id: number, note: string, pos?: Award["pos"]) =>
+      awards.push({ name, league: lg, ...(pos ? { pos } : {}), playerId: id, teamId: teamOf(id), note });
+    const top = <T,>(rows: T[], score: (r: T) => number) => [...rows].sort((a, b) => score(b) - score(a))[0];
 
-    const bestHitter = [...hitters].sort((a, b) => b.WAR - a.WAR)[0];
-    const bestPitcher = [...pitchers].sort((a, b) => b.WAR - a.WAR)[0];
-    const mvp = bestPitcher && bestHitter && bestPitcher.WAR > bestHitter.WAR + 1 ? bestPitcher : bestHitter;
-    if (mvp) {
-      const note = "PA" in mvp ? hitterNote(mvp as (typeof hitters)[number]) : pitcherNote(mvp as (typeof pitchers)[number]);
-      awards.push({ name: "MVP", league: lg, playerId: mvp.id, teamId: teamOf(mvp.id), note });
-    }
+    // MVP: WAR, a little for the homers and RBI the voters love, and for playing on a contender.
+    const hitVote = (h: (typeof hitters)[number]) => h.WAR + h.line.HR / 40 + h.line.RBI / 200 + glow(h.id);
+    const bestHitter = top(hitters, hitVote);
+    const bestPitcher = top(pitchers, (p) => p.WAR + glow(p.id));
+    if (bestHitter && !(bestPitcher && bestPitcher.WAR + glow(bestPitcher.id) > hitVote(bestHitter) + 1)) push("MVP", bestHitter.id, hitterNote(bestHitter));
+    else if (bestPitcher) push("MVP", bestPitcher.id, pitcherNote(bestPitcher));
+
     // Cy Young voters weigh run prevention: WAR plus a nudge for innings and ERA.
-    const cy = [...pitchers].filter((p) => p.IP >= 100).sort((a, b) => b.WAR + (4 - b.ERA) * 0.3 - (a.WAR + (4 - a.ERA) * 0.3))[0];
-    if (cy) awards.push({ name: "Cy Young", league: lg, playerId: cy.id, teamId: teamOf(cy.id), note: pitcherNote(cy) });
+    const cy = top(
+      pitchers.filter((p) => p.IP >= 100),
+      (p) => p.WAR + (4 - p.ERA) * 0.3,
+    );
+    if (cy) push("Cy Young", cy.id, pitcherNote(cy));
 
     const rookies = [
       ...hitters.filter((h) => rookie(h.id) && h.PA >= 150).map((h) => ({ id: h.id, war: h.WAR, note: hitterNote(h) })),
       ...pitchers.filter((p) => rookie(p.id) && p.IP >= 40).map((p) => ({ id: p.id, war: p.WAR, note: pitcherNote(p) })),
-    ].sort((a, b) => b.war - a.war);
-    const roy = rookies[0];
-    if (roy) awards.push({ name: "Rookie of the Year", league: lg, playerId: roy.id, teamId: teamOf(roy.id), note: roy.note });
+    ];
+    const roy = top(rookies, (r) => r.war);
+    if (roy) push("Rookie of the Year", roy.id, roy.note);
+
+    // Reliever of the Year: the voters count saves.
+    const relievers = pitchers.filter((p) => p.line.GS < p.line.G / 2 && p.IP >= 40);
+    const rel = top(relievers, (p) => p.WAR + p.line.SV * 0.08 + (3 - p.ERA) * 0.3);
+    if (rel) push("Reliever of the Year", rel.id, `${rel.line.SV} SV, ${rel.ERA.toFixed(2)} ERA, ${rel.line.SO} K in ${rel.IP.toFixed(1)} IP`);
+
+    // Gold Gloves: the most fielding runs among regulars at each position, with a little for reputation.
+    for (const pos of FIELD_POSITIONS) {
+      const regulars = hitters.filter((h) => at.get(h.id) === pos && ((season.fielding.lines.get(h.id)?.[`outs${pos}`] as number | undefined) ?? 0) >= 1800);
+      const gg = top(regulars, (h) => h.fieldingRuns + (defenseGrade(league.players[h.id]!, pos) - 50) * 0.15);
+      if (gg) push("Gold Glove", gg.id, `${gg.fieldingRuns >= 0 ? "+" : ""}${Math.round(gg.fieldingRuns)} fielding runs`, pos);
+    }
+    // Silver Sluggers: the best bat at each position, homers weighing a little extra.
+    for (const pos of [...FIELD_POSITIONS, "DH"] as const) {
+      const regulars = hitters.filter((h) => at.get(h.id) === pos && h.PA >= 350);
+      const ss = top(regulars, (h) => h.battingRuns + h.line.HR / 5);
+      if (ss) push("Silver Slugger", ss.id, `${slash(ss)}, ${ss.line.HR} HR, ${ss.line.RBI} RBI`, pos);
+    }
   });
 
   for (const a of awards) {
     const p = league.players[a.playerId]!;
-    p.awards.push(`${league.year} ${league.structure.leagues[a.league]} ${a.name}`);
+    p.awards.push(`${league.year} ${league.structure.leagues[a.league]} ${a.name}${a.pos ? ` (${a.pos})` : ""}`);
   }
   return awards;
+}
+
+/**
+ * Executive of the Year: the front office whose club most outran its payroll
+ * and last season, with a bonus for reaching October.
+ */
+export function executiveAwards(league: League, season: Season): ExecutiveAward[] {
+  const last = league.history.at(-1);
+  const pay = new Map(league.teams.map((t) => [t.id, payroll(league, t)]));
+  const avgPay = [...pay.values()].reduce((a, b) => a + b, 0) / Math.max(1, pay.size);
+  const october = new Set(season.postseason?.seeds?.flat() ?? []);
+  const lastWins = (id: number) => last?.standings.find((s) => s.teamId === id)?.w;
+  const score = (r: { teamId: number; w: number }) => {
+    const before = lastWins(r.teamId);
+    return (r.w - 81) + (before === undefined ? 0 : 0.6 * (r.w - before)) - 0.12 * (pay.get(r.teamId)! - avgPay) + (october.has(r.teamId) ? 4 : 0);
+  };
+  return league.structure.leagues.map((_name, lg) => {
+    const rows = season.records.filter((r) => league.teams[r.teamId]!.league === lg);
+    const best = [...rows].sort((a, b) => score(b) - score(a))[0]!;
+    const before = lastWins(best.teamId);
+    const change = before === undefined ? "" : `, ${best.w - before >= 0 ? "up" : "down"} ${Math.abs(best.w - before)} from last year`;
+    return { league: lg, teamId: best.teamId, note: `${best.w}-${best.l}${change}, on a $${Math.round(pay.get(best.teamId)!)}M payroll` };
+  });
 }
 
 /** How each club's season ended. */
@@ -156,13 +215,16 @@ export function recordHistory(league: League, season: Season, awards: Award[]): 
     pennants,
     standings,
     awards,
+    executives: executiveAwards(league, season),
     userTeamId: league.userTeamId,
   };
+  const g = season.allStar;
+  if (g) entry.allStar = { leagues: g.leagues, score: g.score, host: g.host, mvp: g.mvp, note: g.mvpNote };
   league.history.push(entry);
   return entry;
 }
 
 export const awardText = (league: League, a: Award): string => {
   const p: Player = league.players[a.playerId]!;
-  return `${league.structure.leagues[a.league]} ${a.name}: ${playerName(p)} (${league.teams[a.teamId]?.abbrev ?? "FA"}), ${a.note}`;
+  return `${league.structure.leagues[a.league]} ${a.name}${a.pos ? ` (${a.pos})` : ""}: ${playerName(p)} (${league.teams[a.teamId]?.abbrev ?? "FA"}), ${a.note}`;
 };

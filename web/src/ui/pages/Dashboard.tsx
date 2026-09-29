@@ -120,6 +120,27 @@ export function Wire({ items, showClub = true }: { items: TransactionItem[]; sho
   );
 }
 
+/** For two weeks after the All-Star Game, its score, MVP and your All-Stars. */
+function AllStarNote({ day }: { day: number }) {
+  const view = useApi("allStar", undefined);
+  const g = view.data;
+  if (!g || day > g.day + 14) return null;
+  const won = g.score[0] > g.score[1] ? 0 : 1;
+  return (
+    <div class="note">
+      <b>All-Star Game:</b> {g.leagues[won]} {g.score[won]}, {g.leagues[1 - won]} {g.score[1 - won]}.
+      {g.mvp && (
+        <>
+          {" "}
+          MVP <a href={playerHref(g.mvp.playerId)}>{g.mvp.name}</a> ({g.mvp.team}).
+        </>
+      )}{" "}
+      {g.mine.length ? `Your All-Stars: ${g.mine.map((p) => p.name).join(", ")}.` : "None of your players made it."}{" "}
+      <a href={href({ page: "allstar" })}>Box score</a>
+    </div>
+  );
+}
+
 export function Dashboard({ status }: { status: Status }) {
   const view = useApi("dashboard", undefined);
   if (view.error) return <ErrorNote error={view.error} />;
@@ -184,6 +205,7 @@ export function Dashboard({ status }: { status: Status }) {
           <a href={href({ page: "trades", partnerId: null })}>Trade desk</a>
         </div>
       )}
+      {status.phase === "regular" && <AllStarNote day={status.day ?? 0} />}
       {status.owner?.fired && (
         <div class="note alert">
           You've been let go. <a href={href({ page: "owner" })}>See which clubs called</a>.

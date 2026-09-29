@@ -17,6 +17,7 @@ import { Standings } from "./pages/Standings";
 import { StatsPage } from "./pages/Stats";
 import { TeamPage } from "./pages/Team";
 import { History } from "./pages/History";
+import { AllStar } from "./pages/AllStar";
 import { Scouting } from "./pages/Scouting";
 import { Finances } from "./pages/Finances";
 import { Owner } from "./pages/Owner";
@@ -43,7 +44,7 @@ const PACE_KEY = "twenty-eighty.pace";
 const paceMs = (p: Pace) => PACES.find((x) => x.key === p)!.ms;
 
 const STOPS_KEY = "twenty-eighty.stops";
-const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true };
+const DEFAULT_STOPS: StopRules = { streak: 0, injury: false, offer: "good", deadline: true, staff: true, allStar: true };
 
 function storedStops(): StopRules {
   try {
@@ -295,7 +296,7 @@ export function App() {
             <span class="t">{stopNote.text}</span>
             {stopNote.href && (
               <a class="btn small" href={stopNote.href} onClick={() => setStopNote(null)}>
-                {stopNote.kind === "offer" || stopNote.kind === "deadline" ? "Trade desk" : stopNote.kind === "injury" ? "See him" : stopNote.kind === "staff" ? "Take a look" : "Your club"}
+                {stopNote.kind === "offer" || stopNote.kind === "deadline" ? "Trade desk" : stopNote.kind === "injury" ? "See him" : stopNote.kind === "staff" ? "Take a look" : stopNote.kind === "allstar" ? "Box score" : "Your club"}
               </a>
             )}
             <button type="button" class="btn ghost small" aria-label="Dismiss" onClick={() => setStopNote(null)}>
@@ -342,6 +343,8 @@ function Page({
       return <Transactions mine={route.mine} status={status} />;
     case "playoffs":
       return <Postseason status={status} />;
+    case "allstar":
+      return <AllStar />;
     case "office":
       return <Office status={status} onStatus={onStatus} />;
     case "winter":
@@ -557,7 +560,8 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
       window.removeEventListener("keydown", close);
     };
   }, [open]);
-  const count = (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer !== "off" ? 1 : 0) + (stops.deadline ? 1 : 0) + (stops.staff ? 1 : 0);
+  const count =
+    (stops.streak > 0 ? 1 : 0) + (stops.injury ? 1 : 0) + (stops.offer !== "off" ? 1 : 0) + (stops.deadline ? 1 : 0) + (stops.staff ? 1 : 0) + (stops.allStar ? 1 : 0);
   const set = (patch: Partial<StopRules>) => onChange({ ...stops, ...patch });
   return (
     <div class="stops" ref={ref}>
@@ -608,6 +612,10 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
           <label>
             <input type="checkbox" checked={stops.deadline} onChange={(e) => set({ deadline: (e.target as HTMLInputElement).checked })} />
             <span>It's trade deadline day (July 31), with the day still to play</span>
+          </label>
+          <label>
+            <input type="checkbox" checked={stops.allStar} onChange={(e) => set({ allStar: (e.target as HTMLInputElement).checked })} />
+            <span>The All-Star Game has been played (mid-July)</span>
           </label>
           <label>
             <input type="checkbox" checked={stops.staff} onChange={(e) => set({ staff: (e.target as HTMLInputElement).checked })} />

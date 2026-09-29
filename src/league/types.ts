@@ -2,7 +2,7 @@ import type { GmState, Owner, TeamFinance } from "../finance/types";
 import type { OffseasonState } from "../offseason/types";
 import type { GameSettings } from "./settings";
 import type { ScoutingState } from "../scouting/types";
-import type { FieldPosition, Level, MinorLevel, Player } from "../players/types";
+import type { FieldPosition, Level, LineupPosition, MinorLevel, Player } from "../players/types";
 
 export interface Park {
   name: string;
@@ -172,9 +172,18 @@ export interface TradeOffer {
 }
 
 export interface Award {
-  name: "MVP" | "Cy Young" | "Rookie of the Year";
+  name: "MVP" | "Cy Young" | "Rookie of the Year" | "Reliever of the Year" | "Gold Glove" | "Silver Slugger";
   league: number;
+  /** The position, for Gold Gloves and Silver Sluggers. */
+  pos?: LineupPosition;
   playerId: number;
+  teamId: number;
+  note: string;
+}
+
+/** The front office that did the most with what it had, in each league. */
+export interface ExecutiveAward {
+  league: number;
   teamId: number;
   note: string;
 }
@@ -185,6 +194,10 @@ export interface SeasonHistory {
   pennants: number[];
   standings: { teamId: number; w: number; l: number; rs: number; ra: number; finish: string }[];
   awards: Award[];
+  /** Executive of the Year in each league (absent in seasons recorded before there was one). */
+  executives?: ExecutiveAward[];
+  /** The All-Star Game: [away, home] leagues and score, and its MVP. */
+  allStar?: { leagues: [number, number]; score: [number, number]; host: number; mvp: number | null; note: string };
   userTeamId: number | null;
 }
 

@@ -16,6 +16,7 @@ export type Route =
   | { page: "box"; key: string }
   | { page: "moves"; mine: boolean }
   | { page: "playoffs" }
+  | { page: "allstar" }
   | { page: "winter" }
   | { page: "trades"; partnerId: number | null; block?: BlockSlug }
   | { page: "history" }
@@ -51,6 +52,8 @@ export function parse(hash: string): Route {
       return { page: "moves", mine: a === "mine" };
     case "playoffs":
       return { page: "playoffs" };
+    case "allstar":
+      return { page: "allstar" };
     case "office":
       return { page: "office" };
     case "winter":
@@ -92,6 +95,8 @@ export function href(r: Route): string {
       return r.mine ? "#moves-mine" : "#moves";
     case "playoffs":
       return "#playoffs";
+    case "allstar":
+      return "#allstar";
     case "office":
       return "#office";
     case "winter":

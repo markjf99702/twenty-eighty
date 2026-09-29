@@ -948,6 +948,12 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 
 .box-notes { display: grid; gap: 2px; font-size: 13px; color: var(--ink-2); }
 .sub-row td.name { padding-left: 18px; font-weight: 400; }
+.allstar-notes { display: grid; gap: 4px; font-size: 14px; }
+.allstar-notes .k, .year-pick .k { font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); margin-right: 4px; }
+.tbl td.mine { background: var(--accent-soft); }
+.small .mine a { font-weight: 600; }
+.history-awards { display: grid; gap: 18px; }
+.year-pick select { font: inherit; padding: 2px 6px; }
 
 /* ------------------------------------------------------------------ postseason */
 
