@@ -241,7 +241,7 @@ function Offers({ canTrade, onAdjust }: { canTrade: boolean; onAdjust: (o: Offer
               <span class="dim small">{o.expires}</span>
             </div>
             <p class="pitch">{o.pitch}</p>
-            {o.advice && <StaffTake advice={o.advice} />}
+            {o.advice && <StaffTake advice={o.advice} brief />}
             <div class="grid-2">
               <OfferSide label="You send" players={o.give} total={o.value.give} />
               <OfferSide label="You get" players={o.get} total={o.value.get} />
@@ -412,6 +412,7 @@ export function Trades({ partnerId, block, status }: { partnerId: number | null;
   const partners = (status.teams ?? []).filter((t) => t.id !== user).sort((a, b) => a.city.localeCompare(b.city));
   const partner = partnerId ?? partners[0]?.id ?? 0;
   const sides = useApi("tradeSides", { partnerId: partner }, [partner]);
+  const theirName = sides.data?.theirs.team.nickname ?? partners.find((t) => t.id === partner)?.nickname ?? "other club";
   const [give, setGive] = useState<Set<number>>(new Set());
   const [get, setGet] = useState<Set<number>>(new Set());
   const [filters, setFilters] = useState<[Filter, Filter]>(["all", "all"]);
@@ -590,12 +591,15 @@ export function Trades({ partnerId, block, status }: { partnerId: number | null;
           <span class="v">{money(check?.get ?? 0)}</span>
         </div>
         <div class="verdict">
+          <span class="k">Their answer</span>
           {check === null ? (
             <span class="dim">Pick players from both sides.</span>
           ) : check.ok ? (
-            <span class="yes">They'd take it.</span>
+            <span class="yes">The {theirName} would say yes.</span>
           ) : check.over ? (
-            <span class="no">They'd take it once you make room: designate {plural(check.over, "more player", "more players")} below.</span>
+            <span class="no">
+              The {theirName} would say yes once you make room: designate {plural(check.over, "more player", "more players")} below.
+            </span>
           ) : (
             <span class="no">{check.reason}</span>
           )}

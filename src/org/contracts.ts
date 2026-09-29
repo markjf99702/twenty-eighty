@@ -56,26 +56,75 @@ export function marketSalary(war: number): number {
   return money(Math.max(MIN_SALARY, DOLLARS_PER_WAR * war - 1.5));
 }
 
-/** His most recent big-league WAR, prorated to a full season (null if he barely played). */
-export function recentWar(p: Player, year: number): number | null {
-  const line = p.career.find((c) => c.year === year && c.level === "MLB");
-  if (!line) return null;
-  if (line.bat && line.bat.PA >= 150) return (line.bat.WAR * 600) / line.bat.PA;
-  if (line.pit && line.pit.outs >= 90) {
-    const full = canStart(p) ? 540 : 195;
-    return (line.pit.WAR * full) / line.pit.outs;
-  }
-  return null;
+/**
+ * What an arbitration panel sees: last season's big-league line as the back of
+ * a baseball card reads it, in wins. It is fit to WAR over simulated seasons
+ * but hands out credit the way arbitration does, not the way WAR does: runs
+ * driven in and pitchers' wins count (WAR gives them next to nothing), walks
+ * and defense don't, and saves pay handsomely (WAR gives them nothing at all).
+ * Totals, not rates: a player who missed half the year has half a case.
+ * Null if he barely played in the majors.
+ */
+export interface ArbCase {
+  /** His case, in wins over replacement. */
+  war: number;
+  /** The numbers he takes into the hearing, e.g. "34 SV, 2.41 ERA, 61.1 IP". */
+  line: string;
+  /** Saves he's paid for (a reliever's; a starter's odd save isn't). */
+  sv: number;
 }
 
-/** An arbitration award: a share of market value, judged half on grades and half on last season. */
-export function arbitrationSalary(p: Player, lastYear: number): number {
+/** Wins of an arbitration case per save. */
+export const ARB_PER_SAVE = 0.06;
+
+export function arbCase(p: Player, year: number): ArbCase | null {
+  const line = p.career.find((c) => c.year === year && c.level === "MLB");
+  if (!line) return null;
+  if (p.pitching) {
+    const q = line.pit;
+    if (!q || q.outs < 90) return null;
+    const ip = q.outs / 3;
+    const ipText = `${Math.floor(q.outs / 3)}${q.outs % 3 ? `.${q.outs % 3}` : ""} IP`;
+    const era = `${q.ERA.toFixed(2)} ERA`;
+    if (q.GS >= q.G / 2) {
+      const war = 0.05 + 0.012 * ip + 0.0195 * q.SO - 0.0453 * q.ER + 0.1 * q.W;
+      return { war, line: `${q.W}-${q.L}, ${era}, ${ipText}, ${q.SO} K`, sv: 0 };
+    }
+    const war = -0.144 + 0.0074 * ip + 0.0232 * q.SO - 0.0473 * q.ER + ARB_PER_SAVE * q.SV;
+    return { war, line: `${q.SV ? `${q.SV} SV, ` : ""}${era}, ${ipText}, ${q.SO} K`, sv: q.SV };
+  }
+  const b = line.bat;
+  if (!b || b.PA < 150) return null;
+  const war = -0.0142 * b.PA + 0.0567 * b.H + 0.0463 * b.HR + 0.025 * b.RBI + 0.0267 * b.SB;
+  const avg = b.AB > 0 ? (b.H / b.AB).toFixed(3).replace(/^0/, "") : ".000";
+  return { war, line: `${avg}, ${b.HR} HR, ${b.RBI} RBI${b.SB >= 10 ? `, ${b.SB} SB` : ""}`, sv: 0 };
+}
+
+/**
+ * An arbitration award: a share of market value, judged mostly on his case
+ * (last season's numbers, saves and all) and a little on his grades; on his
+ * grades alone if he barely played. `withoutSaves` prices the same case with
+ * the saves taken out, to show what they're worth.
+ */
+export function arbitrationSalary(p: Player, lastYear: number, withoutSaves = false): number {
   const n = Math.min(ARB_SHARE.length - 1, Math.max(0, serviceYears(p) - ARB_YEARS));
-  const recent = recentWar(p, lastYear);
-  const war = recent === null ? projectedWar(p) : 0.5 * projectedWar(p) + 0.5 * recent;
+  const c = arbCase(p, lastYear);
+  const war = c === null ? projectedWar(p) : 0.25 * projectedWar(p) + 0.75 * (c.war - (withoutSaves ? ARB_PER_SAVE * c.sv : 0));
   const award = ARB_SHARE[n]! * marketSalary(war);
   const floor = p.contract && p.contract.type !== "minor" ? p.contract.salary : MIN_SALARY;
   return money(Math.max(floor, award, MIN_SALARY + 0.3));
+}
+
+/**
+ * What a club thinks a year of him is worth when deciding whether to tender
+ * him: his wins above a replacement at the market rate, with a reliever's
+ * counted up for the late innings he pitches (WAR doesn't weigh leverage, and
+ * clubs pay for it) and measured against a smaller margin (a reliever's whole
+ * season is a third of a starter's innings).
+ */
+export function tenderWorth(p: Player, war: number): number {
+  const relief = p.pitching !== undefined && !canStart(p);
+  return Math.max(0, war - (relief ? 0.1 : 0.3)) * DOLLARS_PER_WAR * (relief ? 1.8 : 1);
 }
 
 export const preArbSalary = (p: Player) => money(MIN_SALARY + 0.03 * serviceYears(p));

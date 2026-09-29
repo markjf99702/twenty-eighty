@@ -1107,7 +1107,9 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .trade-bar > div:not(.verdict) { display: grid; }
 .trade-bar .k { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
 .trade-bar .v { font-family: var(--display); font-weight: 700; font-size: 24px; line-height: 1; font-variant-numeric: tabular-nums; }
-.trade-bar .verdict { flex: 1 1 220px; }
+.trade-bar .verdict { flex: 1 1 220px; display: grid; gap: 2px; }
+.staff-take .why { margin-left: auto; font-size: 13px; }
+.staff-take.brief .take-line { margin-bottom: 0; }
 .trade-bar-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .trade-bar .yes { color: var(--accent-text); font-weight: 700; }
 .trade-bar .no { color: var(--alert); }
@@ -1525,6 +1527,8 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 /* ------------------------------------------------------------------ trades: stats and the staff's take */
 
 .stat-brief { display: block; font-size: 12px; font-weight: 400; color: var(--ink-3); white-space: normal; min-width: 14em; max-width: 24em; line-height: 1.3; }
+.arb-case { font-size: 12px; font-weight: 400; color: var(--ink-3); white-space: normal; line-height: 1.3; }
+.arb-case .arb-saves { color: var(--warn, var(--ink-2)); }
 .offer-player .line { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: -2px; }
 .staff-take {
   display: grid;

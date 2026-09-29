@@ -176,7 +176,8 @@ the GM:
   away.
 - **My club**: the active roster, injured list and every affiliate, with each player's
   present grades, projected WAR (for big leaguers and anyone close) or future value (for
-  prospects), the overall Now grade, 40-man status, options left and service
+  prospects), the overall Now grade (on tables with prospects in them; a table of big
+  leaguers leads with wins), 40-man status, options left and service
   time. Switch the tables between the scouting report, the club's last 15 games, this
   season's stats (AVG/OBP/SLG,
   wRC+, xwOBA, fielding runs and WAR for hitters; ERA, ERA-, FIP, K%, BB%, WHIP and WAR
@@ -200,7 +201,8 @@ the GM:
   shutouts, a starter's gem, a two-homer night) and a box score, the bracket as it fills
   in, and MVPs for the League Championship Series and the World Series.
 - **The offseason**, a phase at a time: the season in review (awards, who developed,
-  who retired), the tender deadline for your arbitration cases, the draft (pick when
+  who retired), the tender deadline for your arbitration cases (each with the stat line
+  he takes into the hearing, and what his saves added to the award), the draft (pick when
   you're on the clock), eight weeks of free agency (make offers; players take the best
   one that clears their price), international signings against your bonus pool, and
   spring training. Then the next season starts.
@@ -337,8 +339,18 @@ Every winter the whole universe moves forward a year:
   prospects break out and more of them stall. Future Value (FV) is the grade of a
   player's projected peak under that model, an honest forecast rather than a ceiling.
 - **Contracts.** Players with under three years of service make near the minimum;
-  three to six years go to arbitration each winter (about 22%, 38% and 58% of their
-  market value); six or more can become free agents. A win costs about $8M on the
+  three to six years go to arbitration each winter; six or more can become free agents.
+  Arbitration reads the back of the baseball card, not WAR: last season's average,
+  homers, RBI and steals, a pitcher's wins, innings, strikeouts and ERA, and a
+  reliever's saves, each worth about 0.06 wins in the hearing though they're worth
+  nothing in WAR. The case is fit to WAR over simulated seasons (`scripts/arb-fit.ts`)
+  with RBI and wins given the weight arbitration gives them, and totals count, so a
+  player who missed half the year has half a case. The award is about 22%, 38% and 58%
+  of what the case (three parts last season, one part grades) would fetch on the open
+  market. So a 35-save closer costs several million more than the setup man with the same
+  line, and a slugger more than the glove man worth the same wins: think about who
+  closes before his arbitration years. Clubs weigh a reliever's wins up for leverage
+  when they decide whom to tender. A win costs about $8M on the
   open market, and projected WAR comes from the grades through coefficients measured
   from the engine. Each club's budget is set by its owner from what the club takes in
   (see Finances and owners below); released players' guaranteed money stays on the

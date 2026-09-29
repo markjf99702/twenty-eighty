@@ -2,8 +2,7 @@
  * View models for the offseason, trades and league history.
  */
 import type { League, Team } from "../../../src/league/types";
-import { payroll } from "../../../src/org/contracts";
-import { orgPlayers } from "../../../src/org/contracts";
+import { arbCase, arbitrationSalary, orgPlayers, payroll } from "../../../src/org/contracts";
 import type { RosterContext } from "../../../src/org/roster";
 import { askingPrice, onTheBlock } from "../../../src/org/market";
 import { offerLive } from "../../../src/org/offers";
@@ -78,7 +77,18 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
     view.tenders = {
       rows: w.tenders
         .filter((t) => t.teamId === user)
-        .map((t) => ({ player: summary(t.playerId), salary: t.salary, war: Math.round(believedWar(season, user, league.players[t.playerId]!) * 10) / 10, tender: t.tender })),
+        .map((t) => {
+          const p = league.players[t.playerId]!;
+          const c = arbCase(p, league.year);
+          return {
+            player: summary(t.playerId),
+            salary: t.salary,
+            war: Math.round(believedWar(season, user, p) * 10) / 10,
+            tender: t.tender,
+            line: c?.line ?? null,
+            saves: c && c.sv > 0 ? Math.max(0, t.salary - arbitrationSalary(p, league.year, true)) : 0,
+          };
+        }),
       expiring: w.expiring.filter((id) => league.players[id]!.teamId === user).map(summary),
     };
   }

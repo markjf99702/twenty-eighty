@@ -244,6 +244,10 @@ function Tenders({ v }: { v: OffseasonView }) {
                   <tr key={r.player.id}>
                     <td class="name">
                       <a href={playerHref(r.player.id)}>{r.player.name}</a> <span class="muted">{r.player.pos}</span>
+                      <div class="arb-case" title="The case he takes into arbitration: last season's big-league numbers">
+                        {r.line ?? "Barely played last season"}
+                        {r.saves >= 0.05 && <span class="arb-saves"> · saves add {$(r.saves)}</span>}
+                      </div>
                     </td>
                     <td class="num">{r.player.age}</td>
                     <td class="num">{r.player.status.service}</td>
@@ -272,8 +276,10 @@ function Tenders({ v }: { v: OffseasonView }) {
           </div>
         )}
         <div class="small dim">
-          Arbitration pays a rising share of a player's market value: about 22%, 38% and 58% in his three years of eligibility.
-          Non-tendered players become free agents.
+          Arbitration reads the back of the baseball card: last season's homers, RBI, average and steals, a pitcher's wins,
+          innings and ERA, and above all a reliever's saves. Walks and defense barely register. The award is a rising share of what
+          that case would fetch on the open market, about 22%, 38% and 58% in his three years of eligibility, so a closer costs far
+          more than the wins behind him. Non-tendered players become free agents.
         </div>
       </Section>
       <Section title="Becoming free agents" aside={`${t.expiring.length}`}>
@@ -436,7 +442,6 @@ function FreeAgency({ v, onWinter }: { v: OffseasonView; onWinter: (kind: Winter
     { key: "pos", label: "Pos", render: (r) => r.player.pos },
     { key: "age", label: "Age", cls: "num", sort: (r) => r.player.age, asc: true, render: (r) => r.player.age },
     { key: "war", label: "Proj", title: GLOSSARY.Proj, cls: "num", sort: (r) => r.war, render: (r) => <span class={r.war < 0 ? "neg" : ""}>{fixed(r.war)}</span> },
-    { key: "ovr", label: "Now", cls: "ctr", sort: (r) => r.player.ovr, render: (r) => <Grade g={r.player.ovr} /> },
     { key: "ask", label: "Asking", cls: "num", sort: (r) => r.askSalary, render: (r) => `${r.askYears} yr × ${$(r.askSalary)}` },
     { key: "floor", label: "Takes now", title: "The lowest annual salary he'd accept this week, at his asked-for years", cls: "num", sort: (r) => r.floor, render: (r) => $(r.floor) },
     { key: "offer", label: "Your offer", render: (r) => <OfferCell row={r} offer={offers.get(r.player.id)} /> },

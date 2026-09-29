@@ -2,7 +2,7 @@ import { Rng } from "../core/rng";
 import { expectedGate, formFactor, referencePrice } from "../finance/finance";
 import { settingsOf } from "../league/settings";
 import type { AdviceNote, League, Team } from "../league/types";
-import { budgetRoom, FREE_AGENT_YEARS, orgPlayers, payroll, serviceYears } from "../org/contracts";
+import { arbCase, arbitrationSalary, budgetRoom, FREE_AGENT_YEARS, orgPlayers, payroll, serviceYears, tenderWorth } from "../org/contracts";
 import { extensionCandidates } from "../org/extensions";
 import { onTheBlock } from "../org/market";
 import { gamesOut } from "../org/offers";
@@ -10,6 +10,7 @@ import { rosterProblems } from "../org/roster";
 import { TRADE_DEADLINE_DAY } from "../org/trades";
 import { canStart, overallGrade } from "../org/value";
 import { boardValue } from "../offseason/draft";
+import type { Tender } from "../offseason/types";
 import { IL_THRESHOLD_DAYS } from "../players/injuries";
 import { randomName } from "../players/names";
 import { FIELD_POSITIONS, type FieldPosition, type Level, playerName, type Player } from "../players/types";
@@ -403,11 +404,21 @@ export function winterAdvice(league: League, season: Season, now: number): void 
 
   if (w.phase === "review") {
     const mine = w.tenders.filter((t) => t.teamId === user);
-    const cut = mine.filter((t) => t.tender && Math.max(0, war(league.players[t.playerId]!)) * 8 < 0.8 * t.salary).slice(0, 3);
-    const keep = mine.filter((t) => !t.tender && Math.max(0, war(league.players[t.playerId]!)) * 8 > 1.3 * t.salary).slice(0, 3);
-    if (cut.length || keep.length) {
+    const worth = (t: Tender) => tenderWorth(league.players[t.playerId]!, war(league.players[t.playerId]!));
+    const cut = mine.filter((t) => t.tender && worth(t) < 0.8 * t.salary).slice(0, 3);
+    const keep = mine.filter((t) => !t.tender && worth(t) > 1.3 * t.salary).slice(0, 3);
+    // A closer's saves pay in arbitration far beyond the wins behind them.
+    const closer = mine
+      .map((t) => ({ t, p: league.players[t.playerId]!, c: arbCase(league.players[t.playerId]!, league.year) }))
+      .filter((x) => x.c && x.c.sv > 0 && x.t.salary - arbitrationSalary(x.p, league.year, true) >= 1)
+      .sort((a, b) => b.c!.sv - a.c!.sv)[0];
+    if (cut.length || keep.length || closer) {
       const P = (id: number) => league.players[id]!;
       const parts: string[] = [];
+      if (closer) {
+        const without = arbitrationSalary(closer.p, league.year, true);
+        parts.push(`Saves pay in arbitration: ${tag(closer.p)}'s ${closer.c!.sv} saves take his award from about ${money(without)} to ${money(closer.t.salary)}.`);
+      }
       if (cut.length) parts.push(`By our read, ${cut.map((t) => `${tag(P(t.playerId))} (${money(t.salary)} for about ${Math.max(0, war(P(t.playerId))).toFixed(1)} wins)`).join(", ")} ${cut.length === 1 ? "costs" : "cost"} more than ${cut.length === 1 ? "he's" : "they're"} worth in arbitration; consider non-tendering.`);
       if (keep.length) parts.push(`${keep.map((t) => tag(P(t.playerId))).join(", ")} ${keep.length === 1 ? "is" : "are"} marked to be non-tendered, but we think ${keep.length === 1 ? "he's" : "they're"} worth the raise.`);
       add(league, now, { key: `tender:${league.year}`, from: "assistant", urgent: false, title: "Arbitration decisions", text: parts.join(" "), href: "#winter" });

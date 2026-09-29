@@ -15,6 +15,7 @@ import {
   orgPlayers,
   preArbSalary,
   seasonWar,
+  tenderWorth,
   serviceYears,
 } from "../org/contracts";
 import { logTransaction, refreshDepth, releasePlayer, type RosterContext } from "../org/roster";
@@ -156,7 +157,7 @@ function rollContracts(league: League): { tenders: Tender[]; expiring: number[] 
       } else if (yrs >= ARB_YEARS) {
         const salary = arbitrationSalary(p, league.year);
         // Keep him if he's worth his award over a replacement-level player, or if it's cheap.
-        const tender = Math.max(0, seasonWar(p) - 0.3) * DOLLARS_PER_WAR >= 0.9 * salary || salary <= 1.2;
+        const tender = tenderWorth(p, seasonWar(p)) >= 0.9 * salary || salary <= 1.2;
         tenders.push({ playerId: p.id, teamId: team.id, salary, tender });
       } else {
         p.contract = { type: "pre-arb", salary: preArbSalary(p), years: 1 };

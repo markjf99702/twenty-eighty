@@ -64,6 +64,11 @@ tenders, the draft, free agency (`winterWeek`), international signings and sprin
 training, and returns the next `Season`. `runOffseason` does the whole winter with the AI
 deciding everything. The winter state lives in `league.offseason`, so it saves and
 resumes like everything else; each step draws randomness from `winterRng(league, label)`.
+Arbitration awards (`arbitrationSalary` in src/org/contracts.ts) come from `arbCase`,
+last season's counting stats read as an arbitration panel would (saves at `ARB_PER_SAVE`
+wins each; refit with `scripts/arb-fit.ts` if the engine's WAR changes), not from WAR;
+tender decisions compare the award with `tenderWorth`, which weighs relievers up for
+leverage. Extensions still price arbitration years from projected WAR.
 
 Grades on a `Player` are the truth, and the simulation only ever uses the truth.
 Decisions use beliefs (src/scouting/): `perceive(league, viewer, p)` is a player as a

@@ -560,7 +560,11 @@ export interface OffseasonView {
     shift: Record<string, number>;
   };
   tenders?: {
-    rows: { player: PlayerSummary; salary: number; war: number; tender: boolean }[];
+    /**
+     * `line` is the case he took into arbitration (last season's numbers; null
+     * if he barely played), `saves` how much of the award his saves bought.
+     */
+    rows: { player: PlayerSummary; salary: number; war: number; tender: boolean; line: string | null; saves: number }[];
     expiring: PlayerSummary[];
   };
   draft?: {

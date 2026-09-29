@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
 import type { PlayerSummary, PostseasonView, SeriesView, Status } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
-import { NowGrade, Proj } from "../components/Outlook";
+import { Proj } from "../components/Outlook";
 import { type Column, Table } from "../components/Table";
 import { LEVEL_NAMES, statBrief } from "../format";
 import { playerHref, teamHref } from "../router";
@@ -178,7 +178,6 @@ function PlanEditor({ onClose }: { onClose: () => void }) {
     { key: "pos", label: "Pos", render: (p) => p.pos },
     { key: "lvl", label: "Lvl", render: (p) => LEVEL_NAMES[p.level] },
     { key: "proj", label: "Proj", cls: "num", sort: (p) => p.proj ?? -99, render: (p) => <Proj p={p} word={false} /> },
-    { key: "ovr", label: "Now", cls: "ctr", sort: (p) => p.ovr, render: (p) => <NowGrade p={p} /> },
   ];
   const rows = (pitching: boolean) => d.players.filter((p) => p.pitcher === pitching);
 
