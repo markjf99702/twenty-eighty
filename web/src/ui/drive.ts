@@ -12,14 +12,15 @@ import type { DriveMeta } from "../api/protocol";
  * secret: Google accepts it only from the origins listed here.
  */
 export const GOOGLE_CLIENT_ID = "897653851078-p5jrh2bto6h3bj0lc4jist3k1vsc1pj4.apps.googleusercontent.com";
-export const DRIVE_ORIGINS = ["https://junkdrawer.works"];
+// Twenty-Eighty lives at its own address now; junkdrawer.works/twenty-eighty/ forwards there.
+export const DRIVE_ORIGINS = ["https://twenty-eighty.junkdrawer.works", "https://junkdrawer.works"];
 
 const SCOPE = "https://www.googleapis.com/auth/drive.file";
 const API = "https://www.googleapis.com/drive/v3/files";
 const UP = "https://www.googleapis.com/upload/drive/v3/files";
 const KEY = "twenty-eighty.drive";
 const DEVICE_KEY = "twenty-eighty.device";
-/** The Google sign-in every junkdrawer.works project shares: one sign-in, good for an hour, lets each of them sync. */
+/** The key every junkdrawer.works project keeps its Google sign-in under: good for an hour, and it remembers the account. */
 const SHARED = "junkdrawer.google";
 /** Ids go into Drive queries, so only the plain ones Twenty-Eighty makes. */
 const SAFE_ID = /^[a-z0-9]{6,32}$/;

@@ -1,6 +1,6 @@
 # Twenty-Eighty
 
-**Play it: [junkdrawer.works/twenty-eighty](https://junkdrawer.works/twenty-eighty/)**
+**Play it: [twenty-eighty.junkdrawer.works](https://twenty-eighty.junkdrawer.works/)**
 
 **A baseball front-office game where every player carries the scouts' 20-80 grades.** You're the
 general manager of a made-up club: set the roster, run the farm system, draft, trade, sign free
@@ -57,13 +57,14 @@ another device's.
 - Twenty-Eighty asks Google only for `drive.file`, so it can reach the files it made and nothing else in
   your Drive.
 - Google signs the page out after an hour. The league keeps saving on the device meanwhile; the cloud in
-  the scoreboard turns red, and one tap signs back in and uploads what waited. The sign-in is shared
-  with the other junkdrawer.works projects on the device (under `junkdrawer.google` in localStorage), so
-  signing in to any of them lets Twenty-Eighty save during that hour without asking.
+  the scoreboard turns red, and one tap signs back in and uploads what waited. The sign-in is kept
+  for the hour under `junkdrawer.google` in localStorage, the same way as the other junkdrawer.works
+  projects, and it remembers your account for the next one.
 - **Stop saving on this device** leaves the files in Drive and doesn't revoke Google's permission,
   which would sign every project out. To take the permission back, remove junkdrawer.works under
   Third-party apps & services in your Google Account.
-- It works only at `https://junkdrawer.works`, where Google accepts the shared OAuth client
+- It works only at `https://twenty-eighty.junkdrawer.works` (and `https://junkdrawer.works`, its old
+  address), where Google accepts the shared OAuth client
   (`GOOGLE_CLIENT_ID` in `web/src/ui/drive.ts`). Anywhere else (a local copy, the Artifact copy) the
   Drive controls don't appear.
 

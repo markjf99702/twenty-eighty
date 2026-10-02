@@ -120,7 +120,7 @@ export function Office({ status, onStatus }: { status: Status; onStatus: (s: Sta
               <input type="file" accept=".json,.txt,application/json,text/plain" hidden onChange={(e) => importSave((e.target as HTMLInputElement).files?.[0])} />
             </label>
           </div>
-          {!CAN_DOWNLOAD && <p class="dim small" style={{ margin: 0 }}>Exporting works at junkdrawer.works/twenty-eighty; importing works here.</p>}
+          {!CAN_DOWNLOAD && <p class="dim small" style={{ margin: 0 }}>Exporting works at twenty-eighty.junkdrawer.works; importing works here.</p>}
           <p class="dim small" style={{ margin: 0 }}>Import takes an exported save or a copy downloaded from the Twenty-Eighty folder in Google Drive.</p>
         </Section>
 

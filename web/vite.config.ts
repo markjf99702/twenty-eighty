@@ -10,7 +10,7 @@ import { defineConfig, type Plugin } from "vite";
 const site = Boolean(process.env.VITE_SITE);
 const artifact = Boolean(process.env.VITE_NO_DOWNLOAD);
 
-const URL = "https://junkdrawer.works/twenty-eighty/";
+const URL = "https://twenty-eighty.junkdrawer.works/";
 
 /** The junkdrawer.works head tags: link preview, icons, install and the phone's theme colour. */
 function siteHead(): Plugin {
@@ -18,20 +18,24 @@ function siteHead(): Plugin {
   const link = (attrs: Record<string, string | boolean>) => ({ tag: "link", attrs, injectTo: "head" as const });
   return {
     name: "site-head",
-    transformIndexHtml: () => [
-      meta({ property: "og:title", content: "Twenty-Eighty" }),
-      meta({ property: "og:description", content: "Run a ball club on the scouts' 20-80 scale." }),
-      meta({ property: "og:image", content: `${URL}og.png` }),
-      meta({ property: "og:url", content: URL }),
-      meta({ name: "twitter:card", content: "summary_large_image" }),
-      meta({ name: "theme-color", content: "#16372b", media: "(prefers-color-scheme: light)" }),
-      meta({ name: "theme-color", content: "#0a120e", media: "(prefers-color-scheme: dark)" }),
-      link({ rel: "manifest", href: "manifest.webmanifest" }),
-      link({ rel: "icon", href: "icon.svg", type: "image/svg+xml" }),
-      link({ rel: "apple-touch-icon", href: "icon-180.png" }),
-      link({ rel: "preload", href: "assets/source-sans-3.woff2", as: "font", type: "font/woff2", crossorigin: true }),
-      link({ rel: "preload", href: "assets/barlow-condensed-700.woff2", as: "font", type: "font/woff2", crossorigin: true }),
-    ],
+    transformIndexHtml: (html) => ({
+      // Before anything else runs: brings saves over from the old address, junkdrawer.works/twenty-eighty/.
+      html: html.replace(/<meta name="viewport"[^>]*>/, (m) => `${m}\n    <script src="carry.js"></script>`),
+      tags: [
+        meta({ property: "og:title", content: "Twenty-Eighty" }),
+        meta({ property: "og:description", content: "Run a ball club on the scouts' 20-80 scale." }),
+        meta({ property: "og:image", content: `${URL}og.png` }),
+        meta({ property: "og:url", content: URL }),
+        meta({ name: "twitter:card", content: "summary_large_image" }),
+        meta({ name: "theme-color", content: "#16372b", media: "(prefers-color-scheme: light)" }),
+        meta({ name: "theme-color", content: "#0a120e", media: "(prefers-color-scheme: dark)" }),
+        link({ rel: "manifest", href: "manifest.webmanifest" }),
+        link({ rel: "icon", href: "icon.svg", type: "image/svg+xml" }),
+        link({ rel: "apple-touch-icon", href: "icon-180.png" }),
+        link({ rel: "preload", href: "assets/source-sans-3.woff2", as: "font", type: "font/woff2", crossorigin: true }),
+        link({ rel: "preload", href: "assets/barlow-condensed-700.woff2", as: "font", type: "font/woff2", crossorigin: true }),
+      ],
+    }),
   };
 }
 

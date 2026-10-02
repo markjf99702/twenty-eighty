@@ -7,7 +7,7 @@ dependencies; the browser UI in web/ uses Preact and Vite. See README.md for the
 
 - `npm run check`: typecheck (engine and web) + tests. Run before every commit.
 - `npm run dev` / `npm run build:web`: the browser UI (Vite, root `web/`).
-- `npm run build:site`: the copy junkdrawer.works serves (GitHub Pages from `main`, repo
+- `npm run build:site`: the copy twenty-eighty.junkdrawer.works serves (GitHub Pages from `main`, repo
   root): writes `index.html` and `assets/` at the root, next to the hand-kept kit files
   (`sw.js`, `manifest.webmanifest`, icons, `og.png`). Rebuild and commit it with any UI or
   engine change, then `npm run test:e2e` (plays the built site in Chromium; offline, no
@@ -22,7 +22,7 @@ one file per league per device tagged with `appProperties`; never revoke) and `w
 the person picks a copy. The worker gives each league `id` and `savedAt` (set in `persist`;
 opening a copy keeps its time) and answers `driveCode` (a gzip+base64 league code, or null if
 unchanged) and `openCode`. `test/drive.mjs` rewrites the origin list in `assets/index.js` to
-allow localhost; it's minified as a template literal, `[`https://junkdrawer.works`]`.
+allow localhost; it's minified as template literals ending in `` `https://junkdrawer.works`] ``.
 - `npm run calibrate [-- --seasons 3]`: full-season league metrics vs. MLB targets,
   plus player/team spread. Aim for "0 metric(s) outside 2x tolerance".
 - `npm run grade-chart [-- --pa 30000]`: what each 20-80 grade produces, per tool.

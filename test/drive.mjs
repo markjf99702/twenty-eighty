@@ -41,7 +41,7 @@ const until = async (what, fn, ms = 20000) => {
 /** A device: its own browser storage, the shared fake Google, and the origin check opened up for localhost. */
 async function device(name, init) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
-  await g.install(ctx, { rewrite: { '**/assets/index.js': (s) => s.replace('[`https://junkdrawer.works`]', `[\`https://junkdrawer.works\`,\`${origin}\`]`) } });
+  await g.install(ctx, { rewrite: { '**/assets/index.js': (s) => s.replace('`https://junkdrawer.works`]', `\`https://junkdrawer.works\`,\`${origin}\`]`) } });
   if (init) await ctx.addInitScript(init);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => problems.push(`${name}: ${e.message}`));

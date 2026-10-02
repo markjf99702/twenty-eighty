@@ -2,9 +2,9 @@
 // The saved league lives in IndexedDB, not here.
 // Network first, so a new version shows up as soon as you're online.
 
-const CACHE = 'twenty-eighty-v1'; // bump the number when the file list changes
+const CACHE = 'twenty-eighty-v2'; // bump the number when the file list changes
 const SHELL = [
-  './', 'index.html', 'icon.svg', 'manifest.webmanifest',
+  './', 'index.html', 'carry.js', 'icon.svg', 'manifest.webmanifest',
   'assets/index.js', 'assets/index.css', 'assets/sim.worker.js',
   'assets/barlow-condensed-500.woff2', 'assets/barlow-condensed-600.woff2', 'assets/barlow-condensed-700.woff2',
   'assets/ibm-plex-mono-500.woff2', 'assets/ibm-plex-mono-600.woff2', 'assets/source-sans-3.woff2',
