@@ -62,6 +62,9 @@ await page.goto(base + '#history');
 await page.waitForSelector('main h1');
 const shell = await page.evaluate(() => ({ strip: document.querySelector('.rail').getBoundingClientRect().height, heading: document.querySelector('main h1').getBoundingClientRect().top }));
 assert.ok(shell.strip < 80 && shell.heading < 500, `League history sits under a blank band (strip ${Math.round(shell.strip)}px tall, heading ${Math.round(shell.heading)}px down)`);
+// The strip scrolls sideways on a phone and shows the page you're on.
+const here = await page.evaluate(() => { const r = document.querySelector('.rail a.on').getBoundingClientRect(); return { left: r.left, right: r.right }; });
+assert.ok(here.left >= 0 && here.right <= 390, `the section strip hides the page you're on (History at ${Math.round(here.left)} to ${Math.round(here.right)}px)`);
 await fits('league history');
 
 // The roster, a player's page and the trade desk.

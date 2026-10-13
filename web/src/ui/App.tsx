@@ -641,6 +641,17 @@ function StopsMenu({ stops, onChange }: { stops: StopRules; onChange: (s: StopRu
 // Navigation
 
 function Rail({ status, route }: { status: Status; route: Route }) {
+  const ref = useRef<HTMLElement>(null);
+  // On a phone the sections are a strip that scrolls sideways: bring the page you're on into view.
+  useEffect(() => {
+    const rail = ref.current;
+    const on = rail?.querySelector<HTMLElement>("a.on");
+    if (!rail || !on || rail.scrollWidth <= rail.clientWidth) return;
+    const box = rail.getBoundingClientRect();
+    const link = on.getBoundingClientRect();
+    if (link.left >= box.left && link.right <= box.right) return;
+    rail.scrollLeft += link.left + link.width / 2 - (box.left + box.width / 2);
+  }, [route.page]);
   const user = status.userTeamId ?? null;
   const userTeam = status.teams?.find((t) => t.id === user);
   const items: { to: Route; label: string; on: boolean; tag?: string }[] = [
@@ -692,7 +703,7 @@ function Rail({ status, route }: { status: Status; route: Route }) {
       : []),
   ];
   return (
-    <aside class="rail">
+    <aside class="rail" ref={ref}>
       <nav aria-label="Sections">
         {items.map((it) => (
           <a key={it.label} href={href(it.to)} class={it.on ? "on" : ""} aria-current={it.on ? "page" : undefined}>
