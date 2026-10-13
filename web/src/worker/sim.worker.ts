@@ -80,6 +80,7 @@ import {
   boxScoreView,
   dashboardView,
   dateLabel,
+  deskFraction,
   extensionCandidatesView,
   extensionView,
   gameItems,
@@ -754,7 +755,7 @@ const handlers: Handlers = {
     const mine = userTeam();
     const partner = s.team(partnerId);
     const st = currentStatus();
-    const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
+    const fraction = deskFraction(s);
     const check = evaluateTrade(s.league, mine, partner, give, get, fraction, (viewer, p) => warShift(s, viewer, p), moves);
     const after = rostersAfter(s.league, mine, give, get, moves);
     const view = {
@@ -785,7 +786,7 @@ const handlers: Handlers = {
 
   askingPrice({ partnerId, get }) {
     const s = requireSeason();
-    const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
+    const fraction = deskFraction(s);
     return askingView(s, partnerId, get, fraction);
   },
 
@@ -820,7 +821,7 @@ const handlers: Handlers = {
     const s = requireSeason();
     const st = currentStatus();
     if (accept && !st.canTrade) return { ok: false, reason: st.tradeNote };
-    const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
+    const fraction = deskFraction(s);
     const res = answerOffer(ctx(), id, accept, offerClock(s.league, s), fraction, (viewer, p) => warShift(s, viewer, p));
     if (res.ok && accept) stats.clear();
     persistSoon();

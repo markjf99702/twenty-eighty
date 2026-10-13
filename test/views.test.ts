@@ -6,6 +6,9 @@ import { allStarLine } from "../web/src/worker/allstar";
 import { careerLine } from "../web/src/worker/records";
 import { careerTotals } from "../src/stats/career";
 import { liveLines, liveSeason } from "../src/stats/records";
+import { evaluateTrade, tradeValue } from "../src/org/trades";
+import { warShift } from "../src/scouting/analytics";
+import { blockView, tradeSide } from "../web/src/worker/winter";
 import { dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, transactions } from "../web/src/worker/views";
 import { budgetRoom } from "../src/org/contracts";
 import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
@@ -67,6 +70,32 @@ describe("a player's career", () => {
     expect(v.careerTotals.pit!.G).toBe(p.prior!.pit!.G + (live?.G ?? 0));
     expect(v.careerTotals.pit!.GS).toBe(p.prior!.pit!.GS + (live?.GS ?? 0));
     p.career.pop();
+  });
+});
+
+describe("the trade desk in season", () => {
+  it("values players on what's left of the season, so the ones picked add up to the deal's totals", () => {
+    const l = generateLeague({ seed: "desk-values" });
+    hireGm(l, 2);
+    const s = new Season(l, { minors: false });
+    const c = new StatsCache(() => s);
+    s.day = 100;
+    const fraction = 1 - s.day / s.totalDays;
+    const seen = (viewer: number, p: Player) => warShift(s, viewer, p);
+    const [mine, partner] = [l.teams[2]!, l.teams.find((t) => t.id !== 2 && t.league === l.teams[2]!.league)!];
+    const give = tradeSide(s, c, mine, s.rosterContext()).players.filter((p) => p.level === "MLB").slice(0, 2);
+    const get = tradeSide(s, c, partner).players.filter((p) => p.level === "MLB").slice(0, 1);
+    const check = evaluateTrade(l, mine, partner, give.map((p) => p.id), get.map((p) => p.id), fraction, seen);
+    const sum = (ps: { surplus: number }[]) => ps.reduce((t, p) => t + p.surplus, 0);
+    expect(Math.abs(check.give - sum(give))).toBeLessThan(0.11);
+    expect(Math.abs(check.get - sum(get))).toBeLessThan(0.06);
+    // The block's values, and a player's page, read the same.
+    for (const t of l.teams.filter((x) => x.league === partner.league)) Object.assign(s.records[t.id]!, { w: 60, l: 55 });
+    Object.assign(s.records[partner.id]!, { w: 45, l: 70 });
+    const block = blockView(s, c);
+    expect(block.length).toBeGreaterThan(0);
+    for (const b of block) expect(b.surplus).toBe(tradeValue(l, l.players[b.id]!, fraction, seen(2, l.players[b.id]!)));
+    expect(playerView(s, c, get[0]!.id, s.rosterContext()).surplus).toBe(get[0]!.surplus);
   });
 });
 

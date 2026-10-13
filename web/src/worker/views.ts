@@ -125,6 +125,9 @@ const WINTER_LABELS: Record<string, [string, string]> = {
 const f3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3).replace(/^(-?)0\./, "$1.") : "---");
 
 /** Per-level season stats, cached until the next simulated day. */
+/** How much of a season a trade counts now: what's left of this one, or in the winter all of the next. */
+export const deskFraction = (season: Season): number => (season.league.offseason ? 1 : Math.max(0, 1 - season.day / season.totalDays));
+
 export class StatsCache {
   private cache = new Map<Level, { day: number; stats: SeasonStats; hit: Map<number, number>; pit: Map<number, number> }>();
 
@@ -865,7 +868,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
     careerTeams,
     awards: condenseAwards(p.awards),
     draft,
-    surplus: team ? tradeValue(league, p, 1, warShift(season, league.userTeamId, p)) : null,
+    surplus: team ? tradeValue(league, p, deskFraction(season), warShift(season, league.userTeamId, p)) : null,
     retired: p.retired ?? null,
     scouting: {
       sigma: Math.round(read.sigma * 10) / 10,

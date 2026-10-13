@@ -17,7 +17,7 @@ import { believedWar, warShift } from "../../../src/scouting/analytics";
 import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
 import type { AskingView, BlockRow, DevRow, HistoryView, OffseasonView, OfferView, TradeAdviceView, TradeSide } from "../api/protocol";
-import { dateLabel, playerSummary, readOf, rosterActions, type StatsCache, teamRef } from "./views";
+import { dateLabel, deskFraction, playerSummary, readOf, rosterActions, type StatsCache, teamRef } from "./views";
 import { allStarLine, awardRows, executiveRows } from "./allstar";
 import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
@@ -213,10 +213,12 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
 /** One club's side of the trade desk; with `ctx`, each player carries the roster moves open to him. */
 export function tradeSide(season: Season, stats: StatsCache, team: Team, ctx?: RosterContext): TradeSide {
   const league = season.league;
+  // Valued as the deal is (evaluateTrade), so the players picked add up to its totals.
+  const fraction = deskFraction(season);
   const players = orgPlayers(league, team)
     .map((p) => ({
       ...playerSummary(p, season, stats, ctx ? rosterActions(p, team, ctx) : undefined),
-      surplus: tradeValue(league, p, 1, warShift(season, league.userTeamId, p)),
+      surplus: tradeValue(league, p, fraction, warShift(season, league.userTeamId, p)),
     }))
     .sort((a, b) => b.surplus - a.surplus);
   return { team: teamRef(team), players };
@@ -227,9 +229,10 @@ export function blockView(season: Season, stats: StatsCache): BlockRow[] {
   const league = season.league;
   const user = league.userTeamId;
   if (user === null) return [];
+  const fraction = deskFraction(season);
   return onTheBlock(season, user).map((b) => ({
     ...playerSummary(b.player, season, stats),
-    surplus: tradeValue(league, b.player, 1, warShift(season, user, b.player)),
+    surplus: tradeValue(league, b.player, fraction, warShift(season, user, b.player)),
     club: teamRef(b.team),
     gamesOut: b.gamesOut,
     group: b.group,
@@ -283,7 +286,7 @@ export function offerViews(season: Season, stats: StatsCache): OfferView[] {
   const user = league.userTeamId;
   if (user === null) return [];
   const now = offerClock(league, season);
-  const fraction = league.offseason ? 1 : Math.max(0, 1 - season.day / season.totalDays);
+  const fraction = deskFraction(season);
   const seen = (viewer: number, p: Player) => warShift(season, viewer, p);
   const row = (id: number) => {
     const p = league.players[id]!;
