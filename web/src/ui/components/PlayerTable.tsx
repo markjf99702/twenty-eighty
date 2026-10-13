@@ -6,6 +6,7 @@ import { fixed, ip, LEVEL_NAMES, pct, rate3, whole } from "../format";
 import { playerHref } from "../router";
 import { useBasics } from "../settings";
 import { notify } from "./Common";
+import { dollars } from "./Extension";
 import { Grade } from "./Grade";
 import { outlookColumns } from "./Outlook";
 import { type Column, Table } from "./Table";
@@ -25,9 +26,23 @@ export function StatusBadges({ p }: { p: PlayerSummary }) {
   );
 }
 
+/** What a designation or a release does, asked before it happens. */
+function askFirst(a: RosterActionOption, p: PlayerSummary): string {
+  if (a.kind === "dfa") {
+    return `Designate ${p.name} for assignment? Other clubs get a shot at him on waivers; if nobody claims him, he stays in your system at AAA, off the 40-man.`;
+  }
+  const c = p.contract;
+  return c && c.type === "guaranteed" && c.years > 0
+    ? `Release ${p.name}? He leaves the organization, but you still owe him ${dollars(c.salary)} a year through ${c.through}, on your payroll as dead money.`
+    : `Release ${p.name}? He leaves the organization, and you owe him nothing more.`;
+}
+
 export function RosterMoves({ p, onDone }: { p: PlayerSummary; onDone?: () => void }) {
   const [busy, setBusy] = useState(false);
+  // Designating and releasing can't be taken back, so they ask first.
+  const [asking, setAsking] = useState<RosterActionOption | null>(null);
   const run = async (a: RosterActionOption) => {
+    setAsking(null);
     setBusy(true);
     try {
       const res = await call("rosterAction", { kind: a.kind, playerId: p.id, ...(a.level ? { level: a.level } : {}) });
@@ -42,11 +57,29 @@ export function RosterMoves({ p, onDone }: { p: PlayerSummary; onDone?: () => vo
     }
   };
   if (!p.actions?.length) return <span class="muted">No moves available.</span>;
+  if (asking) {
+    return (
+      <div class="confirm">
+        <span>{askFirst(asking, p)}</span>
+        <button type="button" class="btn small danger" disabled={busy} onClick={() => run(asking)}>
+          {asking.kind === "dfa" ? "Designate him" : "Release him"}
+        </button>
+        <button type="button" class="btn small" onClick={() => setAsking(null)}>
+          Not yet
+        </button>
+      </div>
+    );
+  }
   return (
     <div class="actions">
       {p.actions.map((a) => (
         <div class="action" key={`${a.kind}-${a.level ?? ""}`}>
-          <button type="button" class={`btn small${a.kind === "release" || a.kind === "dfa" ? " danger" : ""}`} disabled={!a.ok || busy} onClick={() => run(a)}>
+          <button
+            type="button"
+            class={`btn small${a.kind === "release" || a.kind === "dfa" ? " danger" : ""}`}
+            disabled={!a.ok || busy}
+            onClick={() => (a.kind === "release" || a.kind === "dfa" ? setAsking(a) : run(a))}
+          >
             {a.label}
           </button>
           {!a.ok && a.reason && <span class="why">{a.reason}</span>}

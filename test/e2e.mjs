@@ -73,6 +73,16 @@ const mine = await page.evaluate(() => document.querySelector("a[href^='#team-']
 await page.goto(base + mine);
 await page.waitForSelector('.tbl tbody tr');
 await fits('the roster');
+// A player's roster moves open on screen (the table scrolls sideways to reach them), and designating him asks first.
+await page.locator('.tbl tbody tr').first().locator('button', { hasText: 'Moves' }).click();
+const moves = await page.locator('tr.expand .actions').boundingBox();
+assert.ok(moves && moves.x >= 0 && moves.x + moves.width <= 390, `the roster moves open off screen (${JSON.stringify(moves)})`);
+await page.locator('tr.expand button', { hasText: 'Designate for assignment' }).click();
+const asked = await page.locator('tr.expand').textContent({ timeout: 5000 }).catch(() => '');
+assert.match(asked, /Designate .+ for assignment\?/, 'designating a player did not ask first');
+await page.locator('tr.expand button', { hasText: 'Not yet' }).click();
+await page.waitForSelector('tr.expand .actions');
+await fits('the roster with a player\'s moves open');
 await page.locator('.tbl td.name a').first().click();
 await page.waitForSelector('.player-head h1');
 await fits('a player page');
