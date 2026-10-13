@@ -710,17 +710,20 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
   // Medical history is private: you know your own players, and what your scouts dig up on others.
   const looks = league.scouting.looks[p.id] ?? 0;
   if (isUser || looks >= 2) traits.push(p.durability > 0.8 ? "Injury-prone" : p.durability < -0.8 ? "Durable" : "Average durability");
+  // Usage is a weight per pitch (the fastball 1.0, the rest less); the page shows each one's share of his pitches.
+  const arsenal = q.pitching?.pitches ?? [];
+  const thrown = arsenal.reduce((s, x) => s + x.usage, 0) || 1;
   return {
     summary: playerSummary(p, season, stats, isUser ? rosterActions(p, team!, ctx) : undefined),
     team: team ? teamRef(team) : null,
     born: `${league.year - p.age}`,
     tools,
-    pitches: (q.pitching?.pitches ?? []).map((x) => ({
+    pitches: arsenal.map((x) => ({
       type: x.type,
       name: PITCH_NAMES[x.type],
       present: x.grade.present,
       future: x.grade.future,
-      usage: x.usage,
+      usage: x.usage / thrown,
     })),
     velocity: p.pitching?.velocity ?? null,
     defense: p.pitching
