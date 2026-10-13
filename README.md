@@ -427,8 +427,10 @@ Every winter the whole universe moves forward a year:
   softens week by week. Leftover veterans take minor league deals or retire. Unless
   you run your roster yourself, your assistant GM bids for your club too, with the
   money and 40-man spots your own offers leave, and each week ends with what you signed.
-- **International signings**: 17-year-olds with bonus asks, and bonus pools that are
-  bigger for worse teams.
+- **International signings**: 17-year-olds with bonus pools that are bigger for worse
+  teams. Each asks a bonus from how the market reads him (a league-average scouting
+  department's look), not from what he'll really become, so the price is a second
+  opinion, not an answer.
 - **Trades** are valued by **surplus**: projected WAR over the years a club controls
   a player, priced at $8M a win and discounted 10% a year, minus salary. A cheap young
   star is worth a fortune; an aging star on a big deal can be worth less than nothing.

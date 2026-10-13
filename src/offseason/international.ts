@@ -8,7 +8,7 @@ import { generateHitter, generatePitcher } from "../players/generate";
 import { uniqueNames } from "../players/names";
 import { type FieldPosition, playerName, type Player } from "../players/types";
 import type { Season } from "../season/season";
-import { valueShift } from "../scouting/scouting";
+import { perceive, valueShift } from "../scouting/scouting";
 import { boardValue, signAmateur } from "./draft";
 import type { InternationalState } from "./types";
 
@@ -39,9 +39,12 @@ export function prospect(rng: Rng, id: number): Player {
   return p;
 }
 
-/** Asking bonus ($M) from the prospect's projected peak: a future 60 wants about $5M. */
-export function bonusAsk(p: Player): number {
-  const fv = overallGrade(p, true);
+/**
+ * Asking bonus ($M) from the prospect's projected peak as the market reads him (a league-average scouting
+ * department's look, not the truth, which nobody knows): a future 60 wants about $5M.
+ */
+export function bonusAsk(league: League, p: Player): number {
+  const fv = overallGrade(perceive(league, null, p), true);
   return Math.round(Math.min(5.5, Math.max(0.1, 0.1 + 0.26 * (fv - 40))) * 20) / 20;
 }
 
@@ -55,7 +58,7 @@ export function openInternational(league: League, season: Season, rng: Rng): Int
     const rank = worstFirst.indexOf(t.id);
     return Math.round((7.5 - (2.5 * rank) / Math.max(1, league.teams.length - 1)) * 20) / 20;
   });
-  return { pool, asks: pool.map((p) => ({ playerId: p.id, bonus: bonusAsk(p) })), pools, signings: [] };
+  return { pool, asks: pool.map((p) => ({ playerId: p.id, bonus: bonusAsk(league, p) })), pools, signings: [] };
 }
 
 export function signInternational(league: League, s: InternationalState, teamId: number, poolId: number, day: number): { ok: boolean; reason?: string } {

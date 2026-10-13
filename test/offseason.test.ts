@@ -6,7 +6,9 @@ import { evaluateTrade, executeTrade, surplusValue, tradeValue } from "../src/or
 import { extensionOptions } from "../src/org/extensions";
 import { Rng } from "../src/core/rng";
 import { boardValue, draftClass, onTheClock } from "../src/offseason/draft";
-import { playerValue } from "../src/org/value";
+import { overallGrade, playerValue } from "../src/org/value";
+import { bonusAsk, prospect } from "../src/offseason/international";
+import { perceive } from "../src/scouting/scouting";
 import { projectPlayer } from "../src/players/development";
 import { advanceOffseason, beginOffseason, winterContext, winterWeek } from "../src/offseason/offseason";
 import { LEVELS, playerName } from "../src/players/types";
@@ -181,6 +183,24 @@ describe("trades", () => {
     expect(get.teamId).toBe(a.id);
     expect(LEVELS.some((lv) => b.rosters[lv].includes(give.id))).toBe(true);
     expect(l.transactions.filter((t) => t.type === "trade")).toHaveLength(2);
+  });
+});
+
+describe("international signings", () => {
+  it("price amateurs from the market's read of them, not from who they truly are", () => {
+    const l = generateLeague({ seed: "intl-asks" });
+    const rng = new Rng("intl-asks");
+    const kids = Array.from({ length: 110 }, (_, i) => prospect(rng.fork(`kid${i}`), -(i + 1)));
+    const fv = (p: (typeof kids)[number]) => overallGrade(p, true);
+    const mean = (ps: typeof kids) => ps.reduce((s, p) => s + fv(p), 0) / ps.length;
+    // Sorting by the asks is a league-average scout's board, not a list of the truly best.
+    const byAsk = [...kids].sort((a, b) => bonusAsk(l, b) - bonusAsk(l, a) || fv(a) - fv(b)).slice(0, 10);
+    const best = [...kids].sort((a, b) => fv(b) - fv(a)).slice(0, 10);
+    expect(mean(byAsk)).toBeLessThan(mean(best) - 3);
+    // The kids the market reads as the best still ask the most.
+    const market = (p: (typeof kids)[number]) => overallGrade(perceive(l, null, p), true);
+    const top = [...kids].sort((a, b) => market(b) - market(a))[0]!;
+    expect(bonusAsk(l, top)).toBe(Math.max(...kids.map((p) => bonusAsk(l, p))));
   });
 });
 
