@@ -12,6 +12,11 @@ const stats = new StatsCache(() => season);
 const ctx = season.rosterContext();
 
 describe("a player's page", () => {
+  it("says so when the link points at no one in this league", () => {
+    // An old link, or one from another league.
+    expect(() => playerView(season, stats, 999999, ctx)).toThrow("There's no player with that number in this league.");
+  });
+
   it("gives each pitch its share of what he throws", () => {
     const pitchers = league.players.filter((p) => p.pitching && p.teamId !== null).slice(0, 60);
     for (const p of pitchers) {

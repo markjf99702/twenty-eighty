@@ -668,7 +668,8 @@ export function teamView(season: Season, stats: StatsCache, teamId: number, ctx:
 
 export function playerView(season: Season, stats: StatsCache, playerId: number, ctx: RosterContext): PlayerView {
   const league = season.league;
-  const p = league.players[playerId]!;
+  const p = league.players[playerId];
+  if (!p) throw new Error("There's no player with that number in this league.");
   const team = p.teamId !== null ? season.team(p.teamId) : null;
   const isUser = team !== null && league.userTeamId === team.id;
   const careerTeams: Record<number, string> = {};
