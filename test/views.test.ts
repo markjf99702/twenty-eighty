@@ -4,7 +4,7 @@ import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { allStarLine } from "../web/src/worker/allstar";
 import { careerLine } from "../web/src/worker/records";
-import { playerView, rosterActions, rosterMessage, StatsCache, transactions } from "../web/src/worker/views";
+import { dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, transactions } from "../web/src/worker/views";
 import { budgetRoom } from "../src/org/contracts";
 import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
 import { playerValue } from "../src/org/value";
@@ -32,6 +32,14 @@ describe("a player's page", () => {
       const raw = p.pitching!.pitches;
       expect(v.pitches[0]!.usage / v.pitches[1]!.usage).toBeCloseTo(raw[0]!.usage / raw[1]!.usage, 6);
     }
+  });
+});
+
+describe("the front office", () => {
+  it("lists your top prospects in the order your scouts rank them", () => {
+    const fvs = dashboardView(season, stats, new Map(), status(league, season, true)).prospects.map((p) => p.fv);
+    expect(fvs).toHaveLength(8);
+    expect(fvs).toEqual([...fvs].sort((a, b) => b - a));
   });
 });
 

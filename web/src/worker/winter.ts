@@ -8,7 +8,6 @@ import { askingPrice, onTheBlock } from "../../../src/org/market";
 import { offerLive } from "../../../src/org/offers";
 import { evaluateTrade, tradeValue } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
-import { overallGrade } from "../../../src/org/value";
 import { boardValue, onTheClock } from "../../../src/offseason/draft";
 import { acceptBar, offerScore } from "../../../src/offseason/freeAgency";
 import { MAX_INTERNATIONAL_SIGNINGS } from "../../../src/offseason/international";
@@ -18,7 +17,7 @@ import { believedWar, warShift } from "../../../src/scouting/analytics";
 import { staffCost, valueShift } from "../../../src/scouting/scouting";
 import type { Season } from "../../../src/season/season";
 import type { AskingView, BlockRow, DevRow, HistoryView, OffseasonView, OfferView, TradeAdviceView, TradeSide } from "../api/protocol";
-import { dateLabel, playerSummary, rosterActions, type StatsCache, teamRef } from "./views";
+import { dateLabel, playerSummary, readOf, rosterActions, type StatsCache, teamRef } from "./views";
 import { allStarLine, awardRows, executiveRows } from "./allstar";
 import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
@@ -154,7 +153,8 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
             playerId: pk.playerId,
             name: playerName(p),
             pos: p.pitching ? (p.role === "SP" ? "SP" : "RP") : p.position,
-            fv: overallGrade(p, true),
+            // As your scouts see him, the way the board and his page do.
+            fv: readOf(season, p).fv,
             mine: pk.teamId === user,
           };
         }),

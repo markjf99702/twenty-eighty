@@ -1048,11 +1048,14 @@ export function dashboardView(season: Season, stats: StatsCache, boxes: Map<stri
   if (sv && sv.line.SV > 0) leaders.push({ label: "Saves", name: sv.name, playerId: sv.id, value: String(sv.line.SV) });
 
   const hurt = [...team.injured, ...team.rosters.MLB.filter((id) => (league.players[id]!.injury?.daysLeft ?? 0) > 0)];
+  // Your best prospects by your scouts' read, the FV each one shows.
   const prospects = MINOR_LEVELS.flatMap((l) => team.rosters[l])
     .map((id) => league.players[id]!)
     .filter((p) => p.age <= 25)
-    .sort((a, b) => overallGrade(b, true) - overallGrade(a, true) || a.age - b.age)
-    .slice(0, 8);
+    .map((p) => ({ p, fv: readOf(season, p).fv }))
+    .sort((a, b) => b.fv - a.fv || a.p.age - b.p.age)
+    .slice(0, 8)
+    .map((x) => x.p);
 
   return {
     status: st,

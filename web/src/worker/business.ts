@@ -20,13 +20,12 @@ import { dials } from "../../../src/league/settings";
 import type { League, Team } from "../../../src/league/types";
 import { WINTER_DAYS } from "../../../src/offseason/offseason";
 import { payroll } from "../../../src/org/contracts";
-import { overallGrade } from "../../../src/org/value";
 import { MINOR_LEVELS } from "../../../src/players/types";
 import { staffCost } from "../../../src/scouting/scouting";
 import { playoffSeeds } from "../../../src/season/postseason";
 import type { Season } from "../../../src/season/season";
 import type { FinanceView, FinanceYearView, GoalStatus, GoalView, LedgerView, OwnerCard, OwnerView, ReviewView } from "../api/protocol";
-import { dateLabel, teamRef } from "./views";
+import { dateLabel, readOf, teamRef } from "./views";
 
 const m1 = (x: number) => Math.round(x * 10) / 10;
 
@@ -280,8 +279,9 @@ export function ownerView(season: Season): OwnerView | null {
     offers: gm.offers.map((id) => {
       const t = league.teams[id]!;
       const row = hist?.standings.find((r) => r.teamId === id);
+      // The farm's best ten as your scouts see them.
       const farm = MINOR_LEVELS.flatMap((lv) => t.rosters[lv])
-        .map((pid) => overallGrade(league.players[pid]!, true))
+        .map((pid) => readOf(season, league.players[pid]!).fv)
         .sort((a, b) => b - a)
         .slice(0, 10);
       return {

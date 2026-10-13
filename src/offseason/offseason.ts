@@ -1,5 +1,6 @@
 import { holdHallVote } from "./hall";
 import { openingDayAdvice, winterAdvice } from "../advice/advice";
+import { scoutRound } from "../core/grades";
 import { clamp } from "../core/math";
 import { closeBooks, priceTickets } from "../finance/finance";
 import { acceptJob, reviewSeason, setGoals } from "../finance/owner";
@@ -23,7 +24,7 @@ import { logTransaction, refreshDepth, releasePlayer, type RosterContext } from 
 import { aiExtensions } from "../org/extensions";
 import { winterOffer } from "../org/offers";
 import { aiTradeMarket } from "../org/trades";
-import { believedWar, warShift } from "../scouting/analytics";
+import { belief, believedWar, warShift } from "../scouting/analytics";
 import { clearAmateurLooks, staffCost } from "../scouting/scouting";
 import { peakValue, playerValue } from "../org/value";
 import { developPlayer } from "../players/development";
@@ -202,13 +203,17 @@ export function beginOffseason(league: League, season: Season): OffseasonState {
   closeBooks(league, season);
   reinstateInjured(league);
 
-  // Development and aging for everyone still in the game.
+  // Development and aging for everyone still in the game. The review's risers and fallers are as the user's scouts and
+  // analysts see them, the way their pages read (this year's scouting error is the same before and after); with no
+  // club of the user's, as they are.
   const rng = winterRng(league, "develop");
+  const user = league.userTeamId;
+  const seen = (p: Player) => (user === null ? playerValue(p) : belief(season, user, p).value);
   const freeAgents = new Set(league.freeAgents);
   const before = new Map<number, number>();
   for (const p of league.players) {
     if (p.retired !== undefined || (p.teamId === null && !freeAgents.has(p.id))) continue;
-    before.set(p.id, playerValue(p));
+    before.set(p.id, seen(p));
     developPlayer(p, rng);
     p.optionedDay = null;
   }
@@ -220,14 +225,15 @@ export function beginOffseason(league: League, season: Season): OffseasonState {
   for (const [id, b] of before) {
     const p = league.players[id]!;
     if (p.retired !== undefined || p.teamId === null) continue;
-    changes.push({ playerId: id, teamId: p.teamId, age: p.age, before: grade(b), after: grade(playerValue(p)) });
+    changes.push({ playerId: id, teamId: p.teamId, age: p.age, before: grade(b), after: grade(seen(p)) });
   }
+  // Only grades that move on the scouts' scale (nearest 5), the way the review shows them.
   const risers = changes
-    .filter((c) => c.after >= 45)
+    .filter((c) => c.after >= 45 && scoutRound(c.after) > scoutRound(c.before))
     .sort((a, b) => b.after - b.before - (a.after - a.before))
     .slice(0, 15);
   const fallers = changes
-    .filter((c) => c.before >= 50)
+    .filter((c) => c.before >= 50 && scoutRound(c.after) < scoutRound(c.before))
     .sort((a, b) => a.after - a.before - (b.after - b.before))
     .slice(0, 15);
 

@@ -22,7 +22,7 @@ import { staffCost } from "../src/scouting/scouting";
 import { playoffSeeds, runPostseason } from "../src/season/postseason";
 import { Season } from "../src/season/season";
 import { ownerView } from "../web/src/worker/business";
-import { status } from "../web/src/worker/views";
+import { readOf, status } from "../web/src/worker/views";
 
 const USER = 5;
 const league = generateLeague({ seed: "finance-test" });
@@ -117,6 +117,12 @@ describe("the winter", () => {
       expect(t.budget).toBeLessThanOrEqual(BUDGET_CEILING);
     }
     expect(state.phase).toBe("review");
+  });
+
+  it("lists the winter's risers and fallers as your scouts see them, the way their pages do", () => {
+    const rows = [...state.development.risers, ...state.development.fallers].filter((r) => league.players[r.playerId]!.teamId !== null);
+    expect(rows.length).toBeGreaterThan(10);
+    for (const r of rows) expect(r.after).toBe(readOf(season, league.players[r.playerId]!).now);
   });
 
   it("has the owner review the season against the goals", () => {

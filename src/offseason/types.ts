@@ -11,7 +11,7 @@ export interface DevelopmentChange {
   playerId: number;
   teamId: number | null;
   age: number;
-  /** Overall grade (Now) before and after the winter. */
+  /** Overall grade (Now) before and after the winter, by the user's read when the user runs a club. */
   before: number;
   after: number;
 }
