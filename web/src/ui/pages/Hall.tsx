@@ -53,7 +53,7 @@ function Ballot({ ballot }: { ballot: NonNullable<HallView["ballot"]> }) {
         <table class="tbl ballot">
           <thead>
             <tr>
-              <th>Player</th>
+              <th class="name">Player</th>
               <th>Career</th>
               <th class="num" title="Year on the ballot">Yr</th>
               <th class="vote-col">Vote</th>

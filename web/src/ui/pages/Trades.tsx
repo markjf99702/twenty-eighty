@@ -69,7 +69,7 @@ function SideTable({ side, picked, toggle, filter }: { side: TradeSide; picked: 
     ...outlookColumns(rows, (p) => p),
     { key: "contract", label: "Contract", render: (p) => <span class="dim">{p.contract?.label ?? "—"}</span> },
   ];
-  return <Table columns={columns} rows={rows} rowKey={(p) => p.id} sortKey="surplus" limit={25} rowClass={(p) => (picked.has(p.id) ? "mine" : "")} />;
+  return <Table columns={columns} rows={rows} rowKey={(p) => p.id} sortKey="surplus" limit={25} rowClass={(p) => (picked.has(p.id) ? "mine" : "")} pinName={false} />;
 }
 
 /** The players picked on one side, whether or not they're in view in the table below. */
@@ -401,7 +401,7 @@ function OnTheBlock({ slug, canTrade }: { slug: BlockSlug; canTrade: boolean }) 
         (rows.length === 0 ? (
           <p class="dim">Nobody at that spot is on the block right now.</p>
         ) : (
-          <Table columns={columns} rows={rows} rowKey={(p) => p.id} sortKey="fit" limit={25} />
+          <Table columns={columns} rows={rows} rowKey={(p) => p.id} sortKey="fit" limit={25} pinName={false} />
         ))}
     </Section>
   );

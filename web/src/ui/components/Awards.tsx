@@ -69,7 +69,7 @@ function ByPosition({ title, name, positions, awards, leagues }: { title: string
   return (
     <Section title={title}>
       <div class="tbl-wrap">
-        <table class="tbl">
+        <table class="tbl no-pin">
           <thead>
             <tr>
               <th />

@@ -27,6 +27,11 @@ interface Props<T> {
   expanded?: (r: T) => ComponentChildren | null;
   ranked?: boolean;
   empty?: string;
+  /**
+   * On a phone the name column stays put while the table scrolls sideways. Off for tables whose
+   * name cell carries a long second line, which would cover the screen.
+   */
+  pinName?: boolean;
 }
 
 export function Table<T>(props: Props<T>) {
@@ -58,7 +63,7 @@ export function Table<T>(props: Props<T>) {
   return (
     <div>
       <div class="tbl-wrap">
-        <table class="tbl">
+        <table class={props.pinName === false ? "tbl no-pin" : "tbl"}>
           <thead>
             <tr>
               {ranked && <th class="rank num">#</th>}

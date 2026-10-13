@@ -613,6 +613,23 @@ table.tbl {
 .tbl .seg { flex-wrap: nowrap; }
 .tbl .rank { color: var(--ink-3); width: 1%; }
 .tbl-more { padding-top: 6px; }
+@media (max-width: 820px) {
+  /* Wide tables scroll sideways on a phone: each row's name stays in view, on the colour of its row. */
+  .tbl:not(.no-pin) td.name, .tbl:not(.no-pin) th.name {
+    position: sticky;
+    left: 0;
+    z-index: 1;
+    background: var(--ground);
+    box-shadow: inset -1px 0 0 var(--line);
+  }
+  .tbl:not(.no-pin) th.name { z-index: 2; }
+  .tbl:not(.no-pin) tbody tr:hover td.name { background: var(--surface-2); }
+  .tbl:not(.no-pin) tr.mine td.name, .tbl:not(.no-pin) tr.mine:hover td.name, .tbl:not(.no-pin) td.name.mine { background: var(--accent-soft); }
+  /* A totals label spanning several columns stays where it is. */
+  .tbl td.name[colspan] { position: static; box-shadow: none; }
+  /* A row's roster moves open where the table is scrolled to, not at its far left. */
+  .tbl tr.expand > td > * { position: sticky; left: 8px; max-width: calc(100vw - 56px); }
+}
 
 /* ------------------------------------------------------------------ grades */
 

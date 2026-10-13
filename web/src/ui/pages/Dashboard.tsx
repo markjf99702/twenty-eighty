@@ -239,7 +239,7 @@ export function Dashboard({ status }: { status: Status }) {
             <table class="tbl">
               <thead>
                 <tr>
-                  <th>Club</th>
+                  <th class="name">Club</th>
                   <th class="num">W</th>
                   <th class="num">L</th>
                   <th class="num">GB</th>
@@ -318,7 +318,7 @@ export function Dashboard({ status }: { status: Status }) {
             <table class="tbl">
               <thead>
                 <tr>
-                  <th>Name</th>
+                  <th class="name">Name</th>
                   <th>Pos</th>
                   <th class="num">Age</th>
                   <th>Level</th>

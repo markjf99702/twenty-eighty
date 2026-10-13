@@ -30,7 +30,7 @@ export function History({ status }: { status: Status }) {
                 <thead>
                   <tr>
                     <th>Year</th>
-                    <th>Champion</th>
+                    <th class="name">Champion</th>
                     <th>Runner-up</th>
                     <th>Your club</th>
                   </tr>

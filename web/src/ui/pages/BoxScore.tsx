@@ -94,7 +94,7 @@ function Batting({ rows }: { rows: BoxBatter[] }) {
       <table class="tbl">
         <thead>
           <tr>
-            <th>Batter</th>
+            <th class="name">Batter</th>
             <th>Pos</th>
             <th class="num">AB</th>
             <th class="num">R</th>
@@ -148,7 +148,7 @@ function Pitching({ rows }: { rows: BoxPitcher[] }) {
       <table class="tbl">
         <thead>
           <tr>
-            <th>Pitcher</th>
+            <th class="name">Pitcher</th>
             <th class="num">IP</th>
             <th class="num">H</th>
             <th class="num">R</th>

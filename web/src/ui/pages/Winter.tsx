@@ -225,7 +225,7 @@ function Tenders({ v }: { v: OffseasonView }) {
           <div class="empty">No arbitration cases this winter.</div>
         ) : (
           <div class="tbl-wrap">
-            <table class="tbl">
+            <table class="tbl no-pin">
               <thead>
                 <tr>
                   <th>Player</th>

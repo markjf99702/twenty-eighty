@@ -31,7 +31,7 @@ export function Standings({ level, status }: { level: Level; status: Status }) {
                     <table class="tbl">
                       <thead>
                         <tr>
-                          <th>Club</th>
+                          <th class="name">Club</th>
                           <th class="num">W</th>
                           <th class="num">L</th>
                           <th class="num">Pct</th>
@@ -75,7 +75,7 @@ export function Standings({ level, status }: { level: Level; status: Status }) {
                     <table class="tbl">
                       <thead>
                         <tr>
-                          <th>Club</th>
+                          <th class="name">Club</th>
                           <th class="num">W</th>
                           <th class="num">L</th>
                           <th class="num">WCGB</th>

@@ -319,7 +319,7 @@ export function Finances({ teamId, status }: { teamId: number | null; status: St
           <table class="tbl">
             <thead>
               <tr>
-                <th>Club</th>
+                <th class="name">Club</th>
                 <th class="num">Metro</th>
                 <th class="num">Fans/G</th>
                 <th class="num">Revenue</th>

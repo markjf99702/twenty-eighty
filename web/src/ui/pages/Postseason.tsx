@@ -217,10 +217,10 @@ function PlanEditor({ onClose }: { onClose: () => void }) {
       </div>
       <div class="grid-2">
         <Section title="Pitchers" aside={`${pitchers} picked`}>
-          <Table columns={columns} rows={rows(true)} rowKey={(p) => p.id} sortKey="proj" rowClass={(p) => (roster.has(p.id) ? "mine" : "")} />
+          <Table columns={columns} rows={rows(true)} rowKey={(p) => p.id} sortKey="proj" rowClass={(p) => (roster.has(p.id) ? "mine" : "")} pinName={false} />
         </Section>
         <Section title="Position players" aside={`${chosen.length - pitchers} picked`}>
-          <Table columns={columns} rows={rows(false)} rowKey={(p) => p.id} sortKey="proj" rowClass={(p) => (roster.has(p.id) ? "mine" : "")} />
+          <Table columns={columns} rows={rows(false)} rowKey={(p) => p.id} sortKey="proj" rowClass={(p) => (roster.has(p.id) ? "mine" : "")} pinName={false} />
         </Section>
       </div>
       <div class="offer-actions">
