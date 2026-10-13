@@ -111,6 +111,32 @@ describe("roster rules", () => {
     expect(team.fortyMan).toHaveLength(39);
   });
 
+  it("keeps an arbitration salary on the books through an outright and back", () => {
+    // Every 40-man is full on a new league, so nobody can claim him.
+    expect(league.teams.every((t) => t.fortyMan.length >= 40)).toBe(true);
+    const arb = team.rosters.MLB.map(player)
+      .filter((p) => p.contract?.type === "arb")
+      .sort((a, b) => b.contract!.salary - a.contract!.salary)[0]!;
+    const salary = arb.contract!.salary;
+    expect(salary).toBeGreaterThan(2);
+    const before = payroll(league, team);
+    expect(designateForAssignment(ctx, team, arb, league.teams).ok).toBe(true);
+    expect(arb.teamId).toBe(team.id);
+    expect(arb.level).toBe("AAA");
+    expect(arb.contract).toMatchObject({ type: "arb", salary });
+    expect(payroll(league, team)).toBe(before);
+    // Selected back, he's paid what he was.
+    expect(callUp(ctx, team, arb).ok).toBe(true);
+    expect(arb.contract).toMatchObject({ type: "arb", salary });
+    expect(payroll(league, team)).toBe(before);
+  });
+
+  it("turns a pre-arbitration deal into a minor league one on an outright", () => {
+    const young = team.fortyMan.map(player).find((p) => p.contract?.type === "pre-arb" && p.level !== "MLB")!;
+    designateForAssignment(ctx, team, young, []);
+    expect(young.contract?.type).toBe("minor");
+  });
+
   it("lets a club claim a player off waivers only if it can afford his contract", () => {
     // A good big leaguer on a big guaranteed deal, and two clubs with a 40-man spot open.
     const vet = team.rosters.MLB.map(player).reduce((a, b) => (playerValue(b) > playerValue(a) ? b : a));

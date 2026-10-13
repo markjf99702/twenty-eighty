@@ -144,9 +144,14 @@ export function ensureMajorContract(p: Player): void {
   else p.contract = { type: "guaranteed", salary: money(MIN_SALARY + 0.5), years: 1 };
 }
 
-/** Off the 40-man (an outright): a non-guaranteed deal reverts to a minor league contract. */
+/**
+ * Off the 40-man (an outright): a pre-arbitration deal reverts to a minor
+ * league contract. An arbitration salary is this season's, owed like a
+ * guaranteed deal, so it stays on the books while he's in the minors (the
+ * winter turns it into a minor league deal if he's still off the 40-man).
+ */
 export function outrightContract(p: Player): void {
-  if (!p.contract || p.contract.type !== "guaranteed") p.contract = minorContract();
+  if (!p.contract || p.contract.type === "pre-arb") p.contract = minorContract();
 }
 
 /**

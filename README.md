@@ -359,7 +359,7 @@ The roster rules are the ones a GM has to work around:
 - Injured list: 10-day (position players), 15-day (pitchers), 60-day (frees a 40-man spot).
 - Designating a player for assignment exposes him to waivers. Other clubs claim him if he
   beats their weakest 40-man player and his salary fits in their budget; otherwise he's
-  outrighted to AAA.
+  outrighted to AAA, and an arbitration salary or a guaranteed deal stays on your payroll.
 
 **Injuries** strike during games. Pitchers face a per-pitch and per-appearance risk,
 hitters a per-plate-appearance risk, and both scale with age and the durability trait.

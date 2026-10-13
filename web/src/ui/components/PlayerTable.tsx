@@ -28,10 +28,13 @@ export function StatusBadges({ p }: { p: PlayerSummary }) {
 
 /** What a designation or a release does, asked before it happens. */
 function askFirst(a: RosterActionOption, p: PlayerSummary): string {
-  if (a.kind === "dfa") {
-    return `Designate ${p.name} for assignment? Other clubs get a shot at him on waivers; if nobody claims him, he stays in your system at AAA, off the 40-man.`;
-  }
   const c = p.contract;
+  if (a.kind === "dfa") {
+    // An arbitration salary or a guaranteed deal is owed whether he's in the majors or not.
+    const owed = c && (c.type === "arb" || (c.type === "guaranteed" && c.years > 0));
+    const pay = owed ? `, and his ${dollars(c.salary)}${c.type === "guaranteed" ? ` a year through ${c.through}` : " salary"} stays on your payroll` : "";
+    return `Designate ${p.name} for assignment? Other clubs get a shot at him on waivers; if nobody claims him, he stays in your system at AAA, off the 40-man${pay}.`;
+  }
   return c && c.type === "guaranteed" && c.years > 0
     ? `Release ${p.name}? He leaves the organization, but you still owe him ${dollars(c.salary)} a year through ${c.through}, on your payroll as dead money.`
     : `Release ${p.name}? He leaves the organization, and you owe him nothing more.`;
