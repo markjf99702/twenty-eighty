@@ -70,13 +70,13 @@ function careerBoards(league: League, live: ReturnType<typeof liveSeason>, teamI
 export function careerLine(bat: CareerBat | null | undefined, pit: CareerPit | null | undefined): string {
   if (pit && (!bat || pit.outs > 300)) {
     const parts = [`${pit.W}-${pit.L}`, `${eraOf(pit).toFixed(2)} ERA`, `${pit.SO.toLocaleString("en-US")} K`];
-    if (pit.SV >= 50) parts.push(`${pit.SV} SV`);
+    if (pit.SV >= 50) parts.push(`${pit.SV.toLocaleString("en-US")} SV`);
     parts.push(`${pit.WAR.toFixed(1)} WAR`);
     return parts.join(", ");
   }
   if (!bat) return "";
-  const parts = [avgOf(bat).toFixed(3).replace(/^0/, ""), `${bat.H.toLocaleString("en-US")} H`, `${bat.HR} HR`, `${bat.RBI.toLocaleString("en-US")} RBI`];
-  if (bat.SB >= 300) parts.push(`${bat.SB} SB`);
+  const parts = [avgOf(bat).toFixed(3).replace(/^0/, ""), `${bat.H.toLocaleString("en-US")} H`, `${bat.HR.toLocaleString("en-US")} HR`, `${bat.RBI.toLocaleString("en-US")} RBI`];
+  if (bat.SB >= 300) parts.push(`${bat.SB.toLocaleString("en-US")} SB`);
   parts.push(`${bat.WAR.toFixed(1)} WAR`);
   return parts.join(", ");
 }

@@ -3,6 +3,7 @@ import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { allStarLine } from "../web/src/worker/allstar";
+import { careerLine } from "../web/src/worker/records";
 import { playerView, StatsCache, transactions } from "../web/src/worker/views";
 
 const league = generateLeague({ seed: "player-view" });
@@ -51,5 +52,14 @@ describe("the All-Star Game's line", () => {
     const city = league.teams[3]!.city;
     expect(allStarLine(league, { leagues: [0, 1], score: [5, 8], host: 3, mvp: null, note: "" })!.text).toBe(`${h} 8, ${a} 5 in ${city}`);
     expect(allStarLine(league, { leagues: [0, 1], score: [6, 2], host: 3, mvp: null, note: "" })!.text).toBe(`${a} 6, ${h} 2 in ${city}`);
+  });
+});
+
+describe("Hall of Fame plaques", () => {
+  it("separate the thousands in every count", () => {
+    const bat = { G: 2900, PA: 12000, AB: 10500, H: 3006, D: 500, T: 90, HR: 420, RBI: 1700, BB: 1300, SB: 1247, WAR: 110.2 };
+    expect(careerLine(bat, null)).toBe(".286, 3,006 H, 420 HR, 1,700 RBI, 1,247 SB, 110.2 WAR");
+    const pit = { G: 1100, GS: 0, W: 80, L: 70, SV: 1012, outs: 3600, ER: 300, SO: 1500, BB: 400, WAR: 40.5 };
+    expect(careerLine(null, pit)).toBe("80-70, 2.25 ERA, 1,500 K, 1,012 SV, 40.5 WAR");
   });
 });
