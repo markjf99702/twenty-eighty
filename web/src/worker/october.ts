@@ -26,12 +26,12 @@ import { dateLabel, gameKey, playerSummary, type StatsCache } from "./views";
 
 const nick = (season: Season, id: number) => season.team(id).nickname;
 
-/** "Forge lead 2-1", "Tied 1-1", "Forge win 3-1". */
+/** "Forge lead 2-1", "Tied 1-1", and once it's over, "Forge win the World Series 4-1". */
 function seriesState(season: Season, s: LiveSeries, wins: [number, number], over: boolean): string {
   const [h, l] = wins;
   if (h === l) return `Tied ${h}-${l}`;
   const [lead, a, b] = h > l ? [s.higher, h, l] : [s.lower, l, h];
-  return `${nick(season, lead)} ${over ? "win" : "lead"} ${a}-${b}`;
+  return over ? `${nick(season, lead)} win the ${s.round} ${a}-${b}` : `${nick(season, lead)} lead ${a}-${b}`;
 }
 
 function seriesView(season: Season, s: LiveSeries, boxes: Map<string, BoxScoreView>): SeriesView {

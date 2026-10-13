@@ -13,6 +13,7 @@ import {
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
 import { Season } from "../src/season/season";
 import type { GameResult } from "../src/sim/game";
+import { postseasonView } from "../web/src/worker/october";
 
 const league = generateLeague({ seed: "october" });
 const season = new Season(league, { minors: false });
@@ -118,5 +119,15 @@ describe("October, a game at a time", () => {
     expect(last.getUTCMonth()).toBe(9);
     expect(last.getTime()).toBeLessThanOrEqual(season.dateOf(218).getTime());
     expect([season.dateOf(218).getUTCMonth(), season.dateOf(218).getUTCDate()]).toEqual([9, 30]);
+  });
+
+  it("names the round on the game that ends a series", () => {
+    const view = postseasonView(season, new Map())!;
+    expect(view.series).toHaveLength(11);
+    for (const s of view.series) {
+      const last = s.games.at(-1)!;
+      expect(last.after).toBe(`${season.team(s.winner === s.higher.abbrev ? s.higher.id : s.lower.id).nickname} win the ${s.round} ${Math.max(...s.wins)}-${Math.min(...s.wins)}`);
+      for (const g of s.games.slice(0, -1)) expect(g.after).not.toMatch(/ win /);
+    }
   });
 });
