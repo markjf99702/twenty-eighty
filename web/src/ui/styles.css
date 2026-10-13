@@ -1659,6 +1659,17 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .plaque-line { font-size: 13px; font-variant-numeric: tabular-nums; }
 
 .ballot .vote-col { min-width: 220px; white-space: nowrap; }
+.ballot .ballot-line { display: none; }
+/* A narrow ballot (a phone, or beside the sidebar on a small laptop): each career under the name, a shorter bar, the vote in view. */
+.ballot-wrap { container: ballot / inline-size; }
+@container ballot (max-width: 680px) {
+  .ballot .career-col { display: none; }
+  .ballot td.name { white-space: normal; }
+  .ballot .ballot-line { display: block; font-size: 12px; font-weight: 400; color: var(--ink-3); line-height: 1.3; margin-top: 2px; }
+  .ballot .vote-col { min-width: 0; }
+  .ballot .vote-bar { width: 64px; margin-right: 6px; }
+  .ballot .vote-col .long { display: none; }
+}
 .vote-bar { display: inline-block; position: relative; width: 110px; height: 8px; border-radius: 4px; background: var(--surface-3); vertical-align: middle; margin-right: 8px; overflow: hidden; }
 .vote-bar span:first-child { position: absolute; left: 0; top: 0; bottom: 0; background: var(--ink-3); }
 .vote-bar span.in { background: var(--accent); }

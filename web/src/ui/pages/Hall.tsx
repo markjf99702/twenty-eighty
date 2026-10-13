@@ -46,15 +46,16 @@ export function Hall() {
   );
 }
 
+/** The last ballot. Where it's narrow (a phone), each career goes under the name and the vote stays in view. */
 function Ballot({ ballot }: { ballot: NonNullable<HallView["ballot"]> }) {
   return (
     <Section title={`${ballot.year} ballot`} aside={`${ballot.entries.filter((e) => e.elected).length} elected`}>
-      <div class="tbl-wrap">
-        <table class="tbl ballot">
+      <div class="tbl-wrap ballot-wrap">
+        <table class="tbl ballot no-pin">
           <thead>
             <tr>
               <th class="name">Player</th>
-              <th>Career</th>
+              <th class="career-col">Career</th>
               <th class="num" title="Year on the ballot">Yr</th>
               <th class="vote-col">Vote</th>
             </tr>
@@ -64,8 +65,9 @@ function Ballot({ ballot }: { ballot: NonNullable<HallView["ballot"]> }) {
               <tr key={e.playerId}>
                 <td class="name">
                   <a href={playerHref(e.playerId)}>{e.name}</a> <span class="muted">{e.pos}</span>
+                  <span class="ballot-line">{e.line}</span>
                 </td>
-                <td class="dim small">{e.line}</td>
+                <td class="dim small career-col">{e.line}</td>
                 <td class="num">{e.ballot}</td>
                 <td class="vote-col">
                   <span class="vote-bar" aria-hidden="true">
@@ -73,7 +75,14 @@ function Ballot({ ballot }: { ballot: NonNullable<HallView["ballot"]> }) {
                     <span class="line75" />
                   </span>
                   <span class="num">{e.vote.toFixed(1)}%</span>
-                  {e.elected ? <b class="elected"> Elected</b> : e.dropped ? <span class="dim"> Off the ballot</span> : null}
+                  {e.elected ? (
+                    <b class="elected"> Elected</b>
+                  ) : e.dropped ? (
+                    <span class="dim">
+                      {" "}
+                      Off<span class="long"> the ballot</span>
+                    </span>
+                  ) : null}
                 </td>
               </tr>
             ))}
