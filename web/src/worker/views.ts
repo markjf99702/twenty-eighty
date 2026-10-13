@@ -561,6 +561,21 @@ export function rosterActions(p: Player, team: Team, ctx: RosterContext): Roster
   return out;
 }
 
+/**
+ * What a roster move did, in a sentence for the toast, when there's more to
+ * it than the move's name: where a designated player went. `logged` is what
+ * the move wrote to the transaction log.
+ */
+export function rosterMessage(league: League, kind: RosterActionOption["kind"], p: Player, logged: Transaction[]): string | undefined {
+  const name = playerName(p);
+  if (kind === "dfa") {
+    const claim = logged.find((t) => t.type === "claim" && t.playerId === p.id);
+    if (claim) return `The ${league.teams[claim.teamId]!.nickname} claimed ${name} off waivers.`;
+    if (logged.some((t) => t.type === "outright" && t.playerId === p.id)) return `${name} cleared waivers and was outrighted to AAA.`;
+  }
+  return undefined;
+}
+
 // ---------------------------------------------------------------------------
 // Standings
 

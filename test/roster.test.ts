@@ -9,12 +9,13 @@ import {
   designateForAssignment,
   optionPlayer,
   placeOnIl,
+  positionLabel,
   refreshDepth,
   rosterProblems,
   type RosterContext,
 } from "../src/org/roster";
 import { playerValue } from "../src/org/value";
-import { FIELD_POSITIONS, type Player } from "../src/players/types";
+import { FIELD_POSITIONS, type Player, playerName } from "../src/players/types";
 import { staffCost } from "../src/scouting/scouting";
 
 let league: League;
@@ -182,6 +183,19 @@ describe("roster rules", () => {
     yours.budget = payroll(league, yours) + staffCost(league, yours) - 1;
     designateForAssignment(ctx, team, third!, [yours]);
     expect(third!.teamId).toBe(team.id);
+  });
+
+  it("tells your moves who claimed the player you designated", () => {
+    league.userTeamId = team.id;
+    const claimer = league.teams[2]!;
+    const spare = claimer.fortyMan.map(player).find((p) => p.level !== "MLB" && !p.il)!;
+    designateForAssignment(ctx, claimer, spare, []);
+    claimer.budget = payroll(league, claimer) + staffCost(league, claimer) + 30;
+    const best = team.rosters.MLB.map(player).reduce((a, b) => (playerValue(b) > playerValue(a) ? b : a));
+    designateForAssignment(ctx, team, best, [claimer]);
+    expect(best.teamId).toBe(claimer.id);
+    const mine = league.transactions.filter((t) => t.teamId === team.id).at(-1)!;
+    expect(mine.text).toBe(`Designated ${positionLabel(best)} ${playerName(best)} for assignment; claimed off waivers by ${claimer.abbrev}`);
   });
 
   it("logs every move", () => {

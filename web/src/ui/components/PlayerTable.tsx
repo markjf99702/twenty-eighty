@@ -49,7 +49,7 @@ export function RosterMoves({ p, onDone }: { p: PlayerSummary; onDone?: () => vo
     setBusy(true);
     try {
       const res = await call("rosterAction", { kind: a.kind, playerId: p.id, ...(a.level ? { level: a.level } : {}) });
-      if (res.ok) notify(`${a.label}: ${p.name}`);
+      if (res.ok) notify(res.message ?? `${a.label}: ${p.name}`);
       else notify(res.reason ?? "That move isn't allowed.", true);
       bump();
       onDone?.();

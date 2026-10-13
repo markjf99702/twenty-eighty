@@ -1002,7 +1002,8 @@ export interface Api {
   transactions: { req: { teamId?: number; majorOnly?: boolean; headlines?: boolean; limit?: number }; res: TransactionItem[] };
   scores: { req: { day?: number }; res: ScoresView };
   boxScore: { req: { key: string }; res: BoxScoreView | null };
-  rosterAction: { req: RosterAction; res: { ok: boolean; reason?: string } };
+  /** `message`: what the move did, when there's more to it than its name (who claimed a designated player, where a call-up plays). */
+  rosterAction: { req: RosterAction; res: { ok: boolean; reason?: string; message?: string } };
   setDepth: { req: { depth: DepthChart }; res: { ok: boolean; reason?: string } };
   setFlags: { req: { manualRoster?: boolean; manualDepth?: boolean }; res: { ok: boolean } };
   postseason: { req: void; res: PostseasonView | null };

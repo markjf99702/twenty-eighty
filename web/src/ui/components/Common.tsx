@@ -49,10 +49,11 @@ export function notify(text: string, bad = false): void {
   const t = { id: ++toastId, text, bad };
   toasts = [...toasts, t].slice(-4);
   emit();
+  // Long enough to read: a sentence about a roster move stays up longer than "Saved".
   setTimeout(() => {
     toasts = toasts.filter((x) => x.id !== t.id);
     emit();
-  }, bad ? 6000 : 3500);
+  }, Math.max(bad ? 6000 : 3500, 60 * text.length));
 }
 
 export function Toasts() {

@@ -4,7 +4,11 @@ import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { allStarLine } from "../web/src/worker/allstar";
 import { careerLine } from "../web/src/worker/records";
-import { playerView, StatsCache, transactions } from "../web/src/worker/views";
+import { playerView, rosterMessage, StatsCache, transactions } from "../web/src/worker/views";
+import { budgetRoom } from "../src/org/contracts";
+import { designateForAssignment } from "../src/org/roster";
+import { playerValue } from "../src/org/value";
+import { playerName } from "../src/players/types";
 
 const league = generateLeague({ seed: "player-view" });
 hireGm(league, 3);
@@ -28,6 +32,27 @@ describe("a player's page", () => {
       const raw = p.pitching!.pitches;
       expect(v.pitches[0]!.usage / v.pitches[1]!.usage).toBeCloseTo(raw[0]!.usage / raw[1]!.usage, 6);
     }
+  });
+});
+
+describe("a roster move's toast", () => {
+  it("says who claimed a designated player, or that he cleared waivers", () => {
+    const l = generateLeague({ seed: "dfa-toast" });
+    hireGm(l, 0);
+    const s = new Season(l, { minors: false });
+    const c = s.rosterContext();
+    const [mine, claimer] = [l.teams[0]!, l.teams[1]!];
+    const spare = claimer.fortyMan.map((id) => l.players[id]!).find((p) => p.level !== "MLB" && !p.il)!;
+    designateForAssignment(c, claimer, spare, []);
+    claimer.budget += 40 - budgetRoom(l, claimer);
+    const best = mine.rosters.MLB.map((id) => l.players[id]!).reduce((a, b) => (playerValue(b) > playerValue(a) ? b : a));
+    let before = l.transactions.length;
+    designateForAssignment(c, mine, best, [claimer]);
+    expect(rosterMessage(l, "dfa", best, l.transactions.slice(before))).toBe(`The ${claimer.nickname} claimed ${playerName(best)} off waivers.`);
+    const fringe = mine.fortyMan.map((id) => l.players[id]!).find((p) => p.level !== "MLB" && !p.il)!;
+    before = l.transactions.length;
+    designateForAssignment(c, mine, fringe, []);
+    expect(rosterMessage(l, "dfa", fringe, l.transactions.slice(before))).toBe(`${playerName(fringe)} cleared waivers and was outrighted to AAA.`);
   });
 });
 

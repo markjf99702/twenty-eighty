@@ -85,6 +85,7 @@ import {
   gameItems,
   gameKey,
   playerView,
+  rosterMessage,
   StatsCache,
   standingsView,
   status,
@@ -608,10 +609,14 @@ const handlers: Handlers = {
   },
 
   rosterAction(req) {
+    const league = requireSeason().league;
+    const before = league.transactions.length;
     const result = applyRosterAction(req);
     stats.clear();
-    if (result.ok) persistSoon();
-    return result.ok ? { ok: true } : { ok: false, reason: result.reason };
+    if (!result.ok) return { ok: false, reason: result.reason };
+    persistSoon();
+    const message = rosterMessage(league, req.kind, league.players[req.playerId]!, league.transactions.slice(before));
+    return message ? { ok: true, message } : { ok: true };
   },
 
   setDepth({ depth }) {

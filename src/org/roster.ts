@@ -363,6 +363,7 @@ export function designateForAssignment(
   p.onFortyMan = false;
   const wasMlb = p.level === "MLB";
   logTransaction(league, ctx.day, team, p, "dfa", `Designated ${label(p)} for assignment`);
+  const designated = league.transactions[league.transactions.length - 1]!;
 
   // Waivers: the first club (worst record first) that wants him, has room
   // and can fit his salary in its budget claims him. The user's club claims
@@ -383,6 +384,8 @@ export function designateForAssignment(
     p.level = "AAA";
     p.optionedDay = ctx.day;
     logTransaction(league, ctx.day, other, p, "claim", `${yours ? "Your assistant GM claimed" : "Claimed"} ${label(p)} off waivers from ${team.abbrev}`);
+    // The claim is logged on the club that made it; your own moves tell the rest of the story.
+    if (team.id === league.userTeamId) designated.text += `; claimed off waivers by ${other.abbrev}`;
     if (wasMlb) refreshDepth(league, team);
     return ok;
   }
