@@ -30,3 +30,9 @@ export function defenseGrade(p: Player, pos: FieldPosition): number {
 
 export const defenseZ = (p: Player, pos: FieldPosition): number => (defenseGrade(p, pos) - 50) / 10;
 export const armZ = (p: Player): number => (p.hitting.arm.present - 50) / 10;
+
+/** The lowest glove a manager will put at a position the player doesn't play. */
+const PLAYABLE_GRADE = 40;
+
+/** Whether a manager will put him at a position: he plays it, or his glove there is playable. */
+export const canPlayPosition = (p: Player, pos: FieldPosition): boolean => p.positions.includes(pos) || defenseGrade(p, pos) >= PLAYABLE_GRADE;

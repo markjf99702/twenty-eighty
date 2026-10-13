@@ -1,7 +1,7 @@
 import { sigmoid } from "../core/math";
 import type { Rng } from "../core/rng";
 import type { League, Park, Team } from "../league/types";
-import { armZ, defenseGrade, defenseZ } from "../players/defense";
+import { armZ, canPlayPosition, defenseGrade, defenseZ } from "../players/defense";
 import { injuryChance, rollInjury, INJURY_RATES } from "../players/injuries";
 import type { FieldPosition, Injury, LineupPosition } from "../players/types";
 import { FIELD_POSITIONS } from "../players/types";
@@ -1063,9 +1063,7 @@ export class GameSim {
   }
 
   private canPlay(id: number, pos: LineupPosition): boolean {
-    if (pos === "DH") return true;
-    const p = this.env.league.players[id]!;
-    return p.positions.includes(pos) || defenseGrade(p, pos) >= 40;
+    return pos === "DH" || canPlayPosition(this.env.league.players[id]!, pos);
   }
 
   private bestSub(side: Side, pos: LineupPosition, by: "defense" | "speed" | "bat", throws: "L" | "R" = "R"): number | undefined {

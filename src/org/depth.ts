@@ -13,7 +13,7 @@ import { canStart, DEFENSE_RUNS_PER_Z, offenseValue, pitchingValue } from "./val
 const SLOTS: (FieldPosition | "DH")[] = ["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF", "DH"];
 
 /** What a hitter adds in a lineup slot: his bat plays anywhere; his glove only in the field. */
-function slotValue(p: Player, slot: FieldPosition | "DH"): number {
+export function slotValue(p: Player, slot: FieldPosition | "DH"): number {
   if (slot === "DH") return offenseValue(p);
   return offenseValue(p) + DEFENSE_RUNS_PER_Z[slot] * defenseZ(p, slot);
 }

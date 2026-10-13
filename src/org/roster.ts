@@ -11,7 +11,9 @@ import {
   playerName,
   SERVICE_DAYS_PER_YEAR,
 } from "../players/types";
-import { autoDepthChart } from "./depth";
+import { maxAssignment } from "../core/assignment";
+import { canPlayPosition } from "../players/defense";
+import { autoDepthChart, slotValue } from "./depth";
 import { ensureMajorContract, outrightContract } from "./contracts";
 import { peakValue, playerValue } from "./value";
 
@@ -94,7 +96,8 @@ export function refreshDepth(league: League, team: Team): void {
     return;
   }
   // Manual depth: keep the user's choices that are still valid (active, in
-  // their proper role, used once) and fill the rest from the manager's chart.
+  // their proper role, used once), fill lineup holes the way the manager
+  // would, and fill the rest from the manager's chart.
   const d = team.depth;
   const hitters = new Set(roster.filter((p) => !isPitcher(p)).map((p) => p.id));
   const pitchers = new Set(roster.filter(isPitcher).map((p) => p.id));
@@ -116,8 +119,31 @@ export function refreshDepth(league: League, team: Team): void {
   const get = (slot: (typeof slots)[number]) => (slot === "DH" ? d.dh : d.starters[slot]);
   const set = (slot: (typeof slots)[number], id: number) => (slot === "DH" ? (d.dh = id) : (d.starters[slot] = id));
   const holes = slots.filter((slot) => pick([get(slot)]) < 0);
-  const fallback = [...FIELD_POSITIONS.map((pos) => auto.starters[pos]), auto.dh, ...auto.bench, ...hitters];
-  for (const slot of holes) set(slot, pick([slot === "DH" ? auto.dh : auto.starters[slot], ...fallback]));
+  if (holes.length) {
+    // Fill the holes together from the hitters who aren't starting: someone
+    // who plays the position if anyone does, then someone who can handle it,
+    // and among those whoever adds the most there (as the manager builds his
+    // own lineup). A hole in center goes to a center fielder, not to the
+    // first player free or to a catcher with a better bat.
+    const free = roster.filter((p) => hitters.has(p.id) && !used.has(p.id));
+    const fit = (p: Player, slot: (typeof slots)[number]) => (slot === "DH" || p.positions.includes(slot) ? 2 : canPlayPosition(p, slot) ? 1 : 0);
+    const n = Math.max(free.length, holes.length);
+    const value = Array.from({ length: n }, (_, i) =>
+      Array.from({ length: n }, (_, j) => {
+        const p = free[i];
+        // Columns past the holes are the bench; a row past the free hitters is nobody.
+        if (j >= holes.length) return 0;
+        return p ? 1000 * fit(p, holes[j]!) + slotValue(p, holes[j]!) : -10_000;
+      }),
+    );
+    for (const slot of holes) set(slot, -1);
+    maxAssignment(value).forEach((j, i) => {
+      const p = free[i];
+      if (!p || j >= holes.length) return;
+      set(holes[j]!, p.id);
+      used.add(p.id);
+    });
+  }
   d.bench = take([...d.bench, ...auto.bench, ...hitters], hitters);
   const size = Math.min(5, Math.max(auto.rotation.length, d.rotation.length));
   d.rotation = take([...d.rotation, ...auto.rotation, ...auto.bullpen], pitchers, size);

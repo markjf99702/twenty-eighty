@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { generateLeague } from "../src/league/generate";
 import type { League, Team } from "../src/league/types";
+import { slotValue } from "../src/org/depth";
 import {
   activateFromIl,
   callUp,
@@ -136,5 +137,37 @@ describe("roster rules", () => {
     const before = JSON.stringify(team.depth);
     refreshDepth(league, team);
     expect(JSON.stringify(team.depth)).toBe(before);
+  });
+
+  it("fills a hole in a hand-set lineup with a player who plays the position", () => {
+    // Every club: start the backup catcher, then lose the center fielder.
+    let checked = 0;
+    for (const club of league.teams) {
+      league.userTeamId = club.id;
+      club.manualDepth = true;
+      const d = club.depth;
+      const regular = d.starters.C;
+      const backup = d.bench.find((id) => player(id).positions.includes("C"));
+      if (backup === undefined) continue;
+      d.starters.C = backup;
+      d.bench = d.bench.map((id) => (id === backup ? regular : id));
+      const kept = { ...d.starters, DH: d.dh };
+      const free = d.bench.map(player);
+      const centerFielders = free.filter((p) => p.positions.includes("CF"));
+      const cf = player(d.starters.CF);
+      injure(cf, 30);
+      expect(placeOnIl(ctx, club, cf).ok).toBe(true);
+
+      // The rest of the user's lineup stands.
+      for (const pos of FIELD_POSITIONS) if (pos !== "CF") expect(club.depth.starters[pos]).toBe(kept[pos]);
+      expect(club.depth.dh).toBe(kept.DH);
+      if (centerFielders.length === 0) continue;
+      // A center fielder from the bench takes over (the best of them by the manager's measure), not the catcher on the bench.
+      const best = centerFielders.reduce((a, b) => (slotValue(b, "CF") > slotValue(a, "CF") ? b : a));
+      expect(club.depth.starters.CF).toBe(best.id);
+      expect(club.depth.bench).toContain(regular);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(15);
   });
 });
