@@ -1,4 +1,5 @@
 import type { Rng } from "../core/rng";
+import { withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
 import { budgetRoom, DOLLARS_PER_WAR, MIN_SALARY, marketSalary, projectedWar, seasonWar } from "../org/contracts";
 import { designateForAssignment, FORTY_MAN_LIMIT, logTransaction, type RosterContext, type RosterResult } from "../org/roster";
@@ -76,7 +77,7 @@ export function signFreeAgent(ctx: RosterContext, team: Team, p: Player, years: 
   p.contract = { type: "guaranteed", salary, years, signed: league.year, total: money(salary * years) };
   team.fortyMan.push(p.id);
   team.rosters.MLB.push(p.id);
-  const terms = years === 1 ? `a one-year, $${salary.toFixed(2)}M deal` : `a ${years}-year, $${(salary * years).toFixed(1)}M deal`;
+  const terms = years === 1 ? `a one-year, $${salary.toFixed(2)}M deal` : `${withArticle(years)}-year, $${(salary * years).toFixed(1)}M deal`;
   logTransaction(league, ctx.day, team, p, "sign", `Signed free agent ${playerName(p)} to ${terms}`);
   return { ok: true };
 }

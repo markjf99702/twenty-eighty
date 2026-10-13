@@ -1,5 +1,6 @@
 import { hashNormal, hashUniform, seedHash } from "../core/hash";
 import type { Rng } from "../core/rng";
+import { withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
 import { projectPlayer } from "../players/development";
 import { type Contract, playerName, type Player, SERVICE_DAYS_PER_YEAR } from "../players/types";
@@ -176,7 +177,7 @@ export function signExtension(ctx: RosterContext, team: Team, p: Player, terms: 
     w.tenders = w.tenders.filter((t) => t.playerId !== p.id);
     w.expiring = w.expiring.filter((id) => id !== p.id);
   }
-  const deal = `a ${terms.years}-year, $${terms.total.toFixed(1)}M extension through ${terms.through}`;
+  const deal = `${withArticle(terms.years)}-year, $${terms.total.toFixed(1)}M extension through ${terms.through}`;
   logTransaction(league, ctx.day, team, p, "extension", `Signed ${playerName(p)} to ${deal}`);
 }
 

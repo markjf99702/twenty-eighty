@@ -1,4 +1,5 @@
 import { clamp } from "../core/math";
+import { withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
 import { budgetRoom, FREE_AGENT_YEARS, serviceYears } from "../org/contracts";
 import { gamesOut } from "../org/offers";
@@ -356,7 +357,7 @@ function luck(season: Season, p: Player): string | null {
     if (!line || line.outs < 60) return null;
     const a = pitcherAdvanced(line, 1, ctx);
     if (a.ERA < a.FIP - 0.8) return `${playerName(p)}'s ${a.ERA.toFixed(2)} ERA is well ahead of his ${a.FIP.toFixed(2)} FIP: expect some of that to come back.`;
-    if (a.ERA > a.FIP + 0.8) return `${playerName(p)}'s ${a.ERA.toFixed(2)} ERA hides a ${a.FIP.toFixed(2)} FIP: he's pitched better than it looks.`;
+    if (a.ERA > a.FIP + 0.8) return `${playerName(p)}'s ${a.ERA.toFixed(2)} ERA hides ${withArticle(a.FIP.toFixed(2))} FIP: he's pitched better than it looks.`;
     return null;
   }
   const line = season.levels[p.level].batting.lines.get(p.id);

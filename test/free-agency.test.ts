@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { Rng } from "../src/core/rng";
 import { generateLeague } from "../src/league/generate";
-import { acceptBar, FREE_AGENCY_WEEKS, freeAgencyWeek, openFreeAgency } from "../src/offseason/freeAgency";
+import { acceptBar, FREE_AGENCY_WEEKS, freeAgencyWeek, openFreeAgency, signFreeAgent } from "../src/offseason/freeAgency";
 import { MIN_SALARY, seasonWar } from "../src/org/contracts";
 import { releasePlayer } from "../src/org/roster";
 import { canStart } from "../src/org/value";
@@ -25,5 +25,16 @@ describe("free agency", () => {
     expect(state.signings.filter((s) => s.salary < MIN_SALARY)).toEqual([]);
     // What a minimum-salary player will take (the free-agent list's "Takes now") stays at the minimum too.
     expect(acceptBar({ playerId: 0, years: 1, salary: MIN_SALARY }, FREE_AGENCY_WEEKS)).toBeGreaterThanOrEqual(MIN_SALARY);
+  });
+
+  it("writes an 8-year deal with 'an'", () => {
+    const league = generateLeague({ seed: "free-agency" });
+    const ctx = { league, day: 0, expanded: false };
+    const [from, to] = [league.teams[0]!, league.teams[1]!];
+    const star = league.players[from.rosters.MLB[0]!]!;
+    releasePlayer(ctx, from, star);
+    releasePlayer(ctx, to, league.players[to.fortyMan.find((id) => league.players[id]!.level !== "MLB")!]!);
+    expect(signFreeAgent(ctx, to, star, 8, 25).ok).toBe(true);
+    expect(league.transactions.at(-1)!.text).toMatch(/ to an 8-year, \$200\.0M deal$/);
   });
 });

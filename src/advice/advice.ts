@@ -1,4 +1,5 @@
 import { Rng } from "../core/rng";
+import { withArticle } from "../core/text";
 import { expectedGate, formFactor, referencePrice } from "../finance/finance";
 import { settingsOf } from "../league/settings";
 import type { AdviceNote, League, Team } from "../league/types";
@@ -316,9 +317,9 @@ function analytics(season: Season, team: Team, day: number): void {
     return { rank: sorted.findIndex(([k]) => k === abbrev) + 1, value: score(byTeam.get(abbrev) ?? get(abbrev)) };
   };
   const units = [
-    { key: "lineup", name: "lineup", ...rank((v) => v.wrc / Math.max(1, v.pa), true), fmt: (x: number) => `a ${Math.round(x)} wRC+` },
-    { key: "rotation", name: "rotation", ...rank((v) => v.spEr / Math.max(1, v.spIp), false), fmt: (x: number) => `a ${x.toFixed(2)} ERA` },
-    { key: "bullpen", name: "bullpen", ...rank((v) => v.rpFip / Math.max(1, v.rpIp), false), fmt: (x: number) => `a ${x.toFixed(2)} FIP` },
+    { key: "lineup", name: "lineup", ...rank((v) => v.wrc / Math.max(1, v.pa), true), fmt: (x: number) => `${withArticle(Math.round(x))} wRC+` },
+    { key: "rotation", name: "rotation", ...rank((v) => v.spEr / Math.max(1, v.spIp), false), fmt: (x: number) => `${withArticle(x.toFixed(2))} ERA` },
+    { key: "bullpen", name: "bullpen", ...rank((v) => v.rpFip / Math.max(1, v.rpIp), false), fmt: (x: number) => `${withArticle(x.toFixed(2))} FIP` },
   ];
   const worst = units.sort((a, b) => b.rank - a.rank)[0]!;
   if (worst.rank >= 24) {
@@ -344,8 +345,8 @@ function analytics(season: Season, team: Team, day: number): void {
     const name = playerName(league.players[p.id]!);
     best =
       gap < 0
-        ? { id: p.id, gap: Math.abs(gap), title: `${name}'s ERA is running ahead of him`, text: `${name} has a ${p.ERA.toFixed(2)} ERA, but he's pitched more like ${p.FIP.toFixed(2)} (FIP). Expect it to rise; ${selling}.` }
-        : { id: p.id, gap: Math.abs(gap), title: `${name} has pitched better than his ERA`, text: `${name}'s ${p.ERA.toFixed(2)} ERA hides how well he's pitched: a ${p.FIP.toFixed(2)} FIP. He should turn it around, so it's no time to give up on him.` };
+        ? { id: p.id, gap: Math.abs(gap), title: `${name}'s ERA is running ahead of him`, text: `${name} has ${withArticle(p.ERA.toFixed(2))} ERA, but he's pitched more like ${p.FIP.toFixed(2)} (FIP). Expect it to rise; ${selling}.` }
+        : { id: p.id, gap: Math.abs(gap), title: `${name} has pitched better than his ERA`, text: `${name}'s ${p.ERA.toFixed(2)} ERA hides how well he's pitched: ${withArticle(p.FIP.toFixed(2))} FIP. He should turn it around, so it's no time to give up on him.` };
   }
   for (const h of stats.hitters) {
     if (!mine.has(h.id) || h.line.PA < 200) continue;
