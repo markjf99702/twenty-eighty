@@ -6,7 +6,7 @@ import { arbCase, arbitrationSalary, orgPlayers, payroll } from "../../../src/or
 import type { RosterContext } from "../../../src/org/roster";
 import { askingPrice, onTheBlock } from "../../../src/org/market";
 import { offerLive } from "../../../src/org/offers";
-import { evaluateTrade, surplusValue } from "../../../src/org/trades";
+import { evaluateTrade, tradeValue } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
 import { overallGrade } from "../../../src/org/value";
 import { boardValue, onTheClock } from "../../../src/offseason/draft";
@@ -216,7 +216,7 @@ export function tradeSide(season: Season, stats: StatsCache, team: Team, ctx?: R
   const players = orgPlayers(league, team)
     .map((p) => ({
       ...playerSummary(p, season, stats, ctx ? rosterActions(p, team, ctx) : undefined),
-      surplus: surplusValue(p, 1, warShift(season, league.userTeamId, p)),
+      surplus: tradeValue(league, p, 1, warShift(season, league.userTeamId, p)),
     }))
     .sort((a, b) => b.surplus - a.surplus);
   return { team: teamRef(team), players };
@@ -229,7 +229,7 @@ export function blockView(season: Season, stats: StatsCache): BlockRow[] {
   if (user === null) return [];
   return onTheBlock(season, user).map((b) => ({
     ...playerSummary(b.player, season, stats),
-    surplus: surplusValue(b.player, 1, warShift(season, user, b.player)),
+    surplus: tradeValue(league, b.player, 1, warShift(season, user, b.player)),
     club: teamRef(b.team),
     gamesOut: b.gamesOut,
     group: b.group,
@@ -287,7 +287,7 @@ export function offerViews(season: Season, stats: StatsCache): OfferView[] {
   const seen = (viewer: number, p: Player) => warShift(season, viewer, p);
   const row = (id: number) => {
     const p = league.players[id]!;
-    return { ...playerSummary(p, season, stats), surplus: surplusValue(p, fraction, seen(user, p)) };
+    return { ...playerSummary(p, season, stats), surplus: tradeValue(league, p, fraction, seen(user, p)) };
   };
   return league.tradeOffers
     .filter((o) => offerLive(league, o, now))

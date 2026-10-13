@@ -1,14 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { generateLeague } from "../src/league/generate";
-import { orgPlayers, payroll } from "../src/org/contracts";
+import { orgPlayers, payroll, worthTendering } from "../src/org/contracts";
 import { rosterProblems } from "../src/org/roster";
-import { evaluateTrade, executeTrade, surplusValue } from "../src/org/trades";
+import { evaluateTrade, executeTrade, surplusValue, tradeValue } from "../src/org/trades";
+import { extensionOptions } from "../src/org/extensions";
 import { Rng } from "../src/core/rng";
 import { boardValue, draftClass, onTheClock } from "../src/offseason/draft";
 import { playerValue } from "../src/org/value";
 import { projectPlayer } from "../src/players/development";
 import { advanceOffseason, beginOffseason, winterContext, winterWeek } from "../src/offseason/offseason";
-import { LEVELS } from "../src/players/types";
+import { LEVELS, playerName } from "../src/players/types";
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
 import { runPostseason } from "../src/season/postseason";
 import { Season } from "../src/season/season";
@@ -53,6 +54,35 @@ describe("the offseason", () => {
     for (const t of state.tenders) expect(t.salary).toBeGreaterThan(0.5);
   });
 
+  // An arbitration case traded before the tender deadline, checked once it has passed.
+  let traded: { id: number; to: number; award: number } | null = null;
+
+  it("trades on next season's contracts until the tender deadline", () => {
+    const ctx = winterContext(league, "review");
+    // A case his club will tender, at an award well over last season's salary: he's valued at the award.
+    const t = state.tenders.find((x) => x.tender && x.salary > league.players[x.playerId]!.contract!.salary + 2)!;
+    const p = league.players[t.playerId]!;
+    expect(tradeValue(league, p)).toBeLessThan(surplusValue(p));
+    // Traded, he takes his tender along, and his new club decides it.
+    const from = league.teams[t.teamId]!;
+    const to = league.teams.find((x) => x.id !== from.id)!;
+    executeTrade(ctx, to, from, [], [p.id]);
+    expect(t.teamId).toBe(to.id);
+    expect(t.tender).toBe(worthTendering(p, t.salary));
+    traded = { id: p.id, to: to.id, award: t.salary };
+    // A veteran whose deal is up can't be traded (he leaves at the deadline), and his salary is off next season's payroll.
+    const leaving = league.players[state.expiring[0]!]!;
+    const club = league.teams[leaving.teamId!]!;
+    const other = league.teams.find((x) => x.id !== club.id)!;
+    const check = evaluateTrade(league, other, club, [], [leaving.id]);
+    expect(check.ok).toBe(false);
+    expect(check.reason).toBe(`${playerName(leaving)} becomes a free agent at the tender deadline.`);
+    const before = payroll(league, club);
+    leaving.contract!.salary += 10;
+    expect(payroll(league, club)).toBe(before);
+    leaving.contract!.salary -= 10;
+  });
+
   it("runs the draft in reverse order of the standings", () => {
     advanceOffseason(league, season); // review -> tenders
     advanceOffseason(league, season); // tenders -> draft
@@ -61,6 +91,12 @@ describe("the offseason", () => {
     expect(onTheClock(d)!.teamId).toBe(d.order[0]);
     expect(season.records[d.order[0]!]!.w).toBeLessThanOrEqual(worst.w + 1);
     for (const id of state.expiring) expect(league.freeAgents).toContain(id);
+  });
+
+  it("sends a case traded before the deadline to arbitration with his new club", () => {
+    const p = league.players[traded!.id]!;
+    expect(p.teamId).toBe(traded!.to);
+    expect(p.contract).toMatchObject({ type: "arb", salary: traded!.award });
   });
 
   it("resumes the winter exactly from a save", () => {
@@ -79,6 +115,10 @@ describe("the offseason", () => {
   it("signs free agents and international amateurs, then sets every club for Opening Day", () => {
     advanceOffseason(league, season); // free agency -> international
     expect(league.offseason!.freeAgency!.signings.length).toBeGreaterThan(20);
+    // A veteran whose deal was up and who signed again for three years isn't up for an extension: his deal is on the books.
+    const resigned = league.offseason!.freeAgency!.signings.find((x) => x.years >= 3 && state.expiring.includes(x.playerId))!;
+    const talk = extensionOptions(league, league.players[resigned.playerId]!, 1);
+    expect(talk.ok ? null : talk.reason).toMatch(/^He's signed through/);
     advanceOffseason(league, season); // international -> spring
     expect(league.offseason!.international!.signings.length).toBeGreaterThan(60);
     const ctx = winterContext(league, "spring");

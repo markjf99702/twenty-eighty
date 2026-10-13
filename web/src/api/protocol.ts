@@ -167,6 +167,11 @@ export interface ContractView {
   through: number;
   /** "$22.5M through 2029", "Pre-arb $0.84M", "Arbitration $6.1M", "Minor league deal". */
   label: string;
+  /**
+   * Before the tender deadline: a veteran leaving as a free agent (salary 0), or an arbitration case whose club means to
+   * tender him or not (salary is the award).
+   */
+  pending?: "free-agent" | "tender" | "non-tender";
 }
 
 /** A compact season line for roster tables. Rates are fractions; null means not tracked at that level. */

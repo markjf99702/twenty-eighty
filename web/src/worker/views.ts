@@ -24,10 +24,10 @@ import {
 import { unreadAdvice } from "../../../src/advice/advice";
 import { mood } from "../../../src/finance/owner";
 import { settingsOf } from "../../../src/league/settings";
-import { committed, payroll, warFromValue } from "../../../src/org/contracts";
+import { committed, payroll, tenderWindow, warFromValue } from "../../../src/org/contracts";
 import { extensionCandidates, extensionGain, extensionOptions, serviceClock } from "../../../src/org/extensions";
 import { offerLive } from "../../../src/org/offers";
-import { surplusValue, TRADE_DEADLINE_DAY } from "../../../src/org/trades";
+import { TRADE_DEADLINE_DAY, tradeValue } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
 import { isProspect, measuredInWins, overallGrade } from "../../../src/org/value";
 import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season";
@@ -261,9 +261,17 @@ function statLine(p: Player, stats: StatsCache): string {
 
 const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
 
-export function contractView(p: Player, year: number): ContractView | null {
+export function contractView(league: League, p: Player, year: number): ContractView | null {
   const c = p.contract;
   if (!c) return null;
+  // Before the tender deadline: next season's, as the veterans leaving and the arbitration cases stand.
+  const w = tenderWindow(league);
+  if (w?.expiring.includes(p.id)) return { type: c.type, salary: 0, years: 0, through: year - 1, label: "Free agent at the tender deadline", pending: "free-agent" };
+  const t = w?.tenders.find((x) => x.playerId === p.id);
+  if (t) {
+    const label = `Award ${money(t.salary)} (${t.tender ? "tender pending" : "non-tender planned"})`;
+    return { type: "arb", salary: t.salary, years: 1, through: year, label, pending: t.tender ? "tender" : "non-tender" };
+  }
   const through = year + c.years - 1;
   const label =
     c.type === "minor"
@@ -523,7 +531,7 @@ export function playerSummary(
     stats: currentSnapshot(p, season, stats),
     last: lastSnapshot(p, season),
     recent: recentSnapshot(p, season, stats),
-    contract: contractView(p, contractYear(season)),
+    contract: contractView(season.league, p, contractYear(season)),
     actions,
   };
 }
@@ -700,7 +708,7 @@ export function payrollView(season: Season, stats: StatsCache, team: Team): Payr
   const contracts = everyone
     .filter((p) => p.contract && p.contract.type !== "minor")
     .sort((a, b) => b.contract!.salary - a.contract!.salary)
-    .map((p) => ({ ...playerSummary(p, season, stats), surplus: surplusValue(p, 1, warShift(season, league.userTeamId, p)) }));
+    .map((p) => ({ ...playerSummary(p, season, stats), surplus: tradeValue(league, p, 1, warShift(season, league.userTeamId, p)) }));
   return {
     payroll: payroll(league, team),
     budget: team.budget,
@@ -830,7 +838,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
     careerTeams,
     awards: condenseAwards(p.awards),
     draft,
-    surplus: team ? surplusValue(p, 1, warShift(season, league.userTeamId, p)) : null,
+    surplus: team ? tradeValue(league, p, 1, warShift(season, league.userTeamId, p)) : null,
     retired: p.retired ?? null,
     scouting: {
       sigma: Math.round(read.sigma * 10) / 10,

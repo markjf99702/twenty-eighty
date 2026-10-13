@@ -299,6 +299,10 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
       render: (p) =>
         !p.contract || p.contract.type === "minor" ? (
           <span class="muted">MiLB</span>
+        ) : p.contract.pending === "free-agent" ? (
+          <span class="muted" title={p.contract.label}>
+            FA
+          </span>
         ) : (
           <span title={p.contract.label}>
             ${p.contract.salary >= 10 ? p.contract.salary.toFixed(1) : p.contract.salary.toFixed(2)}M

@@ -11,7 +11,10 @@ import {
   MIN_SALARY,
   marketSalary,
   budgetRoom,
+  followTender,
+  leavesAtDeadline,
   orgPlayers,
+  pendingContract,
   seasonWar,
   serviceYears,
 } from "./contracts";
@@ -129,6 +132,16 @@ export function surplusValue(p: Player, fraction = 1, warShift = 0): number {
   return Math.round(total * 10) / 10;
 }
 
+/**
+ * Surplus value as a trade sees it: before the tender deadline, on next
+ * season's contract (nothing for a veteran about to leave, an arbitration
+ * case at his award). See `pendingContract`.
+ */
+export function tradeValue(league: League, p: Player, fraction = 1, warShift = 0): number {
+  const c = pendingContract(league, p);
+  return surplusValue(c === p.contract ? p : { ...p, contract: c }, fraction, warShift);
+}
+
 export interface TradeCheck {
   ok: boolean;
   reason?: string;
@@ -234,7 +247,7 @@ export function evaluateTrade(
   moves: RoomMove[] = [],
 ): TradeCheck {
   const P = (id: number) => league.players[id]!;
-  const value = (viewer: number, ids: number[]) => ids.reduce((s, id) => s + surplusValue(P(id), fraction, seen(viewer, P(id))), 0);
+  const value = (viewer: number, ids: number[]) => ids.reduce((s, id) => s + tradeValue(league, P(id), fraction, seen(viewer, P(id))), 0);
   const giveValue = value(userTeam.id, give);
   const getValue = value(userTeam.id, get);
   const base = { give: Math.round(giveValue * 10) / 10, get: Math.round(getValue * 10) / 10 };
@@ -242,11 +255,17 @@ export function evaluateTrade(
   if (give.some((id) => P(id).teamId !== userTeam.id) || get.some((id) => P(id).teamId !== partner.id)) {
     return { ...base, ok: false, reason: "Those players aren't all on the right clubs." };
   }
+  const leaving = [...give, ...get].map(P).find((p) => leavesAtDeadline(league, p));
+  if (leaving) return { ...base, ok: false, reason: `${playerName(leaving)} becomes a free agent at the tender deadline.` };
   if (fortyManAfter(league, partner, get, give) > FORTY_MAN_LIMIT + 2) {
     return { ...base, ok: false, reason: `${partner.nickname} don't have room on their 40-man roster.` };
   }
-  const salaryIn = give.reduce((s, id) => s + (P(id).contract?.type === "guaranteed" ? P(id).contract!.salary : 0), 0);
-  const salaryOut = get.reduce((s, id) => s + (P(id).contract?.type === "guaranteed" ? P(id).contract!.salary : 0), 0);
+  const guaranteed = (id: number) => {
+    const c = pendingContract(league, P(id));
+    return c?.type === "guaranteed" ? c.salary : 0;
+  };
+  const salaryIn = give.reduce((s, id) => s + guaranteed(id), 0);
+  const salaryOut = get.reduce((s, id) => s + guaranteed(id), 0);
   if (salaryIn - salaryOut > 0 && salaryIn - salaryOut > budgetRoom(league, partner) + 0.05 * partner.budget) {
     return { ...base, ok: false, reason: `${partner.nickname} can't take on that much salary.` };
   }
@@ -289,6 +308,8 @@ export function executeTrade(ctx: RosterContext, a: Team, b: Team, aSends: numbe
   const names = (ids: number[]) => ids.map((id) => playerName(P(id))).join(", ") || "nothing";
   for (const id of aSends) moveTo(league, a, b, P(id));
   for (const id of bSends) moveTo(league, b, a, P(id));
+  // Before the tender deadline, an arbitration case's tender goes with him.
+  for (const id of [...aSends, ...bSends]) followTender(league, P(id));
   for (const id of aSends) logTransaction(league, ctx.day, b, P(id), "trade", `Acquired ${playerName(P(id))} from ${a.abbrev} for ${names(bSends)}`);
   for (const id of bSends) logTransaction(league, ctx.day, a, P(id), "trade", `Acquired ${playerName(P(id))} from ${b.abbrev} for ${names(aSends)}`);
   refreshDepth(league, a);
@@ -338,10 +359,10 @@ export function aiTradeMarket(
     const room = budgetRoom(league, buyer) + (ctx.offseason ? 0 : 0.05 * buyer.budget);
     const target = orgPlayers(league, seller)
       // In season, relievers and role players are on the market too.
-      .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 27 && seasonWar(p) >= minWar && (p.contract?.salary ?? 0) * fraction <= room)
+      .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 27 && seasonWar(p) >= minWar && (p.contract?.salary ?? 0) * fraction <= room && !leavesAtDeadline(league, p))
       .sort((a, b) => seasonWar(b) - seasonWar(a))[0];
     if (!target) continue;
-    const price = surplusValue(target, fraction, seen(seller.id, target));
+    const price = tradeValue(league, target, fraction, seen(seller.id, target));
     if (price <= 2) continue;
     const top = new Set(
       orgPlayers(league, buyer)
@@ -352,8 +373,8 @@ export function aiTradeMarket(
     );
     // The seller prices the prospects it's offered with its own scouts.
     const chips = orgPlayers(league, buyer)
-      .filter((p) => !top.has(p.id) && !p.il && !p.injury && p.age <= 26)
-      .map((p) => ({ p, v: surplusValue(p, fraction, seen(seller.id, p)) }))
+      .filter((p) => !top.has(p.id) && !p.il && !p.injury && p.age <= 26 && !leavesAtDeadline(league, p))
+      .map((p) => ({ p, v: tradeValue(league, p, fraction, seen(seller.id, p)) }))
       .filter((x) => x.v > 1 && x.v < price * 1.3)
       .sort((a, b) => b.v - a.v);
     const pkg: typeof chips = [];

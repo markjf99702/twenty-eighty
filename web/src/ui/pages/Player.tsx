@@ -133,7 +133,7 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
                 <span class="k">Deal</span>
                 <span class="v">{p.contract?.label ?? (v.retired ? `Retired (${v.retired})` : "Free agent")}</span>
               </div>
-              {p.contract && p.contract.type === "guaranteed" && (
+              {p.contract && p.contract.type === "guaranteed" && !p.contract.pending && (
                 <div>
                   <span class="k">Years left</span>
                   <span class="v">{p.contract.years}</span>

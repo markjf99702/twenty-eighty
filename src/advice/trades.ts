@@ -1,9 +1,9 @@
 import { clamp } from "../core/math";
 import { withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
-import { budgetRoom, FREE_AGENT_YEARS, serviceYears } from "../org/contracts";
+import { budgetRoom, FREE_AGENT_YEARS, pendingContract, serviceYears } from "../org/contracts";
 import { gamesOut } from "../org/offers";
-import { surplusValue } from "../org/trades";
+import { tradeValue } from "../org/trades";
 import { isProspect, overallGrade } from "../org/value";
 import { FIELD_POSITIONS, type FieldPosition, type Level, playerName, type Player } from "../players/types";
 import { belief, believedWar, warShift } from "../scouting/analytics";
@@ -64,7 +64,7 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
   const ins = get.map(P);
   const outs = give.map(P);
   const war = (p: Player) => believedWar(season, user, p);
-  const surplus = (p: Player) => surplusValue(p, fraction, warShift(season, user, p));
+  const surplus = (p: Player) => tradeValue(league, p, fraction, warShift(season, user, p));
   const notes: TradeNote[] = [];
 
   // Value, by our read.
@@ -131,9 +131,17 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
 
   // Money.
   const thisYear = inSeason ? fraction : 1;
-  const salary = (p: Player) => (p.contract && p.contract.type !== "minor" ? p.contract.salary : 0);
+  // Next season's contracts, in the winter before the tender deadline (an arbitration case at his award).
+  const salary = (p: Player) => {
+    const c = pendingContract(league, p);
+    return c && c.type !== "minor" ? c.salary : 0;
+  };
   const payroll = (ins.reduce((s, p) => s + salary(p), 0) - outs.reduce((s, p) => s + salary(p), 0)) * thisYear;
-  const future = (ps: Player[]) => ps.reduce((s, p) => s + (p.contract?.type === "guaranteed" ? p.contract.salary * Math.max(0, p.contract.years - 1) : 0), 0);
+  const future = (ps: Player[]) =>
+    ps.reduce((s, p) => {
+      const c = pendingContract(league, p);
+      return s + (c?.type === "guaranteed" ? c.salary * Math.max(0, c.years - 1) : 0);
+    }, 0);
   const later = future(ins) - future(outs);
   if (Math.abs(payroll) >= 0.25 || Math.abs(later) >= 1) {
     const room = budgetRoom(league, team);

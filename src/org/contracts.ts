@@ -1,5 +1,6 @@
 import type { Rng } from "../core/rng";
 import type { League, Team } from "../league/types";
+import type { OffseasonState } from "../offseason/types";
 import { projectPlayer } from "../players/development";
 import { type Contract, type Player, SERVICE_DAYS_PER_YEAR } from "../players/types";
 import { staffCost } from "../scouting/scouting";
@@ -127,7 +128,46 @@ export function tenderWorth(p: Player, war: number): number {
   return Math.max(0, war - (relief ? 0.1 : 0.3)) * DOLLARS_PER_WAR * (relief ? 1.8 : 1);
 }
 
+/** A club's call on an arbitration case: keep him if he's worth his award over a replacement-level player, or if it's cheap. */
+export const worthTendering = (p: Player, award: number) => tenderWorth(p, seasonWar(p)) >= 0.9 * award || award <= 1.2;
+
 export const preArbSalary = (p: Player) => money(MIN_SALARY + 0.03 * serviceYears(p));
+
+/**
+ * The winter before the tender deadline (its review and tender phases), while next season's contracts are still
+ * pending: veterans whose deals are up leave at the deadline, and arbitration cases wait on their tenders.
+ */
+export function tenderWindow(league: League): OffseasonState | null {
+  const w = league.offseason;
+  return w && (w.phase === "review" || w.phase === "tenders") ? w : null;
+}
+
+/** A veteran whose contract is up: he becomes a free agent at the tender deadline. */
+export const leavesAtDeadline = (league: League, p: Player): boolean => tenderWindow(league)?.expiring.includes(p.id) ?? false;
+
+/**
+ * His contract for next season while the tender deadline is ahead: none for a veteran whose deal is up, and a one-year
+ * deal at his award for an arbitration case (whoever has him at the deadline decides whether to tender it). Otherwise,
+ * and after the deadline, the contract he has.
+ */
+export function pendingContract(league: League, p: Player): Contract | null {
+  const w = tenderWindow(league);
+  if (!w) return p.contract;
+  if (w.expiring.includes(p.id)) return null;
+  const t = w.tenders.find((x) => x.playerId === p.id);
+  return t ? { type: "arb", salary: t.salary, years: 1 } : p.contract;
+}
+
+/**
+ * Before the tender deadline, an arbitration case who changes clubs (a trade, a waiver claim) takes his pending tender
+ * along, and his new club decides it by the clubs' rule (the user can change his own on the tender table).
+ */
+export function followTender(league: League, p: Player): void {
+  const t = tenderWindow(league)?.tenders.find((x) => x.playerId === p.id);
+  if (!t || p.teamId === null || t.teamId === p.teamId) return;
+  t.teamId = p.teamId;
+  t.tender = worthTendering(p, t.salary);
+}
 
 export const minorContract = (): Contract => ({ type: "minor", salary: 0, years: 1 });
 
@@ -168,10 +208,19 @@ export function budgetRoom(league: League, team: Team): number {
   return team.budget - staffCost(league, team) - payroll(league, team);
 }
 
-/** This season's payroll: every non-minor-league contract in the organization plus dead money. */
+/**
+ * This season's payroll: every non-minor-league contract in the organization plus dead money. Before the tender
+ * deadline it's next season's: veterans whose deals are up don't count, and arbitration cases count at their awards
+ * when their club tenders them.
+ */
 export function payroll(league: League, team: Team): number {
   let total = 0;
-  for (const p of orgPlayers(league, team)) total += salaryOf(p);
+  const w = tenderWindow(league);
+  for (const p of orgPlayers(league, team)) {
+    const t = w?.tenders.find((x) => x.playerId === p.id);
+    if (t) total += t.tender ? t.salary : 0;
+    else if (!w?.expiring.includes(p.id)) total += salaryOf(p);
+  }
   for (const d of team.deadMoney) total += d.amount;
   return money(total);
 }

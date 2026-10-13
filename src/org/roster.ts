@@ -14,7 +14,7 @@ import {
 import { maxAssignment } from "../core/assignment";
 import { canPlayPosition } from "../players/defense";
 import { autoDepthChart, slotValue } from "./depth";
-import { budgetRoom, ensureMajorContract, MIN_SALARY, outrightContract } from "./contracts";
+import { budgetRoom, ensureMajorContract, followTender, MIN_SALARY, outrightContract } from "./contracts";
 import { peakValue, playerValue } from "./value";
 
 /**
@@ -383,6 +383,7 @@ export function designateForAssignment(
     other.rosters.AAA.push(p.id);
     p.level = "AAA";
     p.optionedDay = ctx.day;
+    followTender(league, p);
     logTransaction(league, ctx.day, other, p, "claim", `${yours ? "Your assistant GM claimed" : "Claimed"} ${label(p)} off waivers from ${team.abbrev}`);
     // The claim is logged on the club that made it; your own moves tell the rest of the story.
     if (team.id === league.userTeamId) designated.text += `; claimed off waivers by ${other.abbrev}`;

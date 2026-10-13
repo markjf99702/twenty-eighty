@@ -4,7 +4,7 @@ import type { League, Team, TradeOffer } from "../league/types";
 import { playerName, type Player } from "../players/types";
 import { warShift } from "../scouting/analytics";
 import type { Season } from "../season/season";
-import { budgetRoom, orgPlayers, seasonWar } from "./contracts";
+import { budgetRoom, leavesAtDeadline, orgPlayers, seasonWar } from "./contracts";
 import { canStart } from "./value";
 import type { RosterContext } from "./roster";
 import {
@@ -12,8 +12,8 @@ import {
   evaluateTrade,
   executeTrade,
   marketSides,
-  surplusValue,
   teamStrength,
+  tradeValue,
   TRADE_DEADLINE_DAY,
   type WarShift,
 } from "./trades";
@@ -71,7 +71,7 @@ export function raceSides(season: Season): Side {
 
 const salaryOf = (p: Player) => (p.contract && p.contract.type !== "minor" ? p.contract.salary : 0);
 
-/** Young players a club would part with: not among its 20 best big leaguers, healthy, 26 or younger. */
+/** Young players a club would part with: not among its 20 best big leaguers, healthy, 26 or younger (and not leaving at the tender deadline). */
 export function chips(league: League, team: Team): Player[] {
   const core = new Set(
     orgPlayers(league, team)
@@ -80,7 +80,7 @@ export function chips(league: League, team: Team): Player[] {
       .slice(0, 20)
       .map((p) => p.id),
   );
-  return orgPlayers(league, team).filter((p) => !core.has(p.id) && !p.il && !p.injury && p.age <= 26);
+  return orgPlayers(league, team).filter((p) => !core.has(p.id) && !p.il && !p.injury && p.age <= 26 && !leavesAtDeadline(league, p));
 }
 
 /** Up to three players whose values add to between `lo` and `hi`, best first. */
@@ -155,7 +155,7 @@ function choose<T extends { p: Player }>(rng: Rng, items: (T & { weight: number 
 function packPool(league: League, team: Team, viewer: Team, rng: Rng, now: number, fraction: number, seen: WarShift) {
   return chips(league, team)
     .map((p) => {
-      const v = surplusValue(p, fraction, seen(viewer.id, p));
+      const v = tradeValue(league, p, fraction, seen(viewer.id, p));
       return { p, v, order: v * freshness(interest(league, p.id, now).times) * (0.85 + 0.3 * rng.next()) };
     })
     .filter((x) => x.v > 0.5)
@@ -170,11 +170,11 @@ function buyOffer(league: League, user: Team, buyers: Team[], rng: Rng, now: num
   const buyer = rng.pick(buyers);
   const room = budgetRoom(league, buyer) + 0.05 * buyer.budget;
   const targets = orgPlayers(league, user)
-    .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 25 && seasonWar(p) >= 1.5 && salaryOf(p) * fraction <= room)
+    .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 25 && seasonWar(p) >= 1.5 && salaryOf(p) * fraction <= room && !leavesAtDeadline(league, p))
     .map((p) => {
       const asked = interest(league, p.id, now);
       const gain = upgrade(league, buyer, p, seen);
-      const v = surplusValue(p, fraction, seen(buyer.id, p));
+      const v = tradeValue(league, p, fraction, seen(buyer.id, p));
       const weight = asked.recent || gain < 0.5 || v <= 3 ? 0 : gain * freshness(asked.times);
       return { p, v, weight };
     });
@@ -194,11 +194,11 @@ function sellOffer(league: League, user: Team, sellers: Team[], rng: Rng, now: n
   const seller = rng.pick(sellers);
   const sellerEyes: WarShift = (_viewer, p) => seen(seller.id, p);
   const vets = orgPlayers(league, seller)
-    .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 26 && seasonWar(p) >= 1.5)
+    .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 26 && seasonWar(p) >= 1.5 && !leavesAtDeadline(league, p))
     .map((p) => {
       const asked = interest(league, p.id, now);
       const gain = upgrade(league, user, p, sellerEyes);
-      const v = surplusValue(p, fraction, seen(seller.id, p));
+      const v = tradeValue(league, p, fraction, seen(seller.id, p));
       const weight = asked.recent || gain < 0.5 || v <= 2 ? 0 : gain * freshness(asked.times);
       return { p, v, weight };
     });

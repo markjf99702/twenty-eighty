@@ -3,7 +3,7 @@ import type { Rng } from "../core/rng";
 import { withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
 import { projectPlayer } from "../players/development";
-import { type Contract, playerName, type Player, SERVICE_DAYS_PER_YEAR } from "../players/types";
+import { playerName, type Player, SERVICE_DAYS_PER_YEAR } from "../players/types";
 import {
   ARB_SHARE,
   ARB_YEARS,
@@ -11,7 +11,9 @@ import {
   FREE_AGENT_YEARS,
   MIN_SALARY,
   marketSalary,
+  pendingContract,
   seasonWar,
+  tenderWindow,
 } from "./contracts";
 import { logTransaction, type RosterContext } from "./roster";
 import { DISCOUNT, serviceAt, surplusValue, type WarShift } from "./trades";
@@ -81,12 +83,13 @@ function standing(league: League, p: Player, fraction: number): Standing | strin
   const c = p.contract;
   if (!c || p.teamId === null || p.retired !== undefined) return "He isn't under contract.";
   if (c.type === "minor" || !p.onFortyMan) return "Only players on the 40-man roster can sign extensions.";
-  const w = league.offseason;
   const service = serviceAt(p, fraction);
-  if (!w) return { inSeason: true, first: league.year, owed: c.type === "guaranteed" ? c.years : 1, owedSalary: c.salary, service };
+  if (!league.offseason) return { inSeason: true, first: league.year, owed: c.type === "guaranteed" ? c.years : 1, owedSalary: c.salary, service };
   const first = league.year + 1;
-  if (w.expiring.includes(p.id)) return { inSeason: false, first, owed: 0, owedSalary: 0, service };
-  const tender = w.tenders.find((t) => t.playerId === p.id);
+  // Before the tender deadline a veteran whose deal is up is owed nothing more, and an arbitration case his award.
+  const w = tenderWindow(league);
+  if (w?.expiring.includes(p.id)) return { inSeason: false, first, owed: 0, owedSalary: 0, service };
+  const tender = w?.tenders.find((t) => t.playerId === p.id);
   if (tender) return { inSeason: false, first, owed: 1, owedSalary: tender.salary, service };
   return { inSeason: false, first, owed: c.type === "guaranteed" ? c.years : 1, owedSalary: c.salary, service };
 }
@@ -149,21 +152,14 @@ export function extensionOptions(league: League, p: Player, fraction: number, sh
   return { ok: true, options };
 }
 
-/** His contract as it stands for valuing him: a pending arbitration award counts; a player about to walk is worth nothing to keep. */
-function contractNow(league: League, p: Player): Contract | null {
-  const w = league.offseason;
-  if (w?.expiring.includes(p.id)) return null;
-  const tender = w?.tenders.find((t) => t.playerId === p.id);
-  if (tender) return { type: "arb", salary: tender.salary, years: 1 };
-  return p.contract;
-}
-
 /**
  * What a deal is worth to a club over keeping him as he is, in surplus value
- * ($M): `shift` is the club's belief about his WAR against the truth.
+ * ($M): `shift` is the club's belief about his WAR against the truth. Before
+ * the tender deadline a pending arbitration award counts, and a player about
+ * to walk is worth nothing to keep.
  */
 export function extensionGain(league: League, p: Player, terms: ExtensionTerms, fraction: number, shift: number): number {
-  const now = contractNow(league, p);
+  const now = pendingContract(league, p);
   const before = now ? surplusValue({ ...p, contract: now }, fraction, shift) : 0;
   const after = surplusValue({ ...p, contract: { type: "guaranteed", salary: terms.salary, years: terms.years } }, fraction, shift);
   return Math.round((after - before) * 10) / 10;

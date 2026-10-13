@@ -2,9 +2,9 @@ import type { Team } from "../league/types";
 import { type FieldPosition, playerName, type Player } from "../players/types";
 import { warShift } from "../scouting/analytics";
 import type { Season } from "../season/season";
-import { orgPlayers, seasonWar } from "./contracts";
+import { leavesAtDeadline, orgPlayers, seasonWar } from "./contracts";
 import { BUYER_GB, chips, gamesOut, raceSides, upgrade } from "./offers";
-import { asking, evaluateTrade, marketSides, surplusValue, type WarShift } from "./trades";
+import { asking, evaluateTrade, marketSides, tradeValue, type WarShift } from "./trades";
 import { canStart } from "./value";
 
 /**
@@ -57,7 +57,7 @@ export function onTheBlock(season: Season, viewer: number): BlockEntry[] {
     if (team.id === viewer) continue;
     const gb = league.offseason ? null : gamesOut(season, team.id);
     for (const p of orgPlayers(league, team)) {
-      if (p.level !== "MLB" || p.il || p.injury || p.age < 26) continue;
+      if (p.level !== "MLB" || p.il || p.injury || p.age < 26 || leavesAtDeadline(league, p)) continue;
       const group = groupOf(p);
       if (!regular(group, seasonWar(p) + seen(team.id, p))) continue;
       out.push({ player: p, team, gamesOut: gb, group, fit: upgrade(league, me, p, seen) });
@@ -93,18 +93,18 @@ export function askingPrice(season: Season, user: Team, partner: Team, get: numb
   const players = get.map((id) => league.players[id]!);
   if (players.length === 0) return { ok: false, reason: "Pick who you want from them first." };
   if (players.some((p) => p.teamId !== partner.id)) return { ok: false, reason: "Those players aren't all on their club." };
-  const theirValue = players.reduce((s, p) => s + surplusValue(p, fraction, seen(partner.id, p)), 0);
+  const theirValue = players.reduce((s, p) => s + tradeValue(league, p, fraction, seen(partner.id, p)), 0);
   const want = asking(league, theirValue);
   const fits = (give: Player[]) => {
     const c = evaluateTrade(league, user, partner, give.map((p) => p.id), get, fraction, seen);
     // Being over on the 40-man is the user's to fix with the deal (Make room).
     return c.ok || c.over !== undefined;
   };
-  const priced = (give: Player[]) => ({ ok: true as const, give, theirValue, want, ourCost: give.reduce((s, p) => s + surplusValue(p, fraction, seen(user.id, p)), 0) });
+  const priced = (give: Player[]) => ({ ok: true as const, give, theirValue, want, ourCost: give.reduce((s, p) => s + tradeValue(league, p, fraction, seen(user.id, p)), 0) });
   if (want <= 0) return fits([]) ? priced([]) : { ok: false, reason: "They'd let him go, but they can't fit the deal on their roster." };
 
   const pool = chips(league, user)
-    .map((p) => ({ p, v: surplusValue(p, fraction, seen(partner.id, p)) }))
+    .map((p) => ({ p, v: tradeValue(league, p, fraction, seen(partner.id, p)) }))
     .filter((x) => x.v > 0.5)
     .sort((a, b) => b.v - a.v || a.p.id - b.p.id);
   const hi = 1.35 * want + 2;

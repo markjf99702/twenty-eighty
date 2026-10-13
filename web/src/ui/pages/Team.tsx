@@ -416,9 +416,18 @@ function Payroll({ d }: { d: TeamView }) {
     { key: "lvl", label: "Lvl", render: (r) => (r.status.il ?? LEVEL_NAMES[r.level]) },
     ...outlookColumns(p.contracts, (r) => r),
     { key: "svc", label: "Svc", title: "Service time (years.days)", cls: "num", sort: (r) => Number(r.status.service), render: (r) => r.status.service },
-    { key: "type", label: "Status", render: (r) => ({ "pre-arb": "Pre-arb", arb: "Arbitration", guaranteed: "Signed", minor: "Minors" })[r.contract!.type] },
-    { key: "salary", label: "Salary", cls: "num", sort: (r) => r.contract!.salary, render: (r) => money(r.contract!.salary) },
-    { key: "through", label: "Through", cls: "num", sort: (r) => r.contract!.through, render: (r) => (r.contract!.type === "guaranteed" ? r.contract!.through : "—") },
+    {
+      key: "type",
+      label: "Status",
+      render: (r) => {
+        const c = r.contract!;
+        // Before the tender deadline: who leaves then, and the arbitration cases' tenders.
+        if (c.pending) return <span title={c.label}>{{ "free-agent": "Free agent", tender: "Tender pending", "non-tender": "Non-tender" }[c.pending]}</span>;
+        return { "pre-arb": "Pre-arb", arb: "Arbitration", guaranteed: "Signed", minor: "Minors" }[c.type];
+      },
+    },
+    { key: "salary", label: "Salary", cls: "num", sort: (r) => r.contract!.salary, render: (r) => (r.contract!.pending === "free-agent" ? "—" : money(r.contract!.salary)) },
+    { key: "through", label: "Through", cls: "num", sort: (r) => r.contract!.through, render: (r) => (r.contract!.type === "guaranteed" && !r.contract!.pending ? r.contract!.through : "—") },
     {
       key: "surplus",
       label: "Value",
