@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
+import { allStarLine } from "../web/src/worker/allstar";
 import { playerView, StatsCache, transactions } from "../web/src/worker/views";
 
 const league = generateLeague({ seed: "player-view" });
@@ -36,5 +37,14 @@ describe("dates", () => {
     l.year += 1;
     expect(transactions(s, { teamId: team.id, limit: 1 })[0]!.date).toBe("Mar 1");
     expect(playerView(s, new StatsCache(() => s), p.id, s.rosterContext()).transactions[0]!.date).toBe("Mar 1 2027");
+  });
+});
+
+describe("the All-Star Game's line", () => {
+  it("puts the winner first, whichever league was at home", () => {
+    const [a, h] = [league.structure.leagues[0]!.replace(" League", ""), league.structure.leagues[1]!.replace(" League", "")];
+    const city = league.teams[3]!.city;
+    expect(allStarLine(league, { leagues: [0, 1], score: [5, 8], host: 3, mvp: null, note: "" })!.text).toBe(`${h} 8, ${a} 5 in ${city}`);
+    expect(allStarLine(league, { leagues: [0, 1], score: [6, 2], host: 3, mvp: null, note: "" })!.text).toBe(`${a} 6, ${h} 2 in ${city}`);
   });
 });

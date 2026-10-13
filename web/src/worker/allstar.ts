@@ -31,14 +31,14 @@ export function executiveRows(league: League, h: SeasonHistory): ExecutiveRow[] 
   }));
 }
 
-/** "Continental 5, Federal 3 in Kansas City" and the MVP, from a season's record. */
+/** "Federal 8, Continental 5 in Kansas City" (the winner first) and the MVP, from a season's record. */
 export function allStarLine(league: League, g: SeasonHistory["allStar"] | undefined): AllStarLine | null {
   if (!g) return null;
-  const [a, h] = g.leagues;
   const where = league.teams[g.host]!.city;
   const mvp = g.mvp === null ? null : league.players[g.mvp]!;
+  const [w, l] = g.score[1] > g.score[0] ? [1, 0] : [0, 1];
   return {
-    text: `${short(league, a)} ${g.score[0]}, ${short(league, h)} ${g.score[1]} in ${where}`,
+    text: `${short(league, g.leagues[w]!)} ${g.score[w]}, ${short(league, g.leagues[l]!)} ${g.score[l]} in ${where}`,
     mvp: mvp ? { playerId: mvp.id, name: playerName(mvp), team: abbrev(league, mvp.teamId), note: g.note } : null,
   };
 }
