@@ -1,4 +1,5 @@
 import { AwardsBlock } from "../components/Awards";
+import type { ComponentChildren } from "preact";
 import { useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
 import type { DevRow, OffseasonPhase, OffseasonView, PlayerSummary, Status } from "../../api/protocol";
@@ -295,9 +296,25 @@ function Tenders({ v }: { v: OffseasonView }) {
 
 // ---------------------------------------------------------------------------
 
-function prospectColumns(extra: Column<PlayerSummary & { school?: string; bonus?: number }>[]): Column<PlayerSummary & { school?: string; bonus?: number }>[] {
+type Prospect = PlayerSummary & { school?: string; bonus?: number };
+
+/**
+ * A board of amateurs. `act` is the row's buttons (Draft or Sign, and Scout), under the name: the board is wider than its
+ * column on a laptop and than a phone, and the name is what stays in view (a phone pins it while the table scrolls).
+ */
+function prospectColumns(extra: Column<Prospect>[], act: (p: Prospect) => ComponentChildren): Column<Prospect>[] {
   return [
-    { key: "name", label: "Name", cls: "name", render: (p) => (p.id >= 0 ? <a href={playerHref(p.id)}>{p.name}</a> : p.name) },
+    {
+      key: "name",
+      label: "Name",
+      cls: "name",
+      render: (p) => (
+        <>
+          {p.id >= 0 ? <a href={playerHref(p.id)}>{p.name}</a> : p.name}
+          <div class="row-act">{act(p)}</div>
+        </>
+      ),
+    },
     { key: "pos", label: "Pos", render: (p) => p.pos },
     { key: "age", label: "Age", cls: "num", sort: (p) => p.age, asc: true, render: (p) => p.age },
     { key: "bt", label: "B/T", cls: "ctr", render: (p) => `${p.bats}/${p.throws}` },
@@ -326,20 +343,20 @@ function Draft({ v }: { v: OffseasonView }) {
     bump();
   };
   const mine = d.onClock?.mine ?? false;
-  const columns = prospectColumns([
-    { key: "school", label: "From", render: (p) => p.school },
-    { key: "conf", label: "Read", title: "How sure your scouts are", render: (p) => <span class={`confidence ${p.read.confidence}`}>{p.read.confidence}</span> },
-    { key: "scout", label: "", render: (p) => <ScoutButton id={p.id} /> },
-    {
-      key: "go",
-      label: "",
-      render: (p) => (
+  const columns = prospectColumns(
+    [
+      { key: "school", label: "From", render: (p) => p.school },
+      { key: "conf", label: "Read", title: "How sure your scouts are", render: (p) => <span class={`confidence ${p.read.confidence}`}>{p.read.confidence}</span> },
+    ],
+    (p) => (
+      <>
         <button type="button" class="btn small primary" disabled={!mine || busy} onClick={() => pick(p.id)}>
           Draft
         </button>
-      ),
-    },
-  ]);
+        <ScoutButton id={p.id} />
+      </>
+    ),
+  );
   return (
     <>
       <div class={`note${mine ? " warn" : ""}`}>
@@ -489,20 +506,20 @@ function International({ v }: { v: OffseasonView }) {
     setBusy(false);
     bump();
   };
-  const columns = prospectColumns([
-    { key: "bonus", label: "Bonus", cls: "num", sort: (p) => p.bonus ?? 0, render: (p) => $(p.bonus ?? 0) },
-    { key: "conf", label: "Read", title: "How sure your scouts are", render: (p) => <span class={`confidence ${p.read.confidence}`}>{p.read.confidence}</span> },
-    { key: "scout", label: "", render: (p) => <ScoutButton id={p.id} /> },
-    {
-      key: "go",
-      label: "",
-      render: (p) => (
+  const columns = prospectColumns(
+    [
+      { key: "bonus", label: "Bonus", cls: "num", sort: (p) => p.bonus ?? 0, render: (p) => $(p.bonus ?? 0) },
+      { key: "conf", label: "Read", title: "How sure your scouts are", render: (p) => <span class={`confidence ${p.read.confidence}`}>{p.read.confidence}</span> },
+    ],
+    (p) => (
+      <>
         <button type="button" class="btn small primary" disabled={busy || (p.bonus ?? 0) > s.pool || s.signed >= s.maxSignings} onClick={() => sign(p.id)}>
           Sign
         </button>
-      ),
-    },
-  ]);
+        <ScoutButton id={p.id} />
+      </>
+    ),
+  );
   return (
     <>
       <div class="note">

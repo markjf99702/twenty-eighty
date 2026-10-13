@@ -146,6 +146,32 @@ await page.waitForSelector('.board', { timeout: 20000 });
 assert.ok(await page.title(), 'the page did not load offline');
 await ctx.setOffline(false);
 
+// The rest of the season (the stops pause it now and then), October, and the winter up to the draft.
+for (let i = 0; i < 40 && !(await board('Start the postseason').count()); i++) {
+  await board('To end').click();
+  await idle();
+}
+await board('Start the postseason').click();
+await board('To the end').click({ timeout: 60000 });
+await board('Start the offseason').click({ timeout: 120000 });
+await page.waitForSelector('.winter-steps', { timeout: 120000 });
+await board('Go to the tender deadline').click({ timeout: 60000 });
+await board('Tender contracts').click({ timeout: 60000 });
+await board('Finish the draft').waitFor({ timeout: 120000 });
+// On the clock, the Draft button is in view: under the name, which stays put while the board scrolls sideways.
+const toMyPick = page.locator('.note button', { hasText: 'Sim to my pick' });
+if (await toMyPick.count()) await toMyPick.click();
+await page.locator('.note', { hasText: "You're on the clock" }).waitFor({ timeout: 60000 });
+const pick = await page.evaluate(() => {
+  const btn = [...document.querySelectorAll('.tbl button')].find((b) => b.textContent.trim() === 'Draft' && !b.disabled);
+  const box = (el) => el && el.getBoundingClientRect();
+  const b = box(btn);
+  const w = box(btn?.closest('.tbl-wrap'));
+  return b && w ? { left: b.left, right: b.right, wrapLeft: w.left, wrapRight: w.right } : null;
+});
+assert.ok(pick && pick.left >= pick.wrapLeft && pick.right <= pick.wrapRight, `the Draft button is off the edge of the board (${JSON.stringify(pick)})`);
+await fits('the draft board');
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();

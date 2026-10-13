@@ -1585,6 +1585,8 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .arb-case { font-size: 12px; font-weight: 400; color: var(--ink-3); white-space: normal; line-height: 1.3; }
 .arb-case .arb-saves { color: var(--warn, var(--ink-2)); }
 .tbl .seg.tender-pick { margin-top: 5px; }
+/* A board's Draft or Sign and Scout, under the name. */
+.tbl td.name .row-act { display: flex; gap: 6px; margin-top: 4px; font-weight: 400; }
 .offer-player .line { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: -2px; }
 .staff-take {
   display: grid;
