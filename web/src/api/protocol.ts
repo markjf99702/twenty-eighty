@@ -10,6 +10,7 @@ import type { Group } from "../../../src/org/market";
 import type { RoomMove } from "../../../src/org/trades";
 import type { CareerLine, ContractType, FieldPosition, Level, MinorLevel, PitchType } from "../../../src/players/types";
 import type { HitterRow, PitcherRow } from "../../../src/season/season";
+import type { CareerBat, CareerPit } from "../../../src/stats/career";
 
 export type { CareerLine, GameSettings, HitterRow, OffseasonPhase, PitcherRow };
 
@@ -325,6 +326,13 @@ export interface PlayerView {
   stats: StatLine[];
   transactions: { date: string; text: string }[];
   career: CareerLine[];
+  /**
+   * This season in the majors so far, while it isn't on his record (null in the winter and for anyone
+   * who hasn't played in the majors this year). `inProgress` until the regular season ends.
+   */
+  careerLive: (CareerLine & { inProgress: boolean }) | null;
+  /** His big-league totals as the record book counts them: the prior career, every season, and this one so far. */
+  careerTotals: { bat: CareerBat | null; pit: CareerPit | null };
   /** His big-league career before the league's first season, in total (generated). */
   prior: PriorCareer | null;
   careerTeams: Record<number, string>;

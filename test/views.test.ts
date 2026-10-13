@@ -4,6 +4,8 @@ import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { allStarLine } from "../web/src/worker/allstar";
 import { careerLine } from "../web/src/worker/records";
+import { careerTotals } from "../src/stats/career";
+import { liveLines, liveSeason } from "../src/stats/records";
 import { dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, transactions } from "../web/src/worker/views";
 import { budgetRoom } from "../src/org/contracts";
 import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
@@ -32,6 +34,39 @@ describe("a player's page", () => {
       const raw = p.pitching!.pitches;
       expect(v.pitches[0]!.usage / v.pitches[1]!.usage).toBeCloseTo(raw[0]!.usage / raw[1]!.usage, 6);
     }
+  });
+});
+
+describe("a player's career", () => {
+  const l = generateLeague({ seed: "career-live" });
+  hireGm(l, 7);
+  const s = new Season(l, { minors: false });
+  s.simDays(6);
+  const c = new StatsCache(() => s);
+  const vet = l.players.find((p) => p.prior?.bat && p.level === "MLB" && !p.pitching && (s.stats().hitters.find((h) => h.id === p.id)?.line.PA ?? 0) > 10)!;
+
+  it("counts this season so far, the way the record book does, until it's on his record", () => {
+    const v = playerView(s, c, vet.id, s.rosterContext());
+    const line = s.stats().hitters.find((h) => h.id === vet.id)!;
+    expect(v.careerLive).toMatchObject({ year: l.year, level: "MLB", teamId: vet.teamId, inProgress: true, bat: { PA: line.line.PA, HR: line.line.HR } });
+    const book = careerTotals(vet, liveLines(liveSeason(s), vet.id));
+    expect(v.careerTotals.bat).toEqual(book.bat);
+    expect(v.careerTotals.bat!.PA).toBe(vet.prior!.bat!.PA + line.line.PA);
+    // Once the season is on his record (the winter), the record has it and there's no row in the making.
+    l.history.push({ year: l.year, champion: -1, pennants: [], standings: [], awards: [], userTeamId: 7 });
+    expect(playerView(s, c, vet.id, s.rosterContext()).careerLive).toBeNull();
+    l.history.pop();
+  });
+
+  it("adds up a pitcher's pitching, whatever turns he took at the plate", () => {
+    const p = l.players.find((x) => x.pitching && x.prior?.pit && x.level === "MLB")!;
+    // An emergency lineup's last reliever: a batting line in the majors and no pitching that season.
+    p.career.push({ year: l.year - 1, level: "MLB", teamId: p.teamId, bat: { G: 1, PA: 3, AB: 3, H: 0, D: 0, T: 0, HR: 0, R: 0, RBI: 0, BB: 0, SO: 2, SB: 0, wRCplus: -100, WAR: -0.1 } });
+    const v = playerView(s, c, p.id, s.rosterContext());
+    const live = s.stats().pitchers.find((x) => x.id === p.id)?.line;
+    expect(v.careerTotals.pit!.G).toBe(p.prior!.pit!.G + (live?.G ?? 0));
+    expect(v.careerTotals.pit!.GS).toBe(p.prior!.pit!.GS + (live?.GS ?? 0));
+    p.career.pop();
   });
 });
 

@@ -1,9 +1,9 @@
 import type { Award, ExecutiveAward, League, SeasonHistory } from "../league/types";
 import { payroll } from "../org/contracts";
 import { defenseGrade } from "../players/defense";
-import { FIELD_POSITIONS, LEVELS, playerName, type Player } from "../players/types";
+import { type CareerBatting, type CareerPitching, FIELD_POSITIONS, LEVELS, playerName, type Player } from "../players/types";
 import { mainPosition } from "../season/allstar";
-import type { Season } from "../season/season";
+import type { HitterRow, PitcherRow, Season } from "../season/season";
 
 /**
  * The permanent record of a finished season: each player's line at every
@@ -14,6 +14,56 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
 const round2 = (x: number) => Math.round(x * 100) / 100;
 const round3 = (x: number) => (Number.isFinite(x) ? Math.round(x * 1000) / 1000 : 0);
 
+/** A season's batting as his career record keeps it. */
+export function careerBatting(h: HitterRow): CareerBatting {
+  const b = h.line;
+  return {
+    G: b.G,
+    PA: b.PA,
+    AB: b.AB,
+    H: b.H,
+    D: b["2B"],
+    T: b["3B"],
+    HR: b.HR,
+    R: b.R,
+    RBI: b.RBI,
+    BB: b.BB,
+    SO: b.SO,
+    SB: b.SB,
+    wRCplus: Math.round(h.wRCplus),
+    WAR: round1(h.WAR),
+    OBP: round3(h.OBP),
+    SLG: round3(h.SLG),
+    Kpct: round3(h.Kpct),
+    BBpct: round3(h.BBpct),
+  };
+}
+
+/** A season's pitching as his career record keeps it. */
+export function careerPitching(x: PitcherRow): CareerPitching {
+  const l = x.line;
+  return {
+    G: l.G,
+    GS: l.GS,
+    W: l.W,
+    L: l.L,
+    SV: l.SV,
+    outs: l.outs,
+    H: l.H,
+    ER: l.ER,
+    HR: l.HR,
+    BB: l.BB,
+    SO: l.SO,
+    ERA: round2(x.ERA),
+    FIP: round2(x.FIP),
+    WAR: round1(x.WAR),
+    Kpct: round3(x.Kpct),
+    BBpct: round3(x.BBpct),
+    WHIP: round2(x.WHIP),
+    ERAminus: Math.round(x.ERAminus),
+  };
+}
+
 /** Add this season's lines to every player's career record. */
 export function recordCareers(league: League, season: Season): void {
   const levels = season.simulateMinors ? LEVELS : (["MLB"] as const);
@@ -21,61 +71,11 @@ export function recordCareers(league: League, season: Season): void {
     const stats = season.levels[level].stats();
     for (const h of stats.hitters) {
       const p = league.players[h.id]!;
-      const b = h.line;
-      p.career.push({
-        year: league.year,
-        level,
-        teamId: p.teamId,
-        bat: {
-          G: b.G,
-          PA: b.PA,
-          AB: b.AB,
-          H: b.H,
-          D: b["2B"],
-          T: b["3B"],
-          HR: b.HR,
-          R: b.R,
-          RBI: b.RBI,
-          BB: b.BB,
-          SO: b.SO,
-          SB: b.SB,
-          wRCplus: Math.round(h.wRCplus),
-          WAR: round1(h.WAR),
-          OBP: round3(h.OBP),
-          SLG: round3(h.SLG),
-          Kpct: round3(h.Kpct),
-          BBpct: round3(h.BBpct),
-        },
-      });
+      p.career.push({ year: league.year, level, teamId: p.teamId, bat: careerBatting(h) });
     }
     for (const x of stats.pitchers) {
       const p = league.players[x.id]!;
-      const l = x.line;
-      p.career.push({
-        year: league.year,
-        level,
-        teamId: p.teamId,
-        pit: {
-          G: l.G,
-          GS: l.GS,
-          W: l.W,
-          L: l.L,
-          SV: l.SV,
-          outs: l.outs,
-          H: l.H,
-          ER: l.ER,
-          HR: l.HR,
-          BB: l.BB,
-          SO: l.SO,
-          ERA: round2(x.ERA),
-          FIP: round2(x.FIP),
-          WAR: round1(x.WAR),
-          Kpct: round3(x.Kpct),
-          BBpct: round3(x.BBpct),
-          WHIP: round2(x.WHIP),
-          ERAminus: Math.round(x.ERAminus),
-        },
-      });
+      p.career.push({ year: league.year, level, teamId: p.teamId, pit: careerPitching(x) });
     }
   }
 }

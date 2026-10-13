@@ -225,7 +225,7 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
 
       {(v.career.length > 0 || v.prior) && (
         <Section title="Career">
-          <Career lines={v.career} prior={v.prior} teams={v.careerTeams} pitcher={pitcher} />
+          <Career v={v} pitcher={pitcher} />
         </Section>
       )}
 
@@ -377,190 +377,200 @@ function PitchingStats({ rows }: { rows: StatLine[] }) {
 /** "2014–2025" for a prior career (his big-league seasons before the league's first). */
 const priorSpan = (prior: PriorCareer) => (prior.seasons > 1 ? `${prior.from}–${prior.from + prior.seasons - 1}` : `${prior.from}`);
 
-function Career({ lines, prior, teams, pitcher }: { lines: CareerLine[]; prior: PriorCareer | null; teams: Record<number, string>; pitcher: boolean }) {
-  const team = (id: number | null) => (id === null ? "—" : (teams[id] ?? "—"));
-  const mlb = lines.filter((l) => l.level === "MLB");
-  const seasons = mlb.length + (prior ? 1 : 0);
+/**
+ * Season by season at every level, then his big-league totals, which count this season so far (as the record
+ * book and the milestones do). A pitcher's rows are his pitching (an emergency turn at the plate isn't one);
+ * the year stays in view while the table scrolls sideways on a phone.
+ */
+function Career({ v, pitcher }: { v: PlayerView; pitcher: boolean }) {
+  const team = (id: number | null) => (id === null ? "—" : (v.careerTeams[id] ?? "—"));
+  const live = v.careerLive;
+  const lines = live ? [...v.career, live] : v.career;
+  const prior = v.prior;
+  const year = (l: CareerLine) => (l === live && live.inProgress ? `${l.year}*` : `${l.year}`);
+  const note = live?.inProgress && (pitcher ? live.pit : live.bat) ? <div class="small dim">* This season, still being played.</div> : null;
   const before = (
     <>
-      <td class="num">{prior ? priorSpan(prior) : ""}</td>
-      <td>MLB</td>
+      <td class="num year">{prior ? priorSpan(prior) : ""}</td>
+      <td>{LEVEL_NAMES.MLB}</td>
       <td class="dim">Before the league</td>
+    </>
+  );
+  // In the year's column, so it stays in view with the years.
+  const totalsLabel = (
+    <>
+      <td class="num year">
+        <b>Totals</b>
+      </td>
+      <td>{LEVEL_NAMES.MLB}</td>
+      <td />
     </>
   );
   if (pitcher) {
     const rows = lines.filter((l) => l.pit);
     const q = prior?.pit;
-    const tot = mlb.reduce(
-      (a, l) => {
-        const x = l.pit!;
-        return { G: a.G + x.G, W: a.W + x.W, L: a.L + x.L, SV: a.SV + x.SV, outs: a.outs + x.outs, ER: a.ER + x.ER, SO: a.SO + x.SO, BB: a.BB + x.BB, WAR: a.WAR + x.WAR };
-      },
-      q ? { G: q.G, W: q.W, L: q.L, SV: q.SV, outs: q.outs, ER: q.ER, SO: q.SO, BB: q.BB, WAR: q.WAR } : { G: 0, W: 0, L: 0, SV: 0, outs: 0, ER: 0, SO: 0, BB: 0, WAR: 0 },
-    );
+    const tot = v.careerTotals.pit;
+    const majors = rows.filter((l) => l.level === "MLB").length + (q ? 1 : 0);
     return (
+      <>
+        <div class="tbl-wrap">
+          <table class="tbl">
+            <thead>
+              <tr>
+                <th class="num year">Year</th>
+                <th>Level</th>
+                <th>Team</th>
+                <th class="num">G</th>
+                <th class="num">GS</th>
+                <th class="num">W-L</th>
+                <th class="num">SV</th>
+                <th class="num">IP</th>
+                <th class="num">ERA</th>
+                <th class="num">FIP</th>
+                <th class="num">SO</th>
+                <th class="num">BB</th>
+                <th class="num">WAR</th>
+              </tr>
+            </thead>
+            <tbody>
+              {q && (
+                <tr class="prior-row">
+                  {before}
+                  <td class="num">{q.G}</td>
+                  <td class="num">{q.GS}</td>
+                  <td class="num">
+                    {q.W}-{q.L}
+                  </td>
+                  <td class="num">{q.SV}</td>
+                  <td class="num">{ip(q.outs / 3)}</td>
+                  <td class="num">{q.outs ? fixed((27 * q.ER) / q.outs, 2) : "—"}</td>
+                  <td />
+                  <td class="num">{q.SO}</td>
+                  <td class="num">{q.BB}</td>
+                  <td class="num">{fixed(q.WAR)}</td>
+                </tr>
+              )}
+              {rows.map((l) => (
+                <tr key={`${l.year}-${l.level}`}>
+                  <td class="num year">{year(l)}</td>
+                  <td>{LEVEL_NAMES[l.level]}</td>
+                  <td>{team(l.teamId)}</td>
+                  <td class="num">{l.pit!.G}</td>
+                  <td class="num">{l.pit!.GS}</td>
+                  <td class="num">
+                    {l.pit!.W}-{l.pit!.L}
+                  </td>
+                  <td class="num">{l.pit!.SV}</td>
+                  <td class="num">{ip(l.pit!.outs / 3)}</td>
+                  <td class="num">{fixed(l.pit!.ERA, 2)}</td>
+                  <td class="num">{fixed(l.pit!.FIP, 2)}</td>
+                  <td class="num">{l.pit!.SO}</td>
+                  <td class="num">{l.pit!.BB}</td>
+                  <td class="num">{fixed(l.pit!.WAR)}</td>
+                </tr>
+              ))}
+              {majors > 1 && tot && (
+                <tr>
+                  {totalsLabel}
+                  <td class="num">{tot.G}</td>
+                  <td class="num">{tot.GS}</td>
+                  <td class="num">
+                    {tot.W}-{tot.L}
+                  </td>
+                  <td class="num">{tot.SV}</td>
+                  <td class="num">{ip(tot.outs / 3)}</td>
+                  <td class="num">{tot.outs ? fixed((27 * tot.ER) / tot.outs, 2) : "—"}</td>
+                  <td />
+                  <td class="num">{tot.SO}</td>
+                  <td class="num">{tot.BB}</td>
+                  <td class="num">{fixed(tot.WAR)}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {note}
+      </>
+    );
+  }
+  const rows = lines.filter((l) => l.bat);
+  const b = prior?.bat;
+  const tot = v.careerTotals.bat;
+  const majors = rows.filter((l) => l.level === "MLB").length + (b ? 1 : 0);
+  return (
+    <>
       <div class="tbl-wrap">
         <table class="tbl">
           <thead>
             <tr>
-              <th>Year</th>
+              <th class="num year">Year</th>
               <th>Level</th>
               <th>Team</th>
               <th class="num">G</th>
-              <th class="num">GS</th>
-              <th class="num">W-L</th>
-              <th class="num">SV</th>
-              <th class="num">IP</th>
-              <th class="num">ERA</th>
-              <th class="num">FIP</th>
-              <th class="num">SO</th>
+              <th class="num">PA</th>
+              <th class="num">AVG</th>
+              <th class="num">HR</th>
+              <th class="num">RBI</th>
+              <th class="num">SB</th>
               <th class="num">BB</th>
+              <th class="num">SO</th>
+              <th class="num">wRC+</th>
               <th class="num">WAR</th>
             </tr>
           </thead>
           <tbody>
-            {q && (
+            {b && (
               <tr class="prior-row">
                 {before}
-                <td class="num">{q.G}</td>
-                <td class="num">{q.GS}</td>
-                <td class="num">
-                  {q.W}-{q.L}
-                </td>
-                <td class="num">{q.SV}</td>
-                <td class="num">{ip(q.outs / 3)}</td>
-                <td class="num">{q.outs ? fixed((27 * q.ER) / q.outs, 2) : "—"}</td>
+                <td class="num">{b.G}</td>
+                <td class="num">{b.PA}</td>
+                <td class="num">{rate3(b.AB ? b.H / b.AB : 0)}</td>
+                <td class="num">{b.HR}</td>
+                <td class="num">{b.RBI}</td>
+                <td class="num">{b.SB}</td>
+                <td class="num">{b.BB}</td>
                 <td />
-                <td class="num">{q.SO}</td>
-                <td class="num">{q.BB}</td>
-                <td class="num">{fixed(q.WAR)}</td>
+                <td />
+                <td class="num">{fixed(b.WAR)}</td>
               </tr>
             )}
             {rows.map((l) => (
               <tr key={`${l.year}-${l.level}`}>
-                <td class="num">{l.year}</td>
+                <td class="num year">{year(l)}</td>
                 <td>{LEVEL_NAMES[l.level]}</td>
                 <td>{team(l.teamId)}</td>
-                <td class="num">{l.pit!.G}</td>
-                <td class="num">{l.pit!.GS}</td>
-                <td class="num">
-                  {l.pit!.W}-{l.pit!.L}
-                </td>
-                <td class="num">{l.pit!.SV}</td>
-                <td class="num">{ip(l.pit!.outs / 3)}</td>
-                <td class="num">{fixed(l.pit!.ERA, 2)}</td>
-                <td class="num">{fixed(l.pit!.FIP, 2)}</td>
-                <td class="num">{l.pit!.SO}</td>
-                <td class="num">{l.pit!.BB}</td>
-                <td class="num">{fixed(l.pit!.WAR)}</td>
+                <td class="num">{l.bat!.G}</td>
+                <td class="num">{l.bat!.PA}</td>
+                <td class="num">{rate3(l.bat!.AB ? l.bat!.H / l.bat!.AB : 0)}</td>
+                <td class="num">{l.bat!.HR}</td>
+                <td class="num">{l.bat!.RBI}</td>
+                <td class="num">{l.bat!.SB}</td>
+                <td class="num">{l.bat!.BB}</td>
+                <td class="num">{l.bat!.SO}</td>
+                <td class="num">{l.bat!.wRCplus}</td>
+                <td class="num">{fixed(l.bat!.WAR)}</td>
               </tr>
             ))}
-            {seasons > 1 && (
+            {majors > 1 && tot && (
               <tr>
-                <td class="name" colSpan={3}>
-                  Major league totals
-                </td>
+                {totalsLabel}
                 <td class="num">{tot.G}</td>
-                <td />
-                <td class="num">
-                  {tot.W}-{tot.L}
-                </td>
-                <td class="num">{tot.SV}</td>
-                <td class="num">{ip(tot.outs / 3)}</td>
-                <td class="num">{tot.outs ? fixed((27 * tot.ER) / tot.outs, 2) : "—"}</td>
-                <td />
-                <td class="num">{tot.SO}</td>
+                <td class="num">{tot.PA}</td>
+                <td class="num">{rate3(tot.AB ? tot.H / tot.AB : 0)}</td>
+                <td class="num">{tot.HR}</td>
+                <td class="num">{tot.RBI}</td>
+                <td class="num">{tot.SB}</td>
                 <td class="num">{tot.BB}</td>
+                <td />
+                <td />
                 <td class="num">{fixed(tot.WAR)}</td>
               </tr>
             )}
           </tbody>
         </table>
       </div>
-    );
-  }
-  const rows = lines.filter((l) => l.bat);
-  const b = prior?.bat;
-  const tot = mlb.reduce(
-    (a, l) => {
-      const x = l.bat!;
-      return { G: a.G + x.G, PA: a.PA + x.PA, AB: a.AB + x.AB, H: a.H + x.H, HR: a.HR + x.HR, RBI: a.RBI + x.RBI, SB: a.SB + x.SB, WAR: a.WAR + x.WAR };
-    },
-    b ? { G: b.G, PA: b.PA, AB: b.AB, H: b.H, HR: b.HR, RBI: b.RBI, SB: b.SB, WAR: b.WAR } : { G: 0, PA: 0, AB: 0, H: 0, HR: 0, RBI: 0, SB: 0, WAR: 0 },
-  );
-  return (
-    <div class="tbl-wrap">
-      <table class="tbl">
-        <thead>
-          <tr>
-            <th>Year</th>
-            <th>Level</th>
-            <th>Team</th>
-            <th class="num">G</th>
-            <th class="num">PA</th>
-            <th class="num">AVG</th>
-            <th class="num">HR</th>
-            <th class="num">RBI</th>
-            <th class="num">SB</th>
-            <th class="num">BB</th>
-            <th class="num">SO</th>
-            <th class="num">wRC+</th>
-            <th class="num">WAR</th>
-          </tr>
-        </thead>
-        <tbody>
-          {b && (
-            <tr class="prior-row">
-              {before}
-              <td class="num">{b.G}</td>
-              <td class="num">{b.PA}</td>
-              <td class="num">{rate3(b.AB ? b.H / b.AB : 0)}</td>
-              <td class="num">{b.HR}</td>
-              <td class="num">{b.RBI}</td>
-              <td class="num">{b.SB}</td>
-              <td class="num">{b.BB}</td>
-              <td />
-              <td />
-              <td class="num">{fixed(b.WAR)}</td>
-            </tr>
-          )}
-          {rows.map((l) => (
-            <tr key={`${l.year}-${l.level}`}>
-              <td class="num">{l.year}</td>
-              <td>{LEVEL_NAMES[l.level]}</td>
-              <td>{team(l.teamId)}</td>
-              <td class="num">{l.bat!.G}</td>
-              <td class="num">{l.bat!.PA}</td>
-              <td class="num">{rate3(l.bat!.AB ? l.bat!.H / l.bat!.AB : 0)}</td>
-              <td class="num">{l.bat!.HR}</td>
-              <td class="num">{l.bat!.RBI}</td>
-              <td class="num">{l.bat!.SB}</td>
-              <td class="num">{l.bat!.BB}</td>
-              <td class="num">{l.bat!.SO}</td>
-              <td class="num">{l.bat!.wRCplus}</td>
-              <td class="num">{fixed(l.bat!.WAR)}</td>
-            </tr>
-          ))}
-          {seasons > 1 && (
-            <tr>
-              <td class="name" colSpan={3}>
-                Major league totals
-              </td>
-              <td class="num">{tot.G}</td>
-              <td class="num">{tot.PA}</td>
-              <td class="num">{rate3(tot.AB ? tot.H / tot.AB : 0)}</td>
-              <td class="num">{tot.HR}</td>
-              <td class="num">{tot.RBI}</td>
-              <td class="num">{tot.SB}</td>
-              <td />
-              <td />
-              <td />
-              <td class="num">{fixed(tot.WAR)}</td>
-            </tr>
-          )}
-        </tbody>
-      </table>
-    </div>
+      {note}
+    </>
   );
 }
 

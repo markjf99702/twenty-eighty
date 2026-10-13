@@ -625,6 +625,10 @@ table.tbl {
   .tbl:not(.no-pin) th.name { z-index: 2; }
   .tbl:not(.no-pin) tbody tr:hover td.name { background: var(--surface-2); }
   .tbl:not(.no-pin) tr.mine td.name, .tbl:not(.no-pin) tr.mine:hover td.name, .tbl:not(.no-pin) td.name.mine { background: var(--accent-soft); }
+  /* A career table's year stays in view the same way. */
+  .tbl td.year, .tbl th.year { position: sticky; left: 0; z-index: 1; background: var(--ground); box-shadow: inset -1px 0 0 var(--line); }
+  .tbl th.year { z-index: 2; }
+  .tbl tbody tr:hover td.year { background: var(--surface-2); }
   /* A totals label spanning several columns stays where it is. */
   .tbl td.name[colspan] { position: static; box-shadow: none; }
   /* A row's roster moves open where the table is scrolled to, not at its far left. */

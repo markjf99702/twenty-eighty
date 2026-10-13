@@ -6,6 +6,7 @@ import type { FieldPosition, Level, MinorLevel, Player } from "../../../src/play
 import { FIELD_POSITIONS, LEVELS } from "../../../src/players/types";
 import type { League, Team, Transaction } from "../../../src/league/types";
 import { onTheClock as draftClock } from "../../../src/offseason/draft";
+import { careerBatting, careerPitching } from "../../../src/offseason/history";
 import { teamName } from "../../../src/league/types";
 import { defenseGrade } from "../../../src/players/defense";
 import {
@@ -32,6 +33,7 @@ import { offerClock } from "../../../src/offseason/offseason";
 import { isProspect, measuredInWins, overallGrade } from "../../../src/org/value";
 import type { Season, SeasonStats, TeamRecord } from "../../../src/season/season";
 import type { GameResult } from "../../../src/sim/game";
+import { careerTotals } from "../../../src/stats/career";
 import { inningsPitched } from "../../../src/stats/lines";
 import { BAT_ROW, PIT_ROW, sumRows } from "../../../src/stats/recent";
 import { octoberStatus } from "./october";
@@ -767,6 +769,29 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
   const isUser = team !== null && league.userTeamId === team.id;
   const careerTeams: Record<number, string> = {};
   for (const c of p.career) if (c.teamId !== null) careerTeams[c.teamId] = league.teams[c.teamId]!.abbrev;
+  // This season in the majors, until it's on his record: the career table's last row, and in his totals the
+  // way the record book and the milestones count it.
+  const unrecorded = !league.offseason && !league.history.some((h) => h.year === league.year);
+  const liveBat = unrecorded ? stats.hitter("MLB", p.id) : undefined;
+  const livePit = unrecorded ? stats.pitcher("MLB", p.id) : undefined;
+  const careerLive =
+    liveBat || livePit
+      ? {
+          year: league.year,
+          level: "MLB" as const,
+          teamId: p.teamId,
+          inProgress: !season.done,
+          ...(liveBat ? { bat: careerBatting(liveBat) } : {}),
+          ...(livePit ? { pit: careerPitching(livePit) } : {}),
+        }
+      : null;
+  if (careerLive && p.teamId !== null) careerTeams[p.teamId] = league.teams[p.teamId]!.abbrev;
+  const totals = careerTotals(
+    p,
+    careerLive
+      ? { year: league.year, ...(liveBat ? { bat: liveBat.line, batWar: liveBat.WAR } : {}), ...(livePit ? { pit: livePit.line, pitWar: livePit.WAR } : {}) }
+      : undefined,
+  );
   const d = p.draft;
   const draft = d
     ? `${d.year} draft, round ${d.round} (#${d.pick} overall) by ${league.teams[d.teamId]!.city} ${league.teams[d.teamId]!.nickname}`
@@ -834,6 +859,8 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
       .reverse()
       .map((t) => ({ date: `${dateLabel(season, t.day, t.year)}${t.year !== league.year ? ` ${season.dateOf(t.day, t.year).getUTCFullYear()}` : ""}`, text: t.text })),
     career: p.career,
+    careerLive,
+    careerTotals: { bat: totals.bat, pit: totals.pit },
     prior: p.prior ?? null,
     careerTeams,
     awards: condenseAwards(p.awards),
