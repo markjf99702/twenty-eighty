@@ -49,8 +49,14 @@ await page.locator('.club-pick').nth(3).click();
 await page.locator('.setup .check input').first().uncheck();
 await page.click('.start-bar .btn.primary');
 await page.waitForSelector('.club-hero', { timeout: 60000 });
-// A new GM is welcomed, and told when free agents and draft picks come.
-assert.match(await page.locator('.note', { hasText: 'Welcome to the job' }).textContent({ timeout: 10000 }), /Free agency, the draft and international signings come in the winter/, 'no welcome for a new GM');
+// A new GM is welcomed, and told when free agents and draft picks come, and that the department budgets are set before the first pitch.
+const welcome = await page.locator('.note', { hasText: 'Welcome to the job' }).textContent({ timeout: 10000 });
+assert.match(welcome, /Free agency, the draft and international signings come in the winter/, 'no welcome for a new GM');
+assert.match(welcome, /Before the first pitch you can also set your scouting and analytics budgets/, 'the welcome does not mention the department budgets');
+await page.goto(base + '#scouting');
+assert.match(await page.locator('.note.warn').textContent({ timeout: 10000 }), /^Before the first game: set this season's scouting and analytics budgets now/, 'the scouting page does not say the budgets lock at the first game');
+await page.goto(base + '#home');
+await page.waitForSelector('.club-hero', { timeout: 60000 });
 
 // A week of games: scores go up and the standings move.
 await board('Week').click();
@@ -61,6 +67,9 @@ await idle();
 const record = (await page.textContent('.board-cells')).replace(/\s+/g, ' ');
 assert.match(record, /\d+[–-]\d+/, 'no record after a week');
 await fits('the front office');
+// Once a game is played the budgets wait for the winter, and the scouting page says when they open again.
+await page.goto(base + '#scouting');
+assert.match(await page.locator('.note').first().textContent({ timeout: 10000 }), /set in the offseason and on Opening Day, before the first game/, 'the scouting page does not say when budgets can change');
 
 // A short page starts right under the section strip (which once stretched into a blank band on phones).
 await page.goto(base + '#history');

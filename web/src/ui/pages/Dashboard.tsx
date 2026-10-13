@@ -231,7 +231,8 @@ export function Dashboard({ status }: { status: Status }) {
           assistant GM handles injuries and call-ups until you take over under <a href={teamHref(d.team.id)}>My club</a>, where
           every player's roster moves (call up, option, DFA, the injured list) are one click away. Free agency, the draft and
           international signings come in the winter, after the World Series; until then new players come by{" "}
-          <a href={href({ page: "trades", partnerId: null })}>trade</a> or from the farm.
+          <a href={href({ page: "trades", partnerId: null })}>trade</a> or from the farm. Before the first pitch you can also set
+          your scouting and analytics budgets under <a href={href({ page: "scouting" })}>Scouting</a>.
         </div>
       )}
 

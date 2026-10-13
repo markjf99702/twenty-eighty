@@ -39,7 +39,15 @@ export function Scouting({ status }: { status: Status }) {
           </span>
         </div>
       </div>
-      {!v.editable && <div class="note">Department budgets are set each winter (or before Opening Day). You can change them in the offseason.</div>}
+      {!v.editable && (
+        <div class="note">Department budgets are set in the offseason and on Opening Day, before the first game. You can change them again this winter.</div>
+      )}
+      {v.editable && status.phase === "regular" && status.day === 0 && (
+        <div class="note warn">
+          Before the first game: set this season's scouting and analytics budgets now. Once a game is played they stay as they are until
+          the offseason.
+        </div>
+      )}
 
       <div class="grid-2">
         <Section title="Scouting department" aside={`${v.scouting.label}, ${$(v.scouting.cost)} a year`}>

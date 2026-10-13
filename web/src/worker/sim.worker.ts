@@ -851,7 +851,7 @@ const handlers: Handlers = {
   setDepartments({ scouting, analytics }) {
     const s = requireSeason();
     const team = userTeam();
-    if (!s.league.offseason && s.day > 0) return { ok: false, reason: "Department budgets are set in the offseason (or before Opening Day)." };
+    if (!s.league.offseason && s.day > 0) return { ok: false, reason: "Department budgets are set in the offseason and on Opening Day, before the first game." };
     if (![scouting, analytics].every((t) => Number.isInteger(t) && t >= 1 && t <= 5)) return { ok: false, reason: "Pick a level from 1 to 5." };
     s.league.scouting.scouting[team.id] = scouting;
     s.league.scouting.analytics[team.id] = analytics;
