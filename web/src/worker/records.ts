@@ -18,7 +18,7 @@ export function momentViews(season: Season, limit: number, boxes: ReadonlyMap<st
     .reverse()
     .map((m) => ({
       year: m.year,
-      date: `${dateLabel(season, m.day)}${m.year !== league.year ? `, ${m.year}` : ""}`,
+      date: `${dateLabel(season, m.day, m.year)}${m.year !== league.year ? `, ${m.year}` : ""}`,
       kind: m.kind,
       text: m.text,
       playerId: m.playerId,

@@ -99,8 +99,9 @@ export function condenseAwards(awards: string[]): string[] {
     .map(([what, ys]) => (ys.length === 1 ? `${ys[0]} ${what}` : `${ys.length}× ${what} (${ys.join(", ")})`));
 }
 
-export function dateLabel(season: Season, day: number): string {
-  return season.dateOf(day).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
+/** "Jul 14": a day of this season, or of the season `year` (a move or moment from an earlier one). */
+export function dateLabel(season: Season, day: number, year?: number): string {
+  return season.dateOf(day, year).toLocaleDateString("en-US", { month: "short", day: "numeric", timeZone: "UTC" });
 }
 
 export function phaseOf(season: Season): "regular" | "postseason" | "done" | "offseason" {
@@ -737,7 +738,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
       .filter((t) => t.playerId === p.id)
       .slice(-40)
       .reverse()
-      .map((t) => ({ date: `${dateLabel(season, t.day)}${t.year !== league.year ? ` ${t.year + (t.day > 280 ? 1 : 0)}` : ""}`, text: t.text })),
+      .map((t) => ({ date: `${dateLabel(season, t.day, t.year)}${t.year !== league.year ? ` ${season.dateOf(t.day, t.year).getUTCFullYear()}` : ""}`, text: t.text })),
     career: p.career,
     prior: p.prior ?? null,
     careerTeams,
@@ -840,7 +841,7 @@ export function transactions(season: Season, opts: { teamId?: number; majorOnly?
     if (opts.teamId !== undefined && t.teamId !== opts.teamId) continue;
     if (opts.majorOnly && SHUFFLES.has(t.type)) continue;
     if (opts.headlines && !isHeadline(season, t, i, debut)) continue;
-    out.push({ date: dateLabel(season, t.day), year: t.year, teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
+    out.push({ date: dateLabel(season, t.day, t.year), year: t.year, teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
   }
   return out;
 }

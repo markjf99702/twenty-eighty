@@ -436,11 +436,12 @@ export class Season {
    * Calendar date of a season day. The postseason (two days after the last
    * game, and at most 31 days long) is dated from September 30, so a full
    * World Series ends by the winter's first day (Oct 30); winter days keep the
-   * regular calendar.
+   * regular calendar. `year` dates a day of an earlier season on its own
+   * calendar (the 2026-27 winter's day 340 is Mar 1, 2027, not Feb 29).
    */
-  dateOf(day: number): Date {
-    if (day > this.totalDays && day < WINTER_OPENS) return new Date(Date.UTC(this.league.year, 8, 30 + day - (this.totalDays + 2)));
-    return new Date(Date.UTC(this.league.year, OPENING_DAY.month, OPENING_DAY.day + day));
+  dateOf(day: number, year = this.league.year): Date {
+    if (day > this.totalDays && day < WINTER_OPENS) return new Date(Date.UTC(year, 8, 30 + day - (this.totalDays + 2)));
+    return new Date(Date.UTC(year, OPENING_DAY.month, OPENING_DAY.day + day));
   }
 
   /** September 1 and later: expanded rosters. */
