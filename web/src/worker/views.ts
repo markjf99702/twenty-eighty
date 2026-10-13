@@ -185,7 +185,7 @@ export function status(league: League | null, season: Season | null, hasSave: bo
     divisions: league.structure.divisions,
     teams: league.teams.map(teamRef),
     record: rec ? { w: rec.w, l: rec.l } : null,
-    owner: league.gm ? { confidence: league.gm.confidence, mood: mood(league.gm.confidence), fired: league.gm.fired } : null,
+    owner: league.gm ? { confidence: league.gm.confidence, mood: mood(league.gm.confidence), fired: league.gm.fired, seasons: league.gm.seasons } : null,
     offers: user !== null ? league.tradeOffers.filter((o) => offerLive(league, o, offerClock(league, season))).length : 0,
     settings: settingsOf(league),
     staffUnread: user !== null ? unreadAdvice(league) : 0,

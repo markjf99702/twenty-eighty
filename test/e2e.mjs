@@ -49,6 +49,8 @@ await page.locator('.club-pick').nth(3).click();
 await page.locator('.setup .check input').first().uncheck();
 await page.click('.start-bar .btn.primary');
 await page.waitForSelector('.club-hero', { timeout: 60000 });
+// A new GM is welcomed, and told when free agents and draft picks come.
+assert.match(await page.locator('.note', { hasText: 'Welcome to the job' }).textContent({ timeout: 10000 }), /Free agency, the draft and international signings come in the winter/, 'no welcome for a new GM');
 
 // A week of games: scores go up and the standings move.
 await board('Week').click();

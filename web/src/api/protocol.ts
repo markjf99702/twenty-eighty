@@ -59,8 +59,8 @@ export interface Status {
   divisions?: string[];
   teams?: TeamRef[];
   record?: { w: number; l: number } | null;
-  /** The owner's view of the user, when the user runs a club. */
-  owner?: { confidence: number; mood: string; fired: boolean } | null;
+  /** The owner's view of the user, when the user runs a club; `seasons` is how many the owner has reviewed. */
+  owner?: { confidence: number; mood: string; fired: boolean; seasons: number } | null;
   /** Trade offers waiting on the user. */
   offers?: number;
   /** The trade deadline, while it's still ahead (or today). */

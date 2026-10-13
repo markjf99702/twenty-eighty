@@ -22,6 +22,7 @@ import { staffCost } from "../src/scouting/scouting";
 import { playoffSeeds, runPostseason } from "../src/season/postseason";
 import { Season } from "../src/season/season";
 import { ownerView } from "../web/src/worker/business";
+import { status } from "../web/src/worker/views";
 
 const USER = 5;
 const league = generateLeague({ seed: "finance-test" });
@@ -210,6 +211,7 @@ describe("the owner", () => {
     expect(l.gm!.fired).toBe(true);
     expect(l.gm!.offers).toHaveLength(3);
     expect(l.gm!.offers).not.toContain(3);
+    expect(status(l, s, true).owner!.seasons).toBe(3);
     const next = l.gm!.offers[0]!;
     acceptJob(l, next);
     expect(l.userTeamId).toBe(next);
@@ -217,6 +219,8 @@ describe("the owner", () => {
     expect(l.gm!.teamId).toBe(next);
     expect(l.teams[3]!.manualRoster).toBe(false);
     expect(l.gm!.reviews).toHaveLength(1);
+    // A new job is a first season again (the front office welcomes a GM only then).
+    expect(status(l, s, true).owner!.seasons).toBe(0);
   });
 });
 

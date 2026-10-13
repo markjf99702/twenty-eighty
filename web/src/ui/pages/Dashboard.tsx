@@ -225,11 +225,13 @@ export function Dashboard({ status }: { status: Status }) {
         </div>
       )}
 
-      {status.day === 0 && status.phase === "regular" && (
+      {status.day === 0 && status.phase === "regular" && status.owner?.seasons === 0 && (
         <div class="note">
           Welcome to the job. The scoreboard's <b>Sim</b> buttons play the schedule a day, a week or a month at a time. Your
           assistant GM handles injuries and call-ups until you take over under <a href={teamHref(d.team.id)}>My club</a>, where
-          every player's roster moves (call up, option, DFA, the injured list) are one click away.
+          every player's roster moves (call up, option, DFA, the injured list) are one click away. Free agency, the draft and
+          international signings come in the winter, after the World Series; until then new players come by{" "}
+          <a href={href({ page: "trades", partnerId: null })}>trade</a> or from the farm.
         </div>
       )}
 
