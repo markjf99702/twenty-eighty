@@ -1,7 +1,7 @@
 import type { League } from "../../../src/league/types";
 import { playerName, type Player } from "../../../src/players/types";
 import type { Season } from "../../../src/season/season";
-import { avgOf, type CareerBat, type CareerPit, careerTotals, eraOf } from "../../../src/stats/career";
+import { avgOf, type CareerBat, type CareerPit, careerTotals, type CareerTotals, eraOf } from "../../../src/stats/career";
 import { CAREER_STATS, careerRecords, careerTable, formatRecord, liveSeason, type RecordRow, SEASON_STATS, seasonRecords, STATS } from "../../../src/stats/records";
 import type { HallPlaque, HallView, MomentView, RecordRowView, RecordsView } from "../api/protocol";
 import { dateLabel } from "./views";
@@ -81,7 +81,12 @@ export function careerLine(bat: CareerBat | null | undefined, pit: CareerPit | n
   return parts.join(", ");
 }
 
-const posOf = (p: Player) => (p.pitching ? (p.role ?? "P") : p.position);
+/** A hitter's position; a pitcher is a starter or a reliever by his career (most of his games started or not), not his last role. */
+function posOf(p: Player, t: CareerTotals): string {
+  if (!p.pitching) return p.position;
+  if (!t.pit || t.pit.G === 0) return p.role ?? "P";
+  return t.pit.GS * 2 >= t.pit.G ? "SP" : "RP";
+}
 
 /** The club he played the most seasons for in the league's own years (his last club if none). */
 function clubOf(p: Player): number | null {
@@ -107,7 +112,7 @@ export function hallView(season: Season): HallView {
         name: playerName(p),
         playerId: p.id,
         legendId: null,
-        pos: posOf(p),
+        pos: posOf(p, t),
         years: `${t.first ?? ""}–${t.last ?? ""}`,
         team: club !== null ? teamName(league, club) : "",
         line: careerLine(t.bat, t.pit),
@@ -126,7 +131,7 @@ export function hallView(season: Season): HallView {
           entries: last.entries.map((e) => {
             const p = league.players[e.playerId]!;
             const t = careerTotals(p);
-            return { playerId: p.id, name: playerName(p), pos: posOf(p), line: careerLine(t.bat, t.pit), vote: e.vote, ballot: e.ballot, elected: e.elected, dropped: e.dropped };
+            return { playerId: p.id, name: playerName(p), pos: posOf(p, t), line: careerLine(t.bat, t.pit), vote: e.vote, ballot: e.ballot, elected: e.elected, dropped: e.dropped };
           }),
         }
       : null,

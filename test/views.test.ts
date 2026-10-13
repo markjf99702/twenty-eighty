@@ -3,7 +3,7 @@ import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { allStarLine } from "../web/src/worker/allstar";
-import { careerLine } from "../web/src/worker/records";
+import { careerLine, hallView } from "../web/src/worker/records";
 import { careerTotals } from "../src/stats/career";
 import { liveLines, liveSeason } from "../src/stats/records";
 import { evaluateTrade, tradeValue } from "../src/org/trades";
@@ -243,6 +243,22 @@ describe("the All-Star Game's line", () => {
     expect(allStarLine(league, game, league.year - 4)!.mvp!.team).toBe("—");
     p.career.pop();
     expect(p.teamId).toBe(now.id);
+  });
+});
+
+describe("the Hall of Fame ballot", () => {
+  it("lists a pitcher as a starter or a reliever by his career, not his last role", () => {
+    const l = generateLeague({ seed: "hall-roles" });
+    const s = new Season(l, { minors: false });
+    const pitchers = l.players.filter((p) => p.pitching && p.prior?.pit && p.prior.pit.G > 0);
+    const [closer, starter] = [pitchers[0]!, pitchers[1]!];
+    // A closer who started at the end (David Ford: 881 games, 72 starts, 336 saves), and a starter who finished in the pen.
+    Object.assign(closer.prior!.pit!, { G: 881, GS: 72, SV: 336 });
+    closer.role = "SP";
+    Object.assign(starter.prior!.pit!, { G: 420, GS: 380, SV: 0 });
+    starter.role = "RP";
+    l.hall.ballots.push({ year: l.year, entries: [closer, starter].map((p) => ({ playerId: p.id, vote: 30, ballot: 1, elected: false, dropped: false })) });
+    expect(hallView(s).ballot!.entries.map((e) => e.pos)).toEqual(["RP", "SP"]);
   });
 });
 
