@@ -205,8 +205,8 @@ export interface SeasonHistory {
   awards: Award[];
   /** Executive of the Year in each league (absent in seasons recorded before there was one). */
   executives?: ExecutiveAward[];
-  /** The All-Star Game: [away, home] leagues and score, and its MVP. */
-  allStar?: { leagues: [number, number]; score: [number, number]; host: number; mvp: number | null; note: string };
+  /** The All-Star Game: [away, home] leagues and score, and its MVP (with his club that day, kept since 2026-10). */
+  allStar?: { leagues: [number, number]; score: [number, number]; host: number; mvp: number | null; mvpTeam?: number | null; note: string };
   userTeamId: number | null;
 }
 

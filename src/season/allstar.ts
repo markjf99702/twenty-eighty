@@ -60,6 +60,8 @@ export interface AllStarGame {
   batting: [AllStarBatting[], AllStarBatting[]];
   pitching: [AllStarPitching[], AllStarPitching[]];
   mvp: number | null;
+  /** His club on the day (absent in games saved before it was kept). */
+  mvpTeam?: number | null;
   /** His line, e.g. "2-for-3, HR, 3 RBI". */
   mvpNote: string;
 }
@@ -236,6 +238,7 @@ export function playAllStarGame(season: Season): AllStarGame {
     batting,
     pitching,
     mvp,
+    mvpTeam: mvp !== null ? league.players[mvp]!.teamId : null,
     mvpNote,
   };
   const leagueName = (lg: number) => league.structure.leagues[lg]!;
@@ -248,6 +251,7 @@ export function playAllStarGame(season: Season): AllStarGame {
 export const mvpText = (league: League, g: AllStarGame): string | null => {
   if (g.mvp === null) return null;
   const p = league.players[g.mvp]!;
-  const team = p.teamId !== null ? league.teams[p.teamId]!.abbrev : "FA";
+  const club = g.mvpTeam !== undefined ? g.mvpTeam : p.teamId;
+  const team = club !== null ? league.teams[club]!.abbrev : "FA";
   return `${playerName(p)} (${team}), ${g.mvpNote}`;
 };

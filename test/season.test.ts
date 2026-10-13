@@ -47,6 +47,9 @@ describe("a simulated season", () => {
     for (const side of g.batting) expect(side.length).toBeGreaterThan(9);
     expect(g.score[0]).not.toBe(g.score[1]);
     expect(g.mvp).not.toBeNull();
+    // His club that day, kept with the game (he may be traded before the season's out): one in the league he played for.
+    const his = g.rosters.find((r) => allStarIds(r).includes(g.mvp!))!;
+    expect(league.teams[g.mvpTeam!]!.league).toBe(his.league);
   });
 
   it("notices the season's moments", () => {

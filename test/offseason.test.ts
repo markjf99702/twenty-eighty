@@ -40,6 +40,8 @@ describe("the offseason", () => {
     for (const a of h.awards.filter((x) => x.name === "Gold Glove")) expect(league.players[a.playerId]!.awards).toContain(`${year} ${league.structure.leagues[a.league]} Gold Glove (${a.pos})`);
     expect(h.executives).toHaveLength(2);
     expect(h.allStar?.score[0]).not.toBe(h.allStar?.score[1]);
+    expect(h.allStar?.mvpTeam).toBe(season.allStar!.mvpTeam);
+    expect(h.allStar?.mvpTeam).not.toBeUndefined();
     const regular = league.players.find((p) => p.career.some((c) => c.year === year && (c.bat?.PA ?? 0) > 500))!;
     expect(regular).toBeDefined();
   });

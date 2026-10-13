@@ -155,7 +155,8 @@ function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak:
     if (m) return { kind: "moment", text: m.text, href: m.box ? `#box-${m.box}` : `#player-${m.playerId}` };
   }
   if (stops.allStar && s.allStar && !before.allStar) {
-    const line = allStarLine(league, { leagues: s.allStar.leagues, score: s.allStar.score, host: s.allStar.host, mvp: s.allStar.mvp, note: s.allStar.mvpNote })!;
+    const g = s.allStar;
+    const line = allStarLine(league, { leagues: g.leagues, score: g.score, host: g.host, mvp: g.mvp, mvpTeam: g.mvpTeam, note: g.mvpNote }, g.year)!;
     const mine = s.allStar.rosters.flatMap(allStarIds).filter((id) => league.players[id]!.teamId === user);
     const yours = mine.length ? ` Your All-Stars: ${mine.map((id) => playerName(league.players[id]!)).join(", ")}.` : " None of your players made it.";
     const mvp = line.mvp ? ` MVP: ${line.mvp.name} (${line.mvp.team}), ${line.mvp.note}.` : "";

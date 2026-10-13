@@ -1,5 +1,5 @@
 import type { League, SeasonHistory } from "../../../src/league/types";
-import { playerName } from "../../../src/players/types";
+import { playerName, type Player } from "../../../src/players/types";
 import { allStarIds } from "../../../src/season/allstar";
 import type { Season } from "../../../src/season/season";
 import type { AllStarLine, AllStarView, AwardRow, ExecutiveRow } from "../api/protocol";
@@ -31,15 +31,28 @@ export function executiveRows(league: League, h: SeasonHistory): ExecutiveRow[] 
   }));
 }
 
-/** "Federal 8, Continental 5 in Kansas City" (the winner first) and the MVP, from a season's record. */
-export function allStarLine(league: League, g: SeasonHistory["allStar"] | undefined): AllStarLine | null {
+type AllStarRecord = NonNullable<SeasonHistory["allStar"]>;
+
+/**
+ * The MVP's club on the day of the game. Games played before it was kept fall back to the club his
+ * record has for that season (where he finished it); only this season's, not yet on his record, to today's.
+ */
+function mvpClub(league: League, g: AllStarRecord, mvp: Player, year: number): string {
+  if (g.mvpTeam !== undefined) return abbrev(league, g.mvpTeam);
+  const line = mvp.career.find((c) => c.year === year && c.level === "MLB");
+  if (line) return abbrev(league, line.teamId);
+  return year === league.year && !league.history.some((h) => h.year === year) ? abbrev(league, mvp.teamId) : "—";
+}
+
+/** "Federal 8, Continental 5 in Kansas City" (the winner first) and the MVP, from `year`'s game. */
+export function allStarLine(league: League, g: AllStarRecord | undefined, year: number): AllStarLine | null {
   if (!g) return null;
   const where = league.teams[g.host]!.city;
   const mvp = g.mvp === null ? null : league.players[g.mvp]!;
   const [w, l] = g.score[1] > g.score[0] ? [1, 0] : [0, 1];
   return {
     text: `${short(league, g.leagues[w]!)} ${g.score[w]}, ${short(league, g.leagues[l]!)} ${g.score[l]} in ${where}`,
-    mvp: mvp ? { playerId: mvp.id, name: playerName(mvp), team: abbrev(league, mvp.teamId), note: g.note } : null,
+    mvp: mvp ? { playerId: mvp.id, name: playerName(mvp), team: mvpClub(league, g, mvp, year), note: g.note } : null,
   };
 }
 
@@ -83,7 +96,7 @@ export function allStarView(season: Season): AllStarView | null {
     score: g.score,
     innings: g.innings,
     lineScore: g.lineScore,
-    mvp: mvp ? { playerId: mvp.id, name: playerName(mvp), team: abbrev(league, mvp.teamId), note: g.mvpNote } : null,
+    mvp: mvp ? { playerId: mvp.id, name: playerName(mvp), team: abbrev(league, g.mvpTeam !== undefined ? g.mvpTeam : mvp.teamId), note: g.mvpNote } : null,
     sides,
     mine: g.rosters.flatMap(allStarIds).filter(mine).map((id) => ({ playerId: id, name: playerName(P(id)) })),
   };

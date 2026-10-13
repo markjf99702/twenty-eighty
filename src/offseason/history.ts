@@ -219,7 +219,7 @@ export function recordHistory(league: League, season: Season, awards: Award[]): 
     userTeamId: league.userTeamId,
   };
   const g = season.allStar;
-  if (g) entry.allStar = { leagues: g.leagues, score: g.score, host: g.host, mvp: g.mvp, note: g.mvpNote };
+  if (g) entry.allStar = { leagues: g.leagues, score: g.score, host: g.host, mvp: g.mvp, ...(g.mvpTeam !== undefined ? { mvpTeam: g.mvpTeam } : {}), note: g.mvpNote };
   league.history.push(entry);
   return entry;
 }

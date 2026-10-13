@@ -227,8 +227,22 @@ describe("the All-Star Game's line", () => {
   it("puts the winner first, whichever league was at home", () => {
     const [a, h] = [league.structure.leagues[0]!.replace(" League", ""), league.structure.leagues[1]!.replace(" League", "")];
     const city = league.teams[3]!.city;
-    expect(allStarLine(league, { leagues: [0, 1], score: [5, 8], host: 3, mvp: null, note: "" })!.text).toBe(`${h} 8, ${a} 5 in ${city}`);
-    expect(allStarLine(league, { leagues: [0, 1], score: [6, 2], host: 3, mvp: null, note: "" })!.text).toBe(`${a} 6, ${h} 2 in ${city}`);
+    expect(allStarLine(league, { leagues: [0, 1], score: [5, 8], host: 3, mvp: null, note: "" }, league.year)!.text).toBe(`${h} 8, ${a} 5 in ${city}`);
+    expect(allStarLine(league, { leagues: [0, 1], score: [6, 2], host: 3, mvp: null, note: "" }, league.year)!.text).toBe(`${a} 6, ${h} 2 in ${city}`);
+  });
+
+  it("names the MVP's club that day, not the one he plays for now", () => {
+    const p = league.players[league.teams[5]!.rosters.MLB[0]!]!;
+    const [then, now] = [league.teams[8]!, league.teams[5]!];
+    const game = { leagues: [0, 1] as [number, number], score: [3, 2] as [number, number], host: 3, mvp: p.id, note: "2-for-3, HR" };
+    // Kept with the game since it was.
+    expect(allStarLine(league, { ...game, mvpTeam: then.id }, league.year - 3)!.mvp!.team).toBe(then.abbrev);
+    // Older games: the club his record has that season, or a dash; never today's.
+    p.career.push({ year: league.year - 3, level: "MLB", teamId: then.id, bat: { G: 150, PA: 600, AB: 540, H: 160, D: 30, T: 2, HR: 30, R: 90, RBI: 95, BB: 50, SO: 120, SB: 5, wRCplus: 130, WAR: 4.5 } });
+    expect(allStarLine(league, game, league.year - 3)!.mvp!.team).toBe(then.abbrev);
+    expect(allStarLine(league, game, league.year - 4)!.mvp!.team).toBe("—");
+    p.career.pop();
+    expect(p.teamId).toBe(now.id);
   });
 });
 

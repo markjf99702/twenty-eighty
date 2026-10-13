@@ -89,7 +89,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
       champion: h.champion >= 0 ? `${league.teams[h.champion]!.city} ${league.teams[h.champion]!.nickname}` : null,
       awards: awardRows(league, h.awards, user),
       executives: executiveRows(league, h),
-      allStar: allStarLine(league, h.allStar),
+      allStar: allStarLine(league, h.allStar, h.year),
       hall: hallResult(league, h.year),
       finish: mine?.finish ?? null,
       record: mine ? `${mine.w}-${mine.l}` : null,
@@ -327,7 +327,7 @@ export function historyView(league: League): HistoryView {
         mine: mine ? { record: `${mine.w}-${mine.l}`, finish: mine.finish, team: club !== league.userTeamId ? abbrev(league, club) : null } : null,
         awards: awardRows(league, h.awards, club),
         executives: executiveRows(league, h),
-        allStar: allStarLine(league, h.allStar),
+        allStar: allStarLine(league, h.allStar, h.year),
       };
     }),
   };
