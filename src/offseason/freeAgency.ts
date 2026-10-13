@@ -42,8 +42,9 @@ export function openFreeAgency(league: League): FreeAgencyState {
 /** How good an offer looks to the player: mostly the annual salary, with a little extra for security. */
 export const offerScore = (o: { years: number; salary: number }) => o.salary * (1 + 0.1 * (o.years - 1));
 
-/** The bar an offer has to clear this week. */
-export const acceptBar = (ask: FreeAgentAsk, week: number) => offerScore(ask) * Math.max(0.45, 1 - SOFTEN * week);
+/** The bar an offer has to clear this week: his ask, softening as the winter goes on, but never under the league minimum. */
+export const acceptBar = (ask: FreeAgentAsk, week: number) =>
+  Math.max(offerScore(ask) * Math.max(0.45, 1 - SOFTEN * week), offerScore({ years: ask.years, salary: MIN_SALARY }));
 
 type Role = "hitter" | "sp" | "rp";
 const roleOf = (p: Player): Role => (p.pitching ? (canStart(p) ? "sp" : "rp") : "hitter");
@@ -146,7 +147,7 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
     const offers = room > 40 ? 2 : 1;
     for (const t of targets.slice(0, offers)) {
       const bar = acceptBar(t.ask, state.week) / (1 + 0.1 * (t.ask.years - 1));
-      const salary = money(Math.min(room, Math.max(bar, t.ask.salary * (0.9 + 0.15 * rng.next()) * (1 - SOFTEN * state.week))));
+      const salary = Math.max(MIN_SALARY, money(Math.min(room, Math.max(bar, t.ask.salary * (0.9 + 0.15 * rng.next()) * (1 - SOFTEN * state.week)))));
       bid(t.p.id, { teamId: team.id, years: t.ask.years, salary });
     }
   }
