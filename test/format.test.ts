@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { finishText, possessive } from "../web/src/ui/format";
+import type { PlayerSummary } from "../web/src/api/protocol";
+import { finishText, holdsFortyManSpot, possessive } from "../web/src/ui/format";
 
 describe("page wording", () => {
   it("says how a club's season ended in plain words", () => {
@@ -21,5 +22,10 @@ describe("page wording", () => {
       "the Ironmen's offer",
       "the Statesmen's offer",
     ]);
+  });
+
+  it("counts the 40-man the way the club page does, without the 60-day injured list", () => {
+    const status = (fortyMan: boolean, il: PlayerSummary["status"]["il"]) => ({ status: { fortyMan, il } }) as PlayerSummary;
+    expect([status(true, null), status(true, "IL10"), status(true, "IL60"), status(false, null)].map(holdsFortyManSpot)).toEqual([true, true, false, false]);
   });
 });

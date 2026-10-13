@@ -34,6 +34,9 @@ export function streak(s: number): string {
   return s > 0 ? `W${s}` : `L${-s}`;
 }
 
+/** Holds one of the 40 spots, as the club page counts them: a player on the 60-day injured list doesn't. */
+export const holdsFortyManSpot = (p: PlayerSummary) => p.status.fortyMan && p.status.il !== "IL60";
+
 /** A club nickname's possessive: "Summit's", "Ironmen's", but "Whales'". */
 export const possessive = (nickname: string) => (nickname.endsWith("s") ? `${nickname}'` : `${nickname}'s`);
 

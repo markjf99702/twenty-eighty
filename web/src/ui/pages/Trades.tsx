@@ -5,7 +5,7 @@ import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
 import { Headline, NowGrade, outlookColumns } from "../components/Outlook";
 import { type Column, Table } from "../components/Table";
 import { StaffTake } from "../components/StaffTake";
-import { LEVEL_NAMES, possessive, statBrief } from "../format";
+import { holdsFortyManSpot, LEVEL_NAMES, possessive, statBrief } from "../format";
 import { BLOCK_SLUGS, type BlockSlug, go, playerHref } from "../router";
 import { useBasics } from "../settings";
 import { takePreset, tradeFor } from "../tradePreset";
@@ -523,7 +523,7 @@ export function Trades({ partnerId, block, status }: { partnerId: number | null;
       value={filters[i]}
       options={[
         ["all", "All"],
-        ["forty", `40-man (${side.players.filter((p) => p.status.fortyMan).length})`],
+        ["forty", `40-man (${side.players.filter(holdsFortyManSpot).length})`],
         ["mlb", "Big leaguers"],
         ["farm", "Farm"],
       ]}
