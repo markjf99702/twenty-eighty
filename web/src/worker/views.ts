@@ -577,7 +577,7 @@ export function rosterActions(p: Player, team: Team, ctx: RosterContext): Roster
   if (p.level === "MLB") {
     const option = canOption(ctx, team, p);
     // In season, his last option year: after this he can't be sent down without waivers.
-    const last = !ctx.offseason && !p.options.usedThisYear && MAX_OPTION_YEARS - p.options.used === 1;
+    const last = option.ok && !ctx.offseason && !p.options.usedThisYear && MAX_OPTION_YEARS - p.options.used === 1;
     add(
       "option",
       last ? "Option to AAA (his last option)" : "Option to AAA",
