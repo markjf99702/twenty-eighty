@@ -3,6 +3,7 @@ import { useApi } from "../../api/client";
 import { AwardsBlock } from "../components/Awards";
 import type { Status } from "../../api/protocol";
 import { ErrorNote, Loading, Section } from "../components/Common";
+import { finishText } from "../format";
 
 export function History({ status }: { status: Status }) {
   const view = useApi("history", undefined);
@@ -41,7 +42,7 @@ export function History({ status }: { status: Status }) {
                       <td class="num">{s.year}</td>
                       <td class="name">{s.champion}</td>
                       <td>{s.runnerUp ?? "—"}</td>
-                      <td class="dim">{s.mine ? `${s.mine.record}, ${s.mine.finish.toLowerCase()}` : "—"}</td>
+                      <td class="dim">{s.mine ? `${s.mine.record}, ${finishText(s.mine.finish)}` : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

@@ -34,6 +34,14 @@ export function streak(s: number): string {
   return s > 0 ? `W${s}` : `L${-s}`;
 }
 
+/** How a season ended, as saved ("Lost Division Series"), the way it reads in a sentence: "lost in the Division Series". */
+export function finishText(finish: string): string {
+  if (finish === "Won World Series") return "won the World Series";
+  if (finish === "Missed postseason") return "missed the postseason";
+  const lost = /^Lost (.+ Series)$/.exec(finish);
+  return lost ? `lost in the ${lost[1]}` : finish.charAt(0).toLowerCase() + finish.slice(1);
+}
+
 export function ordinal(n: number): string {
   const s = ["th", "st", "nd", "rd"];
   const v = n % 100;

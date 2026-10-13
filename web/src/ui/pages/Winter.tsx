@@ -5,7 +5,7 @@ import type { DevRow, OffseasonPhase, OffseasonView, PlayerSummary, Status } fro
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeChips } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
-import { fixed, GLOSSARY, LEVEL_NAMES } from "../format";
+import { finishText, fixed, GLOSSARY, LEVEL_NAMES } from "../format";
 import { href, playerHref } from "../router";
 import { ConfidenceMeter, GoalList, JobOffers } from "./Owner";
 
@@ -169,7 +169,7 @@ function Review({ v }: { v: OffseasonView }) {
           <span class="v">{r.champion}</span>
           {r.record && (
             <span class="small" style={{ color: "var(--board-dim)" }}>
-              Your club: {r.record}, {r.finish?.toLowerCase()}
+              Your club: {r.record}, {r.finish && finishText(r.finish)}
             </span>
           )}
         </div>
