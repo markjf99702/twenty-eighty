@@ -1115,10 +1115,16 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
   .winter-steps li:nth-child(-n + 3) { border-bottom: 1px solid var(--line); }
 }
 
-.offer { display: flex; align-items: center; gap: 4px; }
+.fa-offer { display: flex; align-items: center; gap: 4px; }
 .money-input { display: inline-flex; align-items: center; gap: 2px; color: var(--ink-3); }
 .money-input input { width: 64px; padding: 2px 6px; text-align: right; font-variant-numeric: tabular-nums; }
-.offer select.sel { padding: 2px 4px; }
+/* Its own width, not the 9.5em the trade desk gives selects in tables. */
+.tbl .fa-offer select.sel { padding: 2px 4px; width: auto; }
+/* Beside a pinned name a phone has room for about 220px, so Withdraw goes under the rest. */
+@media (max-width: 820px) {
+  .fa-offer { display: grid; grid-template-columns: repeat(3, max-content); justify-content: start; }
+  .fa-offer .btn.ghost { grid-column: 1 / -1; justify-self: start; }
+}
 
 .wire-item.mine-row { background: var(--accent-soft); }
 

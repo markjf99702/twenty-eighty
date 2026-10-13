@@ -401,7 +401,7 @@ function OfferCell({ row, offer }: { row: NonNullable<OffseasonView["freeAgency"
     bump();
   };
   return (
-    <div class="offer">
+    <div class="fa-offer">
       <select class="sel" aria-label="Years" value={years} onChange={(e) => setYears(Number((e.target as HTMLSelectElement).value))}>
         {[1, 2, 3, 4, 5, 6, 7, 8].map((y) => (
           <option key={y} value={y}>
