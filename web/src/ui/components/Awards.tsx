@@ -17,7 +17,7 @@ export function AwardsBlock({ awards, executives, allStar }: { awards: AwardRow[
     <>
       <Section title="Awards">
         <div class="tbl-wrap">
-          <table class="tbl awards">
+          <table class="tbl awards no-pin">
             <tbody>
               {major.map((a) => (
                 <tr key={`${a.name}-${a.league}`} class={a.mine ? "mine" : ""}>

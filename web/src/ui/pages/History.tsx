@@ -26,7 +26,7 @@ export function History({ status }: { status: Status }) {
         <>
           <Section title="Champions">
             <div class="tbl-wrap">
-              <table class="tbl">
+              <table class="tbl champions no-pin">
                 <thead>
                   <tr>
                     <th>Year</th>

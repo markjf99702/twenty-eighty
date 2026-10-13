@@ -301,7 +301,7 @@ export function Dashboard({ status }: { status: Status }) {
                         <a href={playerHref(p.id)}>{p.name}</a>
                         <StatusBadges p={p} />
                       </td>
-                      <td class="dim wrap">{p.status.injury?.name ?? "Recovering"}</td>
+                      <td class="dim wrap tight">{p.status.injury?.name ?? "Recovering"}</td>
                       <td class="num">{p.status.injury ? `${p.status.injury.daysLeft}d` : ""}</td>
                     </tr>
                   ))}

@@ -1205,6 +1205,7 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .tier-pick button.on .s { color: var(--bulb); }
 @media (max-width: 560px) { .tier-pick { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
 
+.miss-track { display: block; }
 .miss-bar { display: block; height: 8px; border-radius: 2px; background: var(--g40); min-width: 4px; }
 
 /* ------------------------------------------------------------------ owner and finances */
@@ -1478,6 +1479,22 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .ext p { margin: 0; max-width: 62ch; }
 .ext-reason { margin: 0; color: var(--ink-2); max-width: 62ch; }
 .tbl td.wrap, .tbl th.wrap { white-space: normal; min-width: 14em; max-width: 26em; }
+/* Small tables on a phone: a text column's minimum width would push the last column off the screen. */
+@media (max-width: 560px) {
+  .tbl td.wrap.tight { min-width: 0; }
+  /* Scouting familiarity: the labels wrap and the misses are drawn on a short track, so the bars fit. */
+  .tbl.familiarity td { white-space: normal; }
+  .tbl.familiarity td.miss { min-width: 0; }
+  .familiarity .miss-track { width: 90px; }
+  /* Champions: names and your club's finish wrap. */
+  .tbl.champions td { white-space: normal; }
+  /* Awards: the note goes under the winner instead of off the side of the screen. */
+  .tbl.awards, .tbl.awards tbody { display: block; }
+  .tbl.awards tr { display: grid; grid-template-columns: minmax(0, 2fr) minmax(0, 3fr); border-bottom: 1px solid var(--line); }
+  .tbl.awards td { border-bottom: 0; white-space: normal; }
+  .tbl.awards td:first-child { grid-row: span 2; }
+  .tbl.awards td.wrap { min-width: 0; max-width: none; padding-top: 0; }
+}
 
 /* ------------------------------------------------------------------ junkdrawer.works footer */
 

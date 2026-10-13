@@ -65,14 +65,16 @@ export function Scouting({ status }: { status: Status }) {
             and command are the hardest reads. Familiarity cuts the miss a lot:
           </div>
           <div class="tbl-wrap">
-            <table class="tbl">
+            <table class="tbl familiarity">
               <tbody>
                 {v.accuracy.map((a) => (
                   <tr key={a.label}>
                     <td>{a.label}</td>
                     <td class="num">±{a.sigma.toFixed(1)}</td>
-                    <td class="wrap">
-                      <span class="miss-bar" style={{ width: `${Math.min(100, a.sigma * 9)}%` }} />
+                    <td class="wrap miss">
+                      <span class="miss-track">
+                        <span class="miss-bar" style={{ width: `${Math.min(100, a.sigma * 9)}%` }} />
+                      </span>
                     </td>
                   </tr>
                 ))}
