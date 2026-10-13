@@ -570,9 +570,9 @@ runs** (this fielder vs. a league-average fielder on the same ball).
 
 | | Sim | MLB | | Sim | MLB |
 |---|---:|---:|---|---:|---:|
-| Runs/game | 4.42 | 4.40 | Avg exit velo | 89.0 | 88.7 |
+| Runs/game | 4.44 | 4.40 | Avg exit velo | 89.0 | 88.7 |
 | AVG / OBP / SLG | .247/.319/.403 | .244/.313/.401 | Hard-hit % | 38.3 | 38.5 |
-| K% / BB% | 22.6 / 8.6 | 22.4 / 8.3 | Barrel % | 7.5 | 7.8 |
+| K% / BB% | 22.5 / 8.6 | 22.4 / 8.3 | Barrel % | 7.5 | 7.8 |
 | HR% of PA | 3.01 | 3.00 | GB / LD / FB % | 43.4 / 25.1 / 22.6 | 43 / 24.5 / 24.5 |
 | BABIP | .296 | .291 | SB per game / SB% | 0.74 / 77% | 0.72 / 79% |
 | Pitches per PA | 3.99 | 3.90 | Errors per game | 0.47 | 0.52 |
