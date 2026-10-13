@@ -42,7 +42,7 @@ export function History({ status }: { status: Status }) {
                       <td class="num">{s.year}</td>
                       <td class="name">{s.champion}</td>
                       <td>{s.runnerUp ?? "—"}</td>
-                      <td class="dim">{s.mine ? `${s.mine.record}, ${finishText(s.mine.finish)}` : "—"}</td>
+                      <td class="dim">{s.mine ? `${s.mine.team ? `${s.mine.team} ` : ""}${s.mine.record}, ${finishText(s.mine.finish)}` : "—"}</td>
                     </tr>
                   ))}
                 </tbody>

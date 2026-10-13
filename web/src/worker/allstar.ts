@@ -8,8 +8,8 @@ import { dateLabel } from "./views";
 const abbrev = (league: League, id: number | null) => (id === null ? "FA" : (league.teams[id]?.abbrev ?? "FA"));
 const short = (league: League, lg: number) => league.structure.leagues[lg]!.replace(" League", "");
 
-/** Season awards for the review and the history page. */
-export function awardRows(league: League, awards: SeasonHistory["awards"]): AwardRow[] {
+/** Season awards for the review and the history page; `mine` marks winners from that club (the one you ran that season). */
+export function awardRows(league: League, awards: SeasonHistory["awards"], mine: number | null): AwardRow[] {
   return awards.map((a) => ({
     name: a.name,
     league: short(league, a.league),
@@ -18,7 +18,7 @@ export function awardRows(league: League, awards: SeasonHistory["awards"]): Awar
     player: playerName(league.players[a.playerId]!),
     team: abbrev(league, a.teamId),
     note: a.note,
-    mine: a.teamId === league.userTeamId,
+    mine: mine !== null && a.teamId === mine,
   }));
 }
 

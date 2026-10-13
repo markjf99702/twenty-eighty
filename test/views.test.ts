@@ -8,7 +8,8 @@ import { careerTotals } from "../src/stats/career";
 import { liveLines, liveSeason } from "../src/stats/records";
 import { evaluateTrade, tradeValue } from "../src/org/trades";
 import { warShift } from "../src/scouting/analytics";
-import { blockView, tradeSide } from "../web/src/worker/winter";
+import { blockView, historyView, tradeSide } from "../web/src/worker/winter";
+import { acceptJob } from "../src/finance/owner";
 import { dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, transactions } from "../web/src/worker/views";
 import { budgetRoom } from "../src/org/contracts";
 import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
@@ -96,6 +97,30 @@ describe("the trade desk in season", () => {
     expect(block.length).toBeGreaterThan(0);
     for (const b of block) expect(b.surplus).toBe(tradeValue(l, l.players[b.id]!, fraction, seen(2, l.players[b.id]!)));
     expect(playerView(s, c, get[0]!.id, s.rosterContext()).surplus).toBe(get[0]!.surplus);
+  });
+});
+
+describe("league history", () => {
+  it("shows the club you ran each season, after a change of jobs", () => {
+    const l = generateLeague({ seed: "history-new-job" });
+    hireGm(l, 4);
+    const [old, next] = [l.teams[4]!, l.teams[9]!];
+    const star = l.players[old.rosters.MLB[0]!]!;
+    l.history.push({
+      year: l.year,
+      champion: 1,
+      pennants: [1, 2],
+      standings: l.teams.map((t) => ({ teamId: t.id, w: 70 + t.id, l: 92 - t.id, rs: 700, ra: 700, finish: "Missed postseason" })),
+      awards: [{ name: "MVP", league: old.league, playerId: star.id, teamId: old.id, note: ".300/.400/.550, 40 HR, 7.0 WAR" }],
+      userTeamId: old.id,
+    });
+    // Fired after the season, and hired by another club.
+    l.gm!.fired = true;
+    l.gm!.offers = [next.id];
+    acceptJob(l, next.id);
+    const season = historyView(l).seasons[0]!;
+    expect(season.mine).toEqual({ record: "74-88", finish: "Missed postseason", team: old.abbrev });
+    expect(season.awards[0]!.mine).toBe(true);
   });
 });
 

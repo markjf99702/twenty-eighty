@@ -730,7 +730,8 @@ export interface HistoryView {
     year: number;
     champion: string;
     runnerUp: string | null;
-    mine: { record: string; finish: string } | null;
+    /** How the club you ran that season did (`team` when it isn't the club you run now). */
+    mine: { record: string; finish: string; team: string | null } | null;
     awards: AwardRow[];
     executives: ExecutiveRow[];
     allStar: AllStarLine | null;

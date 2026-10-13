@@ -87,7 +87,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
         .map((r) => ({ player: summary(r.playerId), team: abbrev(league, r.teamId), before: r.before, after: r.after }));
     view.review = {
       champion: h.champion >= 0 ? `${league.teams[h.champion]!.city} ${league.teams[h.champion]!.nickname}` : null,
-      awards: awardRows(league, h.awards),
+      awards: awardRows(league, h.awards, user),
       executives: executiveRows(league, h),
       allStar: allStarLine(league, h.allStar),
       hall: hallResult(league, h.year),
@@ -313,18 +313,19 @@ export function offerViews(season: Season, stats: StatsCache): OfferView[] {
 }
 
 export function historyView(league: League): HistoryView {
-  const user = league.userTeamId;
   const name = (id: number) => `${league.teams[id]!.city} ${league.teams[id]!.nickname}`;
   return {
     seasons: [...league.history].reverse().map((h) => {
       const ws = h.standings.find((r) => r.finish === "Lost World Series");
-      const mine = user !== null ? h.standings.find((r) => r.teamId === user) : undefined;
+      // The club you ran that season (after a change of jobs, not today's); none if you ran none.
+      const club = "userTeamId" in h ? h.userTeamId : league.userTeamId;
+      const mine = club !== null ? h.standings.find((r) => r.teamId === club) : undefined;
       return {
         year: h.year,
         champion: h.champion >= 0 ? name(h.champion) : "",
         runnerUp: ws ? name(ws.teamId) : null,
-        mine: mine ? { record: `${mine.w}-${mine.l}`, finish: mine.finish } : null,
-        awards: awardRows(league, h.awards),
+        mine: mine ? { record: `${mine.w}-${mine.l}`, finish: mine.finish, team: club !== league.userTeamId ? abbrev(league, club) : null } : null,
+        awards: awardRows(league, h.awards, club),
         executives: executiveRows(league, h),
         allStar: allStarLine(league, h.allStar),
       };
