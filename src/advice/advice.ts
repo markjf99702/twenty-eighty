@@ -229,15 +229,36 @@ function callUps(season: Season, team: Team, day: number): void {
   });
 }
 
+type DeadlineFamily = "buy" | "sell";
+
+/** Whether the deadline's note to buy (or sell) is out for this check: this year's weekly note, or the last week's, after which the weekly ones stop. */
+function deadlineNoted(league: League, family: DeadlineFamily, lastWeek: boolean): boolean {
+  return league.advice.some((a) => a.key === `${family}-last:${league.year}` || (!lastWeek && a.key === `${family}:${league.year}`));
+}
+
+/**
+ * The deadline's note to buy or to sell, one of each a season: the weekly one,
+ * or in the last week the urgent one, which takes the place of a weekly note
+ * from the days just before rather than saying it again.
+ */
+function deadlineNote(league: League, day: number, family: DeadlineFamily, lastWeek: boolean, n: Omit<AdviceNote, "key" | "urgent" | "year" | "at" | "read">): void {
+  const weekly = `${family}:${league.year}`;
+  if (lastWeek) {
+    const recent = league.advice.findIndex((a) => a.key === weekly && day - a.at < 7);
+    if (recent >= 0) league.advice.splice(recent, 1);
+  }
+  add(league, day, { ...n, key: lastWeek ? `${family}-last:${league.year}` : weekly, urgent: lastWeek });
+}
+
 /** Before the deadline: sell rentals when we're out of it, find the hole to fill when we're in it. */
 function deadline(season: Season, team: Team, day: number): void {
   const league = season.league;
   const user = team.id;
   const gb = gamesOut(season, user);
   const lastWeek = day === TRADE_DEADLINE_DAY - 7;
-  const suffix = lastWeek ? "-last" : "";
   const when = lastWeek ? "The deadline is a week away." : "The trade deadline is July 31.";
   if (gb >= 7) {
+    if (deadlineNoted(league, "sell", lastWeek)) return;
     const vets = orgPlayers(league, team)
       .filter((p) => p.level === "MLB" && !p.injury && p.age >= 26 && believedWar(season, user, p) >= 1)
       .sort((a, b) => believedWar(season, user, b) - believedWar(season, user, a));
@@ -245,10 +266,8 @@ function deadline(season: Season, team: Team, day: number): void {
     const rentals = vets.filter((p) => freeAfterSeason(p, left)).slice(0, 2);
     const pool = rentals.length ? rentals : vets.filter((p) => p.age >= 30).slice(0, 2);
     if (pool.length === 0) return;
-    add(league, day, {
-      key: `sell${suffix}:${league.year}`,
+    deadlineNote(league, day, "sell", lastWeek, {
       from: "scouting",
-      urgent: lastWeek,
       title: "Contenders will pay for our veterans",
       text:
         `We're ${gb} games out of a playoff spot. ` +
@@ -259,8 +278,7 @@ function deadline(season: Season, team: Team, day: number): void {
       href: "#trades",
     });
   } else if (gb <= 3) {
-    const key = `buy${suffix}:${league.year}`;
-    if (league.advice.some((a) => a.key === key)) return;
+    if (deadlineNoted(league, "buy", lastWeek)) return;
     const spot = weakestSpot(season, team);
     if (!spot) return;
     // Who's available there, best fit first by our read.
@@ -271,10 +289,8 @@ function deadline(season: Season, team: Team, day: number): void {
     const market = fits.length
       ? ` On the block, the best ${fits.length === 1 ? "fit is" : "fits are"} ${fits.length <= 2 ? fits.map(of).join(" and ") : `${fits.slice(0, -1).map(of).join(", ")} and ${of(fits.at(-1)!)}`}.`
       : " Nobody on the block there is a clear upgrade, but any club will listen on its players.";
-    add(league, day, {
-      key,
+    deadlineNote(league, day, "buy", lastWeek, {
       from: "scouting",
-      urgent: lastWeek,
       title: `A trade could shore up ${spot.label}`,
       text: `We're ${gb <= 0 ? "in a playoff spot" : `${gb} games out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
       href: there.length ? `#trades-block-${group.toLowerCase()}` : "#trades",
@@ -328,7 +344,8 @@ function analytics(season: Season, team: Team, day: number): void {
       from: "analytics",
       urgent: false,
       title: `Our ${worst.name} is the weak link`,
-      text: `The ${worst.name} ranks ${worst.rank}th of 30 with ${worst.fmt(worst.value)}. If we add anyone, that's where it counts most.`,
+      // Once the deadline has passed, nobody can be added until the winter.
+      text: `The ${worst.name} ranks ${worst.rank}th of 30 with ${worst.fmt(worst.value)}. ${day < TRADE_DEADLINE_DAY ? "If we add anyone, that's where it counts most." : "That's the spot to fix this winter."}`,
       href: `#team-${team.id}`,
     });
   }

@@ -86,6 +86,88 @@ describe("rentals", () => {
   });
 });
 
+describe("the staff's deadline notes", () => {
+  const notes = (family: "buy" | "sell") => league.advice.filter((a) => a.key.startsWith(`${family}:`) || a.key.startsWith(`${family}-last:`));
+  /** The staff's end of the day on each of these days. */
+  const days = (...ds: number[]) => {
+    for (const d of ds) {
+      season.day = d;
+      seasonAdvice(season);
+    }
+  };
+  const lastWeek = TRADE_DEADLINE_DAY - 7;
+
+  it("come once a season to buy, the last week's standing in for the one before it", () => {
+    league.advice = [];
+    standings(-2);
+    days(lastWeek - 2, lastWeek, lastWeek + 5);
+    expect(notes("buy")).toHaveLength(1);
+    expect(notes("buy")[0]).toMatchObject({ key: `buy-last:${league.year}`, urgent: true, at: lastWeek });
+  });
+
+  it("come once a season to sell", () => {
+    league.advice = [];
+    standings(12);
+    days(lastWeek - 2, lastWeek, lastWeek + 5);
+    expect(notes("sell")).toHaveLength(1);
+    expect(notes("sell")[0]!.urgent).toBe(true);
+  });
+
+  it("don't follow the last week's note with a plain copy", () => {
+    // Out of reach of a playoff spot until the last week, then in it.
+    league.advice = [];
+    standings(5);
+    days(lastWeek - 2);
+    expect(notes("buy")).toHaveLength(0);
+    standings(2);
+    days(lastWeek, lastWeek + 5);
+    expect(notes("buy")).toHaveLength(1);
+    expect(notes("buy")[0]!.key).toBe(`buy-last:${league.year}`);
+  });
+
+  it("keep a note from weeks before alongside the last week's reminder", () => {
+    league.advice = [];
+    standings(-2);
+    days(lastWeek - 16, lastWeek, lastWeek + 5);
+    expect(notes("buy").map((a) => a.key)).toEqual([`buy:${league.year}`, `buy-last:${league.year}`]);
+  });
+
+  it("stop the sim when the last week's note replaces an earlier one", () => {
+    league.advice = [];
+    standings(-2);
+    days(lastWeek - 2);
+    const seen = new Set(league.advice.map((a) => a.key));
+    const kept = league.advice.length;
+    days(lastWeek);
+    // The list is no longer than before (the weekly note made way), but the urgent one is new.
+    expect(league.advice.length).toBe(kept);
+    expect(notesSince(league, seen).find((a) => a.urgent)?.key).toBe(`buy-last:${league.year}`);
+  });
+});
+
+describe("the analysts' weak link", () => {
+  it("looks to the winter once the deadline has passed", () => {
+    const l = generateLeague({ seed: "deadline-weak-link" });
+    hireGm(l, 0);
+    const s = new Season(l, { minors: false });
+    s.simDays(20);
+    // The analysts' monthly look, as some club whose lineup, rotation or bullpen ranks near the bottom would get it.
+    const weakLink = (day: number) => {
+      s.day = day;
+      for (const t of l.teams) {
+        l.userTeamId = t.id;
+        l.advice = [];
+        seasonAdvice(s);
+        const note = l.advice.find((a) => a.key.startsWith("unit:"));
+        if (note) return note.text;
+      }
+      return "";
+    };
+    expect(weakLink(TRADE_DEADLINE_DAY - 16)).toMatch(/ranks \d+th of 30 with .+\. If we add anyone, that's where it counts most\.$/);
+    expect(weakLink(TRADE_DEADLINE_DAY + 12)).toMatch(/ranks \d+th of 30 with .+\. That's the spot to fix this winter\.$/);
+  });
+});
+
 describe("the staff's urgent notes", () => {
   it("are found to stop the sim even once the list of notes is full", () => {
     // Sixty kept (the most there are): a new note pushes the oldest out, so the list is no longer than before.
