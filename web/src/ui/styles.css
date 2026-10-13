@@ -1607,6 +1607,10 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .desk-switch { margin: -4px 0 14px; }
 .block-about { margin: 0 0 12px; color: var(--ink-2); max-width: 70ch; }
 .block-actions { display: inline-flex; gap: 6px; white-space: nowrap; }
+/* The pick box's label covers its whole cell. */
+.tbl td.pick { position: relative; }
+.tbl td.pick label { display: flex; cursor: pointer; }
+.tbl td.pick label::before { content: ""; position: absolute; inset: 0; }
 
 /* ------------------------------------------------------------------ record book and Hall of Fame */
 
@@ -1642,3 +1646,12 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .vote-bar span.in { background: var(--accent); }
 .vote-bar .line75 { position: absolute; left: 75%; top: 0; bottom: 0; width: 2px; background: var(--alert); }
 .ballot .elected { color: var(--accent-text); }
+
+/* ------------------------------------------------------------------ touch screens */
+
+/* iOS Safari zooms into a field whose text is under 16px and stays zoomed in, and a 13px box is a
+   small target for a thumb. */
+@media (pointer: coarse) {
+  input, select, textarea, .stops-panel select, .year-pick select { font-size: 16px; }
+  input[type="checkbox"] { width: 20px; height: 20px; flex: none; }
+}

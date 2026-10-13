@@ -32,7 +32,13 @@ function SideTable({ side, picked, toggle, filter }: { side: TradeSide; picked: 
     {
       key: "pick",
       label: "",
-      render: (p) => <input type="checkbox" aria-label={`Include ${p.name}`} checked={picked.has(p.id)} onChange={() => toggle(p.id)} />,
+      cls: "pick",
+      // The whole cell is the box's label, so a tap anywhere in it picks him.
+      render: (p) => (
+        <label>
+          <input type="checkbox" aria-label={`Include ${p.name}`} checked={picked.has(p.id)} onChange={() => toggle(p.id)} />
+        </label>
+      ),
     },
     {
       key: "name",
