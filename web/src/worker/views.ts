@@ -531,29 +531,68 @@ export function playerSummary(
 /** The season a contract's first year refers to (next season, during the winter). */
 export const contractYear = (season: Season) => season.league.year + (season.league.offseason ? 1 : 0);
 
+type Check = { ok: boolean; reason?: string };
+
+/** The engine's reasons a move waits on room: the active roster, the pitching staff, the 40-man. */
+const NO_ROOM = /^(The active roster is full|Already carrying|He isn't on the 40-man roster and it's full|The 40-man roster is full)/;
+
+/**
+ * A move blocked for want of room, said with what to do about it: the active
+ * roster (or the staff, for a pitcher) when he'd join the big-league club, and
+ * the 40-man when he'd need a spot on it. Null when there's room.
+ */
+function roomReason(ctx: RosterContext, team: Team, p: Player, needsForty: boolean, needsActive = true): string | null {
+  const active = team.rosters.MLB.length;
+  const limit = activeLimit(ctx);
+  const arms = activePitchers(ctx.league, team);
+  const activeFull = needsActive && active >= limit;
+  const armsFull = needsActive && Boolean(p.pitching) && arms >= pitcherLimit(ctx);
+  const fortyFull = needsForty && team.fortyMan.length >= FORTY_MAN_LIMIT;
+  const forty = `${team.fortyMan.length}/${FORTY_MAN_LIMIT}`;
+  const someone = armsFull ? "a pitcher" : "someone";
+  if (fortyFull && (activeFull || armsFull)) {
+    const full = activeFull ? `The active roster (${active}/${limit}) and the 40-man (${forty}) are both full` : `The staff already has ${arms} pitchers, the most allowed, and the 40-man is full (${forty})`;
+    return `${full}: designate ${someone} on the big-league roster first, which opens a spot on both.`;
+  }
+  if (activeFull) return `The active roster is full (${active}/${limit}): option or designate ${someone} on the big-league roster first.`;
+  if (armsFull) return `The staff already has ${arms} pitchers, the most allowed: option or designate a pitcher on the big-league roster first.`;
+  if (fortyFull) return `He needs a 40-man spot and the 40-man is full (${forty}): designate a 40-man player first.`;
+  return null;
+}
+
 /** Roster moves the user's club could make with this player right now. */
 export function rosterActions(p: Player, team: Team, ctx: RosterContext): RosterActionOption[] {
   const out: RosterActionOption[] = [];
-  const add = (kind: RosterActionOption["kind"], label: string, check: { ok: boolean; reason?: string }, level?: MinorLevel) =>
+  const add = (kind: RosterActionOption["kind"], label: string, check: Check, level?: MinorLevel) =>
     out.push({ kind, label, ok: check.ok, ...(check.ok ? {} : { reason: check.reason }), ...(level ? { level } : {}) });
+  // The engine says what's full; the panel says what to do about it.
+  const room = (check: Check, needsForty: boolean, needsActive = true): Check =>
+    check.ok || !NO_ROOM.test(check.reason ?? "") ? check : { ok: false, reason: roomReason(ctx, team, p, needsForty, needsActive) ?? check.reason };
 
   if (p.il) {
-    add("activate", "Activate", canActivate(ctx, team, p, "MLB"));
-    add("activateToMinors", "Activate to AAA", canActivate(ctx, team, p, "AAA"));
+    add("activate", "Activate", room(canActivate(ctx, team, p, "MLB"), p.il === "IL60"));
+    add("activateToMinors", "Activate to AAA", room(canActivate(ctx, team, p, "AAA"), p.il === "IL60", false));
     return out;
   }
   if (p.level === "MLB") {
-    add("option", "Option to AAA", canOption(ctx, team, p));
+    const option = canOption(ctx, team, p);
+    // In season, his last option year: after this he can't be sent down without waivers.
+    const last = !ctx.offseason && !p.options.usedThisYear && MAX_OPTION_YEARS - p.options.used === 1;
+    add(
+      "option",
+      last ? "Option to AAA (his last option)" : "Option to AAA",
+      option.ok ? option : { ok: false, reason: option.reason.replace(/can refuse an option\.$/, "can refuse an option, so designating him is the way to send him out.") },
+    );
     if (p.injury && p.injury.daysLeft > 0) add("placeIl", "Place on IL", { ok: true });
     add("dfa", "Designate for assignment", p.onFortyMan ? { ok: true } : { ok: false, reason: "Not on the 40-man." });
     return out;
   }
-  add("callUp", p.onFortyMan ? "Call up" : "Select contract", canCallUp(ctx, team, p));
+  add("callUp", p.onFortyMan ? "Call up" : "Select contract", room(canCallUp(ctx, team, p), !p.onFortyMan));
   const idx = MINOR_LEVELS.indexOf(p.level as MinorLevel);
   if (idx > 0) add("assign", `Promote to ${MINOR_LEVELS[idx - 1]}`, { ok: true }, MINOR_LEVELS[idx - 1]);
   if (idx < MINOR_LEVELS.length - 1) add("assign", `Send to ${MINOR_LEVELS[idx + 1]}`, { ok: true }, MINOR_LEVELS[idx + 1]);
   if (!p.onFortyMan) {
-    add("add40", "Add to 40-man", team.fortyMan.length < FORTY_MAN_LIMIT ? { ok: true } : { ok: false, reason: "The 40-man roster is full." });
+    add("add40", "Add to 40-man", team.fortyMan.length < FORTY_MAN_LIMIT ? { ok: true } : { ok: false, reason: roomReason(ctx, team, p, true, false)! });
     add("release", "Release", { ok: true });
   } else {
     add("dfa", "Designate for assignment", { ok: true });
@@ -561,10 +600,38 @@ export function rosterActions(p: Player, team: Team, ctx: RosterContext): Roster
   return out;
 }
 
+/** Where a starter plays, as the toast after a call-up says it. */
+const SPOT: Record<FieldPosition | "DH", string> = {
+  C: "at catcher",
+  "1B": "at first base",
+  "2B": "at second base",
+  "3B": "at third base",
+  SS: "at shortstop",
+  LF: "in left field",
+  CF: "in center field",
+  RF: "in right field",
+  DH: "as the designated hitter",
+};
+
+/** Where a player just added to the big-league roster fits, from the depth chart his move redrew. */
+function whereHePlays(league: League, team: Team, p: Player, verb: string): string {
+  const d = team.depth;
+  const name = playerName(p);
+  if (p.pitching) return `${name} ${verb} and joins the ${d.rotation.includes(p.id) ? "rotation" : "bullpen"}.`;
+  const slot = d.dh === p.id ? "DH" : FIELD_POSITIONS.find((pos) => d.starters[pos] === p.id);
+  if (slot) return `${name} ${verb} and starts ${SPOT[slot]}.`;
+  const who = team.manualDepth ? "your depth chart has him" : "the manager has him";
+  const pos = p.position === "P" ? null : p.position;
+  const regular = pos === null ? -1 : pos === "DH" ? d.dh : d.starters[pos];
+  const instead = pos !== null && regular >= 0 ? ` (${playerName(league.players[regular]!)} starts ${SPOT[pos]})` : "";
+  return `${name} ${verb}; ${who} on the bench${instead}.`;
+}
+
 /**
  * What a roster move did, in a sentence for the toast, when there's more to
- * it than the move's name: where a designated player went. `logged` is what
- * the move wrote to the transaction log.
+ * it than the move's name: where a designated player went, and where a
+ * player who just joined the big-league club plays. `logged` is what the move
+ * wrote to the transaction log.
  */
 export function rosterMessage(league: League, kind: RosterActionOption["kind"], p: Player, logged: Transaction[]): string | undefined {
   const name = playerName(p);
@@ -572,6 +639,9 @@ export function rosterMessage(league: League, kind: RosterActionOption["kind"], 
     const claim = logged.find((t) => t.type === "claim" && t.playerId === p.id);
     if (claim) return `The ${league.teams[claim.teamId]!.nickname} claimed ${name} off waivers.`;
     if (logged.some((t) => t.type === "outright" && t.playerId === p.id)) return `${name} cleared waivers and was outrighted to AAA.`;
+  }
+  if ((kind === "callUp" || kind === "activate") && p.level === "MLB" && p.teamId !== null) {
+    return whereHePlays(league, league.teams[p.teamId]!, p, kind === "activate" ? "is back" : "is up");
   }
   return undefined;
 }

@@ -222,8 +222,9 @@ the GM:
   wRC+, xwOBA, fielding runs and WAR for hitters; ERA, ERA-, FIP, K%, BB%, WHIP and WAR
   for pitchers) and last season's, sortable, with standout numbers tinted and small
   samples faded. Every legal roster move (call up, select a contract, option, DFA,
-  injured list, promote or demote within the farm, release) is a click away, and moves
-  that aren't allowed say why.
+  injured list, promote or demote within the farm, release) is a click away; moves that
+  aren't allowed say why and where to make room, and a call-up or a designation says how
+  it turned out (where he plays, who claimed him).
 - **Depth chart**: set the lineup, rotation and bullpen order yourself, or leave it to
   the manager. An assistant GM can handle injuries and call-ups until you turn him off.
 - **Player pages**: the scouting report as present/future 20-80 bars, pitch mix, defense

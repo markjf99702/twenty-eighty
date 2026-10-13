@@ -4,11 +4,11 @@ import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { allStarLine } from "../web/src/worker/allstar";
 import { careerLine } from "../web/src/worker/records";
-import { playerView, rosterMessage, StatsCache, transactions } from "../web/src/worker/views";
+import { playerView, rosterActions, rosterMessage, StatsCache, transactions } from "../web/src/worker/views";
 import { budgetRoom } from "../src/org/contracts";
-import { designateForAssignment } from "../src/org/roster";
+import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
 import { playerValue } from "../src/org/value";
-import { playerName } from "../src/players/types";
+import { MAX_OPTION_YEARS, type Player, playerName } from "../src/players/types";
 
 const league = generateLeague({ seed: "player-view" });
 hireGm(league, 3);
@@ -53,6 +53,61 @@ describe("a roster move's toast", () => {
     before = l.transactions.length;
     designateForAssignment(c, mine, fringe, []);
     expect(rosterMessage(l, "dfa", fringe, l.transactions.slice(before))).toBe(`${playerName(fringe)} cleared waivers and was outrighted to AAA.`);
+  });
+});
+
+describe("roster moves on Opening Day", () => {
+  // Every club opens with a full active roster and a full 40-man.
+  const l = generateLeague({ seed: "opening-day-moves" });
+  hireGm(l, 4);
+  const s = new Season(l, { minors: false });
+  const c = s.rosterContext();
+  const team = l.teams[4]!;
+  const all = (ids: number[]) => ids.map((id) => l.players[id]!);
+  const reason = (p: Player, label: RegExp) => rosterActions(p, team, c).find((a) => label.test(a.label))?.reason;
+
+  it("say where to make room", () => {
+    expect([team.rosters.MLB.length, team.fortyMan.length]).toEqual([26, 40]);
+    const onForty = all(team.rosters.AAA).find((p) => p.onFortyMan && !p.pitching)!;
+    expect(reason(onForty, /^Call up$/)).toBe("The active roster is full (26/26): option or designate someone on the big-league roster first.");
+    const arm = all(team.rosters.AAA).find((p) => p.onFortyMan && p.pitching)!;
+    expect(reason(arm, /^Call up$/)).toBe("The active roster is full (26/26): option or designate a pitcher on the big-league roster first.");
+    const off = all(team.rosters.AAA).find((p) => !p.onFortyMan && !p.pitching)!;
+    expect(reason(off, /^Select contract$/)).toBe(
+      "The active roster (26/26) and the 40-man (40/40) are both full: designate someone on the big-league roster first, which opens a spot on both.",
+    );
+    expect(reason(off, /^Add to 40-man$/)).toBe("He needs a 40-man spot and the 40-man is full (40/40): designate a 40-man player first.");
+  });
+
+  it("say how to send down a veteran who can refuse an option, and when an option is his last", () => {
+    const vet = all(team.rosters.MLB).find((p) => p.service >= 5 * 172)!;
+    expect(reason(vet, /^Option to AAA/)).toBe(`${playerName(vet)} has 5+ years of service and can refuse an option, so designating him is the way to send him out.`);
+    const young = all(team.rosters.MLB).find((p) => p.service < 5 * 172 && !p.options.usedThisYear)!;
+    const used = young.options.used;
+    young.options.used = MAX_OPTION_YEARS - 1;
+    expect(rosterActions(young, team, c).find((a) => a.kind === "option")!.label).toBe("Option to AAA (his last option)");
+    young.options.used = MAX_OPTION_YEARS - 2;
+    expect(rosterActions(young, team, c).find((a) => a.kind === "option")!.label).toBe("Option to AAA");
+    young.options.used = used;
+  });
+
+  it("say where a player called up plays", () => {
+    // Room for a hitter and a pitcher: option one of each.
+    const down = (pitcher: boolean) => all(team.rosters.MLB).find((p) => Boolean(p.pitching) === pitcher && p.service < 3 * 172 && p.options.used < MAX_OPTION_YEARS)!;
+    expect(optionPlayer(c, team, down(false)).ok && optionPlayer(c, team, down(true)).ok).toBe(true);
+    for (const pitcher of [false, true]) {
+      const p = all(team.rosters.AAA).find((x) => x.onFortyMan && Boolean(x.pitching) === pitcher && !x.injury && x.optionedDay === null)!;
+      expect(callUp(c, team, p).ok).toBe(true);
+      const msg = rosterMessage(l, "callUp", p, [])!;
+      const d = team.depth;
+      if (pitcher) expect(msg).toBe(`${playerName(p)} is up and joins the ${d.rotation.includes(p.id) ? "rotation" : "bullpen"}.`);
+      else if ([...Object.values(d.starters), d.dh].includes(p.id)) expect(msg).toMatch(new RegExp(`^${playerName(p)} is up and starts (at|in|as) .+\\.$`));
+      else {
+        const regular = p.position === "DH" ? d.dh : d.starters[p.position as Exclude<typeof p.position, "DH" | "P">];
+        expect(msg.startsWith(`${playerName(p)} is up; the manager has him on the bench (${playerName(l.players[regular]!)} starts `)).toBe(true);
+        expect(msg.endsWith(").")).toBe(true);
+      }
+    }
   });
 });
 
