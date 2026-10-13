@@ -2,10 +2,11 @@ import { describe, expect, it } from "vitest";
 import { tradeAdvice, tradeAdviceOn, winsThisSeason } from "../src/advice/trades";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
-import { orgPlayers } from "../src/org/contracts";
+import { orgPlayers, payroll } from "../src/org/contracts";
 import { surplusValue } from "../src/org/trades";
 import { type Player, playerName } from "../src/players/types";
 import { believedWar } from "../src/scouting/analytics";
+import { staffCost } from "../src/scouting/scouting";
 import { Season } from "../src/season/season";
 
 const USER = 6;
@@ -81,6 +82,18 @@ describe("the staff's take on a trade", () => {
       expect(war(next)).toBeGreaterThan(0.5);
       expect(winsThisSeason(season, [cf.id], [prospect.id], fraction)).toBeCloseTo(war(next) * fraction - war(cf) * time(cf), 6);
     });
+  });
+
+  it("says how far over the budget we already are", () => {
+    const budget = mine.budget;
+    mine.budget = Math.round(payroll(league, mine) + staffCost(league, mine) - 20);
+    const pricey = league.players.find(
+      (p) => p.teamId !== null && p.teamId !== USER && p.level === "MLB" && p.contract?.type === "guaranteed" && p.contract.salary >= 5 && p.contract.years >= 2,
+    )!;
+    const take = tradeAdvice(season, [myScrub.id], [pricey.id], fraction)!;
+    mine.budget = budget;
+    const note = take.notes.find((n) => n.from === "business")!.text;
+    expect(note).toMatch(/payroll, and we're already \$20\.0M over the budget\. It also adds \$[\d.]+M to what we owe in later years\.$/);
   });
 
   it("is surer about other clubs' players with a better scouting department, or on Easy", () => {

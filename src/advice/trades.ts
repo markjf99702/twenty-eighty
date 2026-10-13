@@ -136,12 +136,26 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
   const later = future(ins) - future(outs);
   if (Math.abs(payroll) >= 0.25 || Math.abs(later) >= 1) {
     const room = budgetRoom(league, team);
-    const parts: string[] = [];
-    const over = room <= 0.05 ? ", and we're already at the budget" : payroll > room ? `, more than the ${money(room)} of room in the budget` : "";
-    if (payroll >= 0.25) parts.push(`It adds about ${money(payroll)} to ${inSeason ? "what's left of this year's" : "next year's"} payroll${over}`);
-    else if (payroll <= -0.25) parts.push(`It saves about ${money(payroll)} ${inSeason ? "over the rest of this year" : "next year"}`);
-    if (Math.abs(later) >= 1) parts.push(`${parts.length ? "and" : "It"} ${later > 0 ? "adds" : "takes"} ${money(later)} ${later > 0 ? "to" : "off"} what we owe in later years`);
-    notes.push({ from: "business", text: `${parts.join(" ")}.` });
+    const over =
+      payroll < 0.25
+        ? ""
+        : room < -0.05
+          ? `, and we're already ${money(room)} over the budget`
+          : room <= 0.05
+            ? ", and we're already at the budget"
+            : payroll > room
+              ? `, more than the ${money(room)} of room in the budget`
+              : "";
+    const year =
+      payroll >= 0.25
+        ? `It adds about ${money(payroll)} to ${inSeason ? "what's left of this year's" : "next year's"} payroll${over}`
+        : payroll <= -0.25
+          ? `It saves about ${money(payroll)} ${inSeason ? "over the rest of this year" : "next year"}`
+          : "";
+    const owed = Math.abs(later) >= 1 ? `${later > 0 ? "adds" : "takes"} ${money(later)} ${later > 0 ? "to" : "off"} what we owe in later years` : "";
+    // After a word on the budget, the years to come read better as a sentence of their own.
+    const text = !year ? `It ${owed}.` : !owed ? `${year}.` : over ? `${year}. It also ${owed}.` : `${year} and ${owed}.`;
+    notes.push({ from: "business", text });
   }
 
   // Scouting: how well we know who's coming.
