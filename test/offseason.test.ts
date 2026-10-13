@@ -38,6 +38,9 @@ describe("the offseason", () => {
     expect(count("Gold Glove")).toBe(16);
     expect(count("Silver Slugger")).toBe(18);
     for (const a of h.awards.filter((x) => x.name === "Gold Glove")) expect(league.players[a.playerId]!.awards).toContain(`${year} ${league.structure.leagues[a.league]} Gold Glove (${a.pos})`);
+    // Notes write WAR to a tenth and innings as baseball does ("58.2", not "58.7").
+    for (const a of h.awards.filter((x) => /WAR$/.test(x.note))) expect(a.note).toMatch(/ -?\d+\.\d WAR$/);
+    for (const a of h.awards.filter((x) => x.name === "Reliever of the Year")) expect(a.note).toMatch(/^\d+ SV, \d+\.\d\d ERA, \d+ K in \d+(\.[12])? IP$/);
     expect(h.executives).toHaveLength(2);
     expect(h.allStar?.score[0]).not.toBe(h.allStar?.score[1]);
     expect(h.allStar?.mvpTeam).toBe(season.allStar!.mvpTeam);

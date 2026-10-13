@@ -4,6 +4,7 @@ import { defenseGrade } from "../players/defense";
 import { type CareerBatting, type CareerPitching, FIELD_POSITIONS, LEVELS, playerName, type Player } from "../players/types";
 import { mainPosition } from "../season/allstar";
 import type { HitterRow, PitcherRow, Season } from "../season/season";
+import { ipText } from "../stats/career";
 
 /**
  * The permanent record of a finished season: each player's line at every
@@ -102,8 +103,8 @@ export function seasonAwards(league: League, season: Season): Award[] {
     const hitters = stats.hitters.filter((h) => inLeague(h.id, lg) && !league.players[h.id]!.pitching);
     const pitchers = stats.pitchers.filter((p) => inLeague(p.id, lg));
     const slash = (h: (typeof hitters)[number]) => `${f3(h.AVG)}/${f3(h.OBP)}/${f3(h.SLG)}`;
-    const hitterNote = (h: (typeof hitters)[number]) => `${slash(h)}, ${h.line.HR} HR, ${round1(h.WAR)} WAR`;
-    const pitcherNote = (p: (typeof pitchers)[number]) => `${p.line.W}-${p.line.L}, ${p.ERA.toFixed(2)} ERA, ${p.line.SO} K, ${round1(p.WAR)} WAR`;
+    const hitterNote = (h: (typeof hitters)[number]) => `${slash(h)}, ${h.line.HR} HR, ${h.WAR.toFixed(1)} WAR`;
+    const pitcherNote = (p: (typeof pitchers)[number]) => `${p.line.W}-${p.line.L}, ${p.ERA.toFixed(2)} ERA, ${p.line.SO} K, ${p.WAR.toFixed(1)} WAR`;
     const push = (name: Award["name"], id: number, note: string, pos?: Award["pos"]) =>
       awards.push({ name, league: lg, ...(pos ? { pos } : {}), playerId: id, teamId: teamOf(id), note });
     const top = <T,>(rows: T[], score: (r: T) => number) => [...rows].sort((a, b) => score(b) - score(a))[0];
@@ -132,7 +133,7 @@ export function seasonAwards(league: League, season: Season): Award[] {
     // Reliever of the Year: the voters count saves.
     const relievers = pitchers.filter((p) => p.line.GS < p.line.G / 2 && p.IP >= 40);
     const rel = top(relievers, (p) => p.WAR + p.line.SV * 0.08 + (3 - p.ERA) * 0.3);
-    if (rel) push("Reliever of the Year", rel.id, `${rel.line.SV} SV, ${rel.ERA.toFixed(2)} ERA, ${rel.line.SO} K in ${rel.IP.toFixed(1)} IP`);
+    if (rel) push("Reliever of the Year", rel.id, `${rel.line.SV} SV, ${rel.ERA.toFixed(2)} ERA, ${rel.line.SO} K in ${ipText(rel.line.outs)} IP`);
 
     // Gold Gloves: the most fielding runs among regulars at each position, with a little for reputation.
     for (const pos of FIELD_POSITIONS) {
