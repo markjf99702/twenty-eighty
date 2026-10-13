@@ -112,7 +112,7 @@ export function Winter({ status, onWinter, onStatus }: { status: Status; onWinte
       {v.phase === "international" && <International v={v} />}
       {v.phase === "spring" && <Spring status={status} />}
 
-      <div class="start-bar">
+      <div class="start-bar winter-next">
         <span class="dim">{NEXT[v.phase]}</span>
         <button type="button" class="btn primary" disabled={status.owner?.fired} onClick={() => onWinter("advance")}>
           {status.winter?.action}
@@ -233,7 +233,6 @@ function Tenders({ v }: { v: OffseasonView }) {
                   <th class="num" title="Service time">Svc</th>
                   <th class="num" title={GLOSSARY.Proj}>Proj</th>
                   <th class="num">Award</th>
-                  <th>Decision</th>
                 </tr>
               </thead>
               <tbody>
@@ -245,14 +244,9 @@ function Tenders({ v }: { v: OffseasonView }) {
                         {r.line ?? "Barely played last season"}
                         {r.saves >= 0.05 && <span class="arb-saves"> · saves add {$(r.saves)}</span>}
                       </div>
-                    </td>
-                    <td class="num">{r.player.age}</td>
-                    <td class="num">{r.player.status.service}</td>
-                    <td class="num">{fixed(r.war)}</td>
-                    <td class="num">{$(r.salary)}</td>
-                    <td>
+                      {/* The decision sits under his case, where a phone shows it without scrolling the table. */}
                       {v.phase === "review" || v.phase === "tenders" ? (
-                        <div class="seg" role="group" aria-label={`Tender ${r.player.name}`}>
+                        <div class="seg tender-pick" role="group" aria-label={`Tender ${r.player.name}`}>
                           <button type="button" class={r.tender ? "on" : ""} aria-pressed={r.tender} onClick={() => set(r.player.id, true)}>
                             Tender
                           </button>
@@ -260,12 +254,14 @@ function Tenders({ v }: { v: OffseasonView }) {
                             Non-tender
                           </button>
                         </div>
-                      ) : r.tender ? (
-                        "Tendered"
                       ) : (
-                        "Non-tendered"
+                        <div class="arb-case">{r.tender ? "Tendered" : "Non-tendered"}</div>
                       )}
                     </td>
+                    <td class="num">{r.player.age}</td>
+                    <td class="num">{r.player.status.service}</td>
+                    <td class="num">{fixed(r.war)}</td>
+                    <td class="num">{$(r.salary)}</td>
                   </tr>
                 ))}
               </tbody>
@@ -367,7 +363,7 @@ function Draft({ v }: { v: OffseasonView }) {
           "The draft is complete."
         )}
       </div>
-      <div class="grid-2" style={{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)" }}>
+      <div class="grid-2 lead">
         <Section title="Draft board" aside="Best available by projected peak">
           <Table columns={columns} rows={d.board} rowKey={(p) => p.id} limit={30} />
         </Section>
@@ -513,7 +509,7 @@ function International({ v }: { v: OffseasonView }) {
         Bonus pool left: <b>{$(s.pool)}</b>. You've signed {s.signed} of up to {s.maxSignings}. These are 17-year-olds: years away, and
         where a lot of stars come from. They report to Single-A.
       </div>
-      <div class="grid-2" style={{ gridTemplateColumns: "minmax(0, 2fr) minmax(0, 1fr)" }}>
+      <div class="grid-2 lead">
         <Section title="Prospects" aside="Best first">
           <Table columns={columns} rows={s.prospects} rowKey={(p) => p.id} limit={30} empty="Everyone has signed." />
         </Section>
