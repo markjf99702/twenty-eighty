@@ -1376,7 +1376,7 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .offer-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 12px; align-items: baseline; }
 .offer-head b { font-family: var(--display); font-size: 19px; }
 .trade-offer .pitch { margin: 0; max-width: 75ch; }
-.offer-side { display: grid; gap: 4px; min-width: 0; }
+.offer-side { display: grid; gap: 4px; min-width: 0; container: offer-side / inline-size; }
 .offer-side .k { font-family: var(--display); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-3); }
 .offer-side .k .dim { text-transform: none; letter-spacing: 0; font-family: var(--ui); }
 .offer-player {
@@ -1390,6 +1390,12 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .offer-player a { font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .offer-player .num { text-align: right; font-variant-numeric: tabular-nums; }
 .offer-player .contract { grid-column: 2 / -1; font-size: 12.5px; margin-top: -4px; }
+/* A narrow side (a phone, or half a card on a tablet or a small laptop): the name gets a line of its own, the numbers go under it. */
+@container offer-side (max-width: 460px) {
+  .offer-player { grid-template-columns: 2.4em minmax(0, 1fr) auto auto 4.8em; }
+  .offer-player a { grid-column: 2 / -1; white-space: normal; }
+  .offer-player > .dim:not(.contract) { grid-column: 2; }
+}
 .offer-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .traits.picked .trait { cursor: pointer; border-color: var(--accent); background: var(--accent-soft); color: var(--accent-text); font: inherit; font-size: 13px; }
 .traits.picked .trait:hover { border-color: var(--alert); color: var(--alert); }
@@ -1586,7 +1592,7 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .arb-case .arb-saves { color: var(--warn, var(--ink-2)); }
 .tbl .seg.tender-pick { margin-top: 5px; }
 .note .fa-week { margin-bottom: 6px; }
-/* A board's Draft or Sign and Scout, under the name. */
+/* A row's buttons under the name: a board's Draft or Sign and Scout, the block's Trade for. */
 .tbl td.name .row-act { display: flex; gap: 6px; margin-top: 4px; font-weight: 400; }
 .offer-player .line { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: -2px; }
 .staff-take {
@@ -1615,7 +1621,6 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 /* The trade desk's two views, and the players on the block. */
 .desk-switch { margin: -4px 0 14px; }
 .block-about { margin: 0 0 12px; color: var(--ink-2); max-width: 70ch; }
-.block-actions { display: inline-flex; gap: 6px; white-space: nowrap; }
 /* The pick box's label covers its whole cell. */
 .tbl td.pick { position: relative; }
 .tbl td.pick label { display: flex; cursor: pointer; }

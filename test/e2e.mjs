@@ -146,11 +146,47 @@ await page.waitForSelector('.board', { timeout: 20000 });
 assert.ok(await page.title(), 'the page did not load offline');
 await ctx.setOffline(false);
 
+// The trade desk once there's something on it: an offer's players by their full names, and the block's Fit and
+// Trade for in view (Trade for is under the name, since the table scrolls sideways on a phone).
+let offerSeen = false;
+let blockSeen = false;
+const checkDesk = async () => {
+  if (!offerSeen) {
+    await page.goto(base + '#trades');
+    await page.waitForSelector('.trade-bar');
+    if (await page.locator('.trade-offer').count()) {
+      const cut = await page.evaluate(() => [...document.querySelectorAll('.offer-player a')].filter((a) => a.scrollWidth > a.clientWidth + 1).map((a) => a.textContent));
+      assert.deepEqual(cut, [], 'an offer cuts its players\' names short on a phone');
+      await fits('the trade desk with an offer');
+      offerSeen = true;
+    }
+  }
+  if (!blockSeen) {
+    await page.goto(base + '#trades-block');
+    await page.waitForSelector('.block-about');
+    if (await page.locator('main .tbl tbody tr').count()) {
+      const at = await page.evaluate(() => {
+        const box = (el) => { const r = el.getBoundingClientRect(); return { left: Math.round(r.left), right: Math.round(r.right) }; };
+        const wrap = box(document.querySelector('main .tbl-wrap'));
+        const fit = box([...document.querySelectorAll('main .tbl th')].find((th) => th.textContent.startsWith('Fit')));
+        const button = box(document.querySelector('main .tbl tbody tr button[aria-label^="Trade for"]'));
+        return { wrap, fit, button };
+      });
+      const inside = (b) => b.left >= at.wrap.left && b.right <= at.wrap.right;
+      assert.ok(inside(at.fit) && inside(at.button), `On the block, Fit or Trade for is off the edge of the table (${JSON.stringify(at)})`);
+      await fits('the players on the block');
+      blockSeen = true;
+    }
+  }
+};
+
 // The rest of the season (the stops pause it now and then), October, and the winter up to the draft.
 for (let i = 0; i < 40 && !(await board('Start the postseason').count()); i++) {
   await board('To end').click();
   await idle();
+  if (!(offerSeen && blockSeen)) await checkDesk();
 }
+assert.ok(blockSeen, 'nobody was on the block all season');
 await board('Start the postseason').click();
 await board('To the end').click({ timeout: 60000 });
 await board('Start the offseason').click({ timeout: 120000 });

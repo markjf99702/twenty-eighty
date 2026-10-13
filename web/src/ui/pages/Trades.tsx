@@ -330,12 +330,29 @@ function OnTheBlock({ slug, canTrade }: { slug: BlockSlug; canTrade: boolean }) 
       cls: "name",
       sort: (p) => p.name,
       asc: true,
+      // His line this season, then the deal buttons: under the name, so they're in view on a phone.
       render: (p) => (
         <>
           <a href={playerHref(p.id)}>{p.name}</a>
           <span class="stat-brief">{statBrief(p, basics)}</span>
+          <div class="row-act">
+            <button type="button" class="btn small" disabled={!canTrade} aria-label={`Trade for ${p.name}`} onClick={() => tradeFor(p.club.id, [p.id])}>
+              Trade for
+            </button>
+            <button type="button" class="btn small ghost" disabled={!canTrade || asking !== null} onClick={() => ask(p)}>
+              {asking === p.id ? "Asking…" : "What would they want?"}
+            </button>
+          </div>
         </>
       ),
+    },
+    {
+      key: "fit",
+      label: "Fit",
+      title: "Wins a season he'd add over who plays there for you now, by your read",
+      cls: "num",
+      sort: (p) => p.fit,
+      render: (p) => <span class={p.fit >= 0.5 ? "up" : p.fit < 0 ? "neg" : "dim"}>{`${p.fit > 0 ? "+" : ""}${p.fit.toFixed(1)}`}</span>,
     },
     { key: "pos", label: "Pos", render: (p) => p.pos },
     { key: "age", label: "Age", cls: "num", sort: (p) => p.age, asc: true, render: (p) => p.age },
@@ -352,14 +369,6 @@ function OnTheBlock({ slug, canTrade }: { slug: BlockSlug; canTrade: boolean }) 
       ),
     },
     {
-      key: "fit",
-      label: "Fit",
-      title: "Wins a season he'd add over who plays there for you now, by your read",
-      cls: "num",
-      sort: (p) => p.fit,
-      render: (p) => <span class={p.fit >= 0.5 ? "up" : p.fit < 0 ? "neg" : "dim"}>{`${p.fit > 0 ? "+" : ""}${p.fit.toFixed(1)}`}</span>,
-    },
-    {
       key: "surplus",
       label: "Value",
       title: "Surplus value by your read: projected wins over his years of control at $8M a win, minus salary",
@@ -369,20 +378,6 @@ function OnTheBlock({ slug, canTrade }: { slug: BlockSlug; canTrade: boolean }) 
     },
     ...outlookColumns(rows, (p) => p),
     { key: "contract", label: "Contract", render: (p) => <span class="dim">{p.contract?.label ?? "—"}</span> },
-    {
-      key: "deal",
-      label: "",
-      render: (p) => (
-        <span class="block-actions">
-          <button type="button" class="btn small" disabled={!canTrade} aria-label={`Trade for ${p.name}`} onClick={() => tradeFor(p.club.id, [p.id])}>
-            Trade for
-          </button>
-          <button type="button" class="btn small ghost" disabled={!canTrade || asking !== null} onClick={() => ask(p)}>
-            {asking === p.id ? "Asking…" : "What would they want?"}
-          </button>
-        </span>
-      ),
-    },
   ];
 
   return (
