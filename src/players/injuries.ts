@@ -84,13 +84,16 @@ export function rollInjury(p: Player, day: number, rng: Rng): Injury {
   return { name: type.name, days, daysLeft: days, startDay: day };
 }
 
+/** An injury's name inside a sentence: only the first letter drops its capital, so "torn UCL (Tommy John surgery)". */
+export const injuryName = (name: string): string => name.charAt(0).toLowerCase() + name.slice(1);
+
 /**
  * "Hamstring strain" -> "a hamstring strain", "Oblique strain" -> "an oblique
  * strain", but no article for plurals and conditions ("back spasms", "arm
  * fatigue", "elbow inflammation"). "Torn UCL (...)" keeps its acronym.
  */
 export function injuryPhrase(name: string): string {
-  const lower = name.charAt(0).toLowerCase() + name.slice(1);
+  const lower = injuryName(name);
   if (/s$|fatigue$|inflammation$|soreness$|tightness$/.test(lower)) return lower;
   return /^[aeiou]/i.test(lower) ? `an ${lower}` : `a ${lower}`;
 }

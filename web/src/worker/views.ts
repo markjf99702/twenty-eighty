@@ -9,6 +9,7 @@ import { onTheClock as draftClock } from "../../../src/offseason/draft";
 import { careerBatting, careerPitching } from "../../../src/offseason/history";
 import { teamName } from "../../../src/league/types";
 import { defenseGrade } from "../../../src/players/defense";
+import { injuryName } from "../../../src/players/injuries";
 import {
   activeLimit,
   activePitchers,
@@ -1027,7 +1028,7 @@ export function boxScoreView(season: Season, r: GameResult, day: number): BoxSco
     const hrs = batting[i]!.filter((b) => b.hr > 0).map((b) => `${P[b.id]!.lastName}${b.hr > 1 ? ` ${b.hr}` : ""}`);
     if (hrs.length) notes.push(`HR (${teams[i]!.abbrev}): ${hrs.join(", ")}`);
   }
-  for (const inj of r.injuries) notes.push(`Injury: ${playerName(P[inj.playerId]!)}, ${inj.injury.name.toLowerCase()} (~${inj.injury.days} days)`);
+  for (const inj of r.injuries) notes.push(`Injury: ${playerName(P[inj.playerId]!)}, ${injuryName(inj.injury.name)} (~${inj.injury.days} days)`);
   return {
     key: gameKey(day, r.homeId),
     date: dateLabel(season, day),

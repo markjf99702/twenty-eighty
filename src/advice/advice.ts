@@ -12,7 +12,7 @@ import { freeAfterSeason, TRADE_DEADLINE_DAY } from "../org/trades";
 import { canStart, overallGrade } from "../org/value";
 import { boardValue } from "../offseason/draft";
 import type { Tender } from "../offseason/types";
-import { IL_THRESHOLD_DAYS } from "../players/injuries";
+import { IL_THRESHOLD_DAYS, injuryName } from "../players/injuries";
 import { randomName } from "../players/names";
 import { FIELD_POSITIONS, type FieldPosition, type Level, playerName, type Player } from "../players/types";
 import { belief, believedWar, warShift } from "../scouting/analytics";
@@ -173,7 +173,7 @@ function housekeeping(season: Season, team: Team, day: number): void {
       from: "assistant",
       urgent: true,
       title: `${playerName(p)} belongs on the injured list`,
-      text: `${tag(p)} is out about ${inj.daysLeft} days (${inj.name.toLowerCase()}) but still on the active roster. Putting him on the injured list frees his spot for someone who can play.`,
+      text: `${tag(p)} is out about ${inj.daysLeft} days (${injuryName(inj.name)}) but still on the active roster. Putting him on the injured list frees his spot for someone who can play.`,
       href: `#player-${p.id}`,
     });
   }

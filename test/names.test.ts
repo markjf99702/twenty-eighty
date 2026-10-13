@@ -1,8 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { article, withArticle } from "../src/core/text";
 import { generateLeague } from "../src/league/generate";
-import { injuryPhrase } from "../src/players/injuries";
+import { seasonAdvice } from "../src/advice/advice";
+import { tradeAdvice } from "../src/advice/trades";
+import { hireGm } from "../src/finance/owner";
+import { injuryName, injuryPhrase } from "../src/players/injuries";
 import { playerName } from "../src/players/types";
+import { Season } from "../src/season/season";
 
 describe("names", () => {
   it("are unique across a new league, and never a famous real player's", () => {
@@ -22,6 +26,26 @@ describe("injury wording", () => {
     expect(injuryPhrase("Arm fatigue")).toBe("arm fatigue");
     expect(injuryPhrase("Elbow inflammation")).toBe("elbow inflammation");
     expect(injuryPhrase("Torn UCL (Tommy John surgery)")).toBe("a torn UCL (Tommy John surgery)");
+  });
+
+  it("keeps an injury's capitals inside a sentence", () => {
+    const tj = "Torn UCL (Tommy John surgery)";
+    expect(injuryName(tj)).toBe("torn UCL (Tommy John surgery)");
+    const l = generateLeague({ seed: "injury-words" });
+    hireGm(l, 2);
+    const s = new Season(l, { minors: false });
+    const [mine, theirs] = [l.teams[2]!, l.teams[7]!];
+    // The assistant GM's note on a player hurt but still on the active roster.
+    mine.manualRoster = true;
+    const hurt = l.players[mine.rosters.MLB[0]!]!;
+    hurt.injury = { name: tj, days: 369, daysLeft: 369, startDay: 0 };
+    seasonAdvice(s);
+    expect(l.advice.find((a) => a.key.startsWith("il:"))!.text).toContain("is out about 369 days (torn UCL (Tommy John surgery))");
+    // The staff's take on a trade for a hurt player.
+    const theirsHurt = l.players[theirs.rosters.MLB[0]!]!;
+    theirsHurt.injury = { name: tj, days: 320, daysLeft: 320, startDay: 0 };
+    const take = tradeAdvice(s, [mine.rosters.MLB[1]!], [theirsHurt.id], 1)!.notes.map((n) => n.text).join(" ");
+    expect(take).toContain("is hurt (torn UCL (Tommy John surgery), about 320 days to go)");
   });
 });
 

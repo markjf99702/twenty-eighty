@@ -13,6 +13,7 @@ import {
 } from "../players/types";
 import { maxAssignment } from "../core/assignment";
 import { canPlayPosition } from "../players/defense";
+import { injuryName } from "../players/injuries";
 import { autoDepthChart, slotValue } from "./depth";
 import { budgetRoom, ensureMajorContract, followTender, MIN_SALARY, outrightContract } from "./contracts";
 import { peakValue, playerValue } from "./value";
@@ -271,7 +272,7 @@ export function placeOnIl(ctx: RosterContext, team: Team, p: Player, type?: IlTy
   }
   const kind = il === "IL60" ? "60-day" : il === "IL15" ? "15-day" : "10-day";
   p.ilDay = ctx.day;
-  const why = p.injury.name.charAt(0).toLowerCase() + p.injury.name.slice(1);
+  const why = injuryName(p.injury.name);
   logTransaction(ctx.league, ctx.day, team, p, "il-place", `Placed ${label(p)} on the ${kind} injured list (${why})`);
   refreshDepth(ctx.league, team);
   return ok;

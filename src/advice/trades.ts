@@ -5,6 +5,7 @@ import { budgetRoom, pendingContract } from "../org/contracts";
 import { gamesOut } from "../org/offers";
 import { freeAfterSeason, tradeValue } from "../org/trades";
 import { isProspect, overallGrade } from "../org/value";
+import { injuryName } from "../players/injuries";
 import { FIELD_POSITIONS, type FieldPosition, type Level, playerName, type Player } from "../players/types";
 import { belief, believedWar, warShift } from "../scouting/analytics";
 import { ANALYTICS_TIERS, perceive, uncertainty } from "../scouting/scouting";
@@ -125,7 +126,7 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
     break;
   }
   for (const p of ins) {
-    if (p.injury && p.injury.daysLeft > 0) notes.push({ from: "assistant", text: `${playerName(p)} is hurt (${p.injury.name.toLowerCase()}, about ${p.injury.daysLeft} days to go).` });
+    if (p.injury && p.injury.daysLeft > 0) notes.push({ from: "assistant", text: `${playerName(p)} is hurt (${injuryName(p.injury.name)}, about ${p.injury.daysLeft} days to go).` });
     else if (inSeason && freeAfterSeason(p, fraction)) notes.push({ from: "assistant", text: `${playerName(p)} can be a free agent after the season, so he's a rental.` });
   }
 

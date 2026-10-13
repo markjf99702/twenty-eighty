@@ -2,6 +2,7 @@ import { formatPresentFuture, gradeLabel, scoutRound } from "../core/grades";
 import type { League, Team } from "../league/types";
 import { teamName } from "../league/types";
 import { defenseGrade } from "../players/defense";
+import { injuryName } from "../players/injuries";
 import { canBeOptioned } from "../org/roster";
 import {
   FIELD_POSITIONS,
@@ -220,7 +221,7 @@ export function statusNote(p: Player): string {
     notes.push(canBeOptioned(p) ? `${left} option${left === 1 ? "" : "s"} left${p.options.usedThisYear ? " (+this year)" : ""}` : "out of options");
   }
   if (p.il) notes.push(`${p.il}`);
-  if (p.injury) notes.push(`${p.injury.name.charAt(0).toLowerCase()}${p.injury.name.slice(1)}, ${p.injury.daysLeft}d`);
+  if (p.injury) notes.push(`${injuryName(p.injury.name)}, ${p.injury.daysLeft}d`);
   return notes.length ? `  [${notes.join(", ")}]` : "";
 }
 

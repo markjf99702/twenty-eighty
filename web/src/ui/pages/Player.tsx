@@ -1,5 +1,6 @@
 import { useState } from "preact/hooks";
 import { bump, call, useApi } from "../../api/client";
+import { IL_THRESHOLD_DAYS, injuryName } from "../../../../src/players/injuries";
 import type { PriorCareer } from "../../../../src/players/prior";
 import type { CareerLine, PlayerView, StatLine, Status } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
@@ -77,7 +78,8 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
 
       {s.injury && (
         <div class="note alert">
-          {s.il ? `On the ${s.il.replace("IL", "")}-day injured list` : "Day to day"}: {s.injury.name.toLowerCase()}, about {s.injury.daysLeft} day
+          {s.il ? `On the ${s.il.replace("IL", "")}-day injured list` : s.injury.daysLeft >= IL_THRESHOLD_DAYS ? "Hurt, not on the injured list" : "Day to day"}:{" "}
+          {injuryName(s.injury.name)}, about {s.injury.daysLeft} day
           {s.injury.daysLeft === 1 ? "" : "s"} left.
         </div>
       )}
