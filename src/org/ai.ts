@@ -89,16 +89,30 @@ function catchersActive(ctx: RosterContext, team: Team): number {
   return players(ctx, team.rosters.MLB).filter((p) => p.position === "C" && healthy(p)).length;
 }
 
+const ROTATION = 5;
+/** Healthy pitchers on the active roster with a starter's stamina. */
+function startersActive(ctx: RosterContext, team: Team): number {
+  return players(ctx, team.rosters.MLB).filter((p) => isPitcher(p) && canStart(p) && healthy(p)).length;
+}
+
+/** How much a club wants a minor leaguer called up: his value, a nudge for the 40-man and AAA, and the position it needs. */
+function callUpScore(p: Player, opts: AiOptions, preferPos?: FieldPosition): number {
+  return estimate(p, opts.performance) + (p.onFortyMan ? 4 : 0) + (preferPos && p.position === preferPos ? 15 : 0) - (p.level === "AA" ? 6 : 0);
+}
+
 /** Best call-up candidate of a type from the upper minors. */
 function bestCandidate(ctx: RosterContext, team: Team, wantPitcher: boolean, opts: AiOptions, preferPos?: FieldPosition): Player | undefined {
-  const pool = [...players(ctx, team.rosters.AAA), ...players(ctx, team.rosters.AA)].filter(
+  let pool = [...players(ctx, team.rosters.AAA), ...players(ctx, team.rosters.AA)].filter(
     // callUpBest makes room on the 40-man if the choice needs it.
     (p) => isPitcher(p) === wantPitcher && healthy(p) && p.optionedDay !== ctx.day && canCallUp(ctx, team, p, true, true).ok,
   );
   if (pool.length === 0) return undefined;
-  const score = (p: Player) =>
-    estimate(p, opts.performance) + (p.onFortyMan ? 4 : 0) + (preferPos && p.position === preferPos ? 15 : 0) - (p.level === "AA" ? 6 : 0);
-  return pool.reduce((a, b) => (score(b) > score(a) ? b : a));
+  // Short of starters: the call-up is a starter if there is one.
+  if (wantPitcher && startersActive(ctx, team) < ROTATION) {
+    const starters = pool.filter(canStart);
+    if (starters.length > 0) pool = starters;
+  }
+  return pool.reduce((a, b) => (callUpScore(b, opts, preferPos) > callUpScore(a, opts, preferPos) ? b : a));
 }
 
 /** Make room on the 40-man: move a long-term injury to the 60-day list, or DFA the weakest minor leaguer on it. */
@@ -147,9 +161,11 @@ function handleActivations(ctx: RosterContext, team: Team, opts: AiOptions): voi
       if (!hitter) continue;
     }
     // Roster is full: send down the weakest optionable player of the same type,
-    // or DFA the weakest if he's clearly worse than the returning player.
+    // or DFA the weakest if he's clearly worse than the returning player. A
+    // reliever coming back doesn't cost the rotation its fifth starter.
+    const protectStarters = isPitcher(p) && !canStart(p) && startersActive(ctx, team) <= ROTATION;
     const sameType = players(ctx, team.rosters.MLB)
-      .filter((x) => isPitcher(x) === isPitcher(p))
+      .filter((x) => isPitcher(x) === isPitcher(p) && !(protectStarters && canStart(x)))
       .sort((a, b) => estimate(a, opts.performance) - estimate(b, opts.performance));
     const optionable = sameType.find((x) => canOption(ctx, team, x).ok);
     const worst = sameType[0];
@@ -180,6 +196,26 @@ function fillActiveRoster(ctx: RosterContext, team: Team, opts: AiOptions): void
   }
 }
 
+/**
+ * A rotation short of five starters (it opened with four, or a trade took
+ * one): send down the weakest reliever who can go and call up the best
+ * starter from the upper minors. A starter out for a few days still counts.
+ */
+function fillRotation(ctx: RosterContext, team: Team, opts: AiOptions): void {
+  const active = players(ctx, team.rosters.MLB);
+  if (active.filter((p) => isPitcher(p) && canStart(p)).length >= ROTATION) return;
+  const spare = active
+    .filter((p) => isPitcher(p) && !canStart(p) && healthy(p) && canOption(ctx, team, p).ok)
+    .sort((a, b) => estimate(a, opts.performance) - estimate(b, opts.performance))[0];
+  const starters = [...players(ctx, team.rosters.AAA), ...players(ctx, team.rosters.AA)].filter(
+    (p) => isPitcher(p) && canStart(p) && healthy(p) && p.optionedDay !== ctx.day,
+  );
+  if (!spare || starters.length === 0) return;
+  const starter = starters.reduce((a, b) => (callUpScore(b, opts) > callUpScore(a, opts) ? b : a));
+  if (!starter.onFortyMan && !openFortyManSpot(ctx, team, opts)) return;
+  if (optionPlayer(ctx, team, spare).ok) callUp(ctx, team, starter, true);
+}
+
 /** Weekly: swap an underperforming big leaguer for a better AAA option. */
 function performanceMoves(ctx: RosterContext, team: Team, opts: AiOptions): void {
   for (const wantPitcher of [true, false]) {
@@ -188,9 +224,11 @@ function performanceMoves(ctx: RosterContext, team: Team, opts: AiOptions): void
       .sort((a, b) => estimate(a, opts.performance) - estimate(b, opts.performance));
     const candidate = bestCandidate(ctx, team, wantPitcher, opts);
     if (!candidate) continue;
-    // The weakest big leaguer who can go, keeping a second catcher around.
+    // The weakest big leaguer who can go, keeping a second catcher around and
+    // five starters (unless the newcomer can start).
     const protectCatchers = candidate.position !== "C" && catchersActive(ctx, team) <= 2;
-    const incumbent = active.find((p) => !(protectCatchers && p.position === "C"));
+    const protectStarters = wantPitcher && !canStart(candidate) && startersActive(ctx, team) <= ROTATION;
+    const incumbent = active.find((p) => !(protectCatchers && p.position === "C") && !(protectStarters && canStart(p)));
     if (!incumbent) continue;
     const gain = estimate(candidate, opts.performance) - estimate(incumbent, opts.performance);
     const optionable = canOption(ctx, team, incumbent).ok;
@@ -306,8 +344,9 @@ function trimActiveRoster(ctx: RosterContext, team: Team, opts: AiOptions): void
     const tooManyArms = activePitchers(ctx.league, team) > pitcherLimit(ctx);
     if (team.rosters.MLB.length <= activeLimit(ctx) && !tooManyArms) return;
     const protectCatchers = catchersActive(ctx, team) <= 2;
+    const protectStarters = startersActive(ctx, team) <= ROTATION;
     const pool = players(ctx, team.rosters.MLB)
-      .filter((p) => (!tooManyArms || isPitcher(p)) && !(protectCatchers && p.position === "C"))
+      .filter((p) => (!tooManyArms || isPitcher(p)) && !(protectCatchers && p.position === "C") && !(protectStarters && isPitcher(p) && canStart(p)))
       .sort((a, b) => estimate(a, opts.performance) - estimate(b, opts.performance));
     const optionable = pool.find((p) => canOption(ctx, team, p).ok);
     // Option the weakest who can go down; designate the weakest if nobody can (or he's clearly the one to go).
@@ -324,6 +363,7 @@ export function manageOrganization(ctx: RosterContext, team: Team, opts: AiOptio
   handleInjuries(ctx, team, opts);
   handleActivations(ctx, team, opts);
   fillActiveRoster(ctx, team, opts);
+  fillRotation(ctx, team, opts);
   if (opts.weekly) performanceMoves(ctx, team, opts);
   if (opts.farmCheck) farmMoves(ctx, team, opts);
   balanceMinors(ctx, team, opts);

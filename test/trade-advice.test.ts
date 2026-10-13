@@ -4,7 +4,7 @@ import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { orgPlayers, payroll } from "../src/org/contracts";
 import { surplusValue } from "../src/org/trades";
-import { type Player, playerName } from "../src/players/types";
+import { type FieldPosition, type Player, playerName } from "../src/players/types";
 import { believedWar } from "../src/scouting/analytics";
 import { staffCost } from "../src/scouting/scouting";
 import { Season } from "../src/season/season";
@@ -40,9 +40,12 @@ describe("the staff's take on a trade", () => {
   });
 
   it("counts this season's wins while the season is on", () => {
-    // A left fielder well ahead of ours would start, and that shows up this season.
-    const ours = P(mine.depth.starters.LF);
-    const better = league.players.find((p) => p.teamId !== null && p.teamId !== USER && p.level === "MLB" && p.position === "LF" && !p.injury && war(p) > war(ours) + 1)!;
+    // A regular well ahead of ours at his position would start, and that shows up this season.
+    const better = league.players.find(
+      (p) =>
+        p.teamId !== null && p.teamId !== USER && p.level === "MLB" && !p.pitching && !p.injury && p.position !== "DH" &&
+        war(p) > war(P(mine.depth.starters[p.position as FieldPosition])) + 1,
+    )!;
     const a = tradeAdvice(season, [myScrub.id], [better.id], fraction)!;
     expect(a.notes.some((n) => n.text.startsWith("For the rest of this season it makes us about") && n.text.includes("better"))).toBe(true);
   });
@@ -86,7 +89,7 @@ describe("the staff's take on a trade", () => {
 
   it("says how far over the budget we already are", () => {
     const budget = mine.budget;
-    mine.budget = Math.round(payroll(league, mine) + staffCost(league, mine) - 20);
+    mine.budget = payroll(league, mine) + staffCost(league, mine) - 20;
     const pricey = league.players.find(
       (p) => p.teamId !== null && p.teamId !== USER && p.level === "MLB" && p.contract?.type === "guaranteed" && p.contract.salary >= 5 && p.contract.years >= 2,
     )!;
