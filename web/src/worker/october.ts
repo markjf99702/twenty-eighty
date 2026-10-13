@@ -17,6 +17,7 @@ import {
   PLAYOFF_PITCHERS,
   PLAYOFF_ROSTER,
   playoffCandidates,
+  playoffRoster,
   probableStarter,
   seriesOf,
   stillAlive,
@@ -137,7 +138,7 @@ export function postseasonView(season: Season, boxes: Map<string, BoxScoreView>)
       };
     }
     const plan = b.plan;
-    const roster = plan.roster ?? season.team(user).rosters.MLB;
+    const roster = lg >= 0 ? playoffRoster(season, season.team(user), plan) : [];
     mine = {
       seed: lg >= 0 ? b.seeds[lg]!.indexOf(user) + 1 : null,
       alive,

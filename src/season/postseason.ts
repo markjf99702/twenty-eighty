@@ -86,7 +86,7 @@ export interface LiveSeries {
 
 /** The user's club in October: who's on the playoff roster and who starts. */
 export interface PlayoffPlan {
-  /** The playoff roster (null: the active roster as it stands). */
+  /** The playoff roster (null: the one the manager would carry, day by day). */
   roster: number[] | null;
   /** Starters in order; each series starts from the top with whoever is rested (null: the best four). */
   rotation: number[] | null;
@@ -154,31 +154,58 @@ const isPitcher = (p: Player) => Boolean(p.pitching);
 const canCatch = (p: Player) => !p.pitching && (p.position === "C" || p.positions.includes("C"));
 
 /**
- * A club's depth chart for October: its playoff roster (the user's pick, or the
- * active roster), four starters in the rotation (the user's order, or its best
- * four), and the rest of the starters in the bullpen as long men.
+ * The playoff roster each club's manager would carry, by club: picked again
+ * when someone heals or a roster move is made. It's never saved; a reloaded
+ * October picks the same rosters again.
+ */
+const managersPicks = new WeakMap<Season, Map<number, { key: string; roster: number[] }>>();
+
+function managersRoster(season: Season, team: Team): number[] {
+  const healthy = playoffCandidates(season.league, team).filter((p) => !season.isOut(p.id));
+  const key = `${season.league.transactions.length}:${healthy.map((p) => p.id).join(",")}`;
+  let picks = managersPicks.get(season);
+  if (!picks) managersPicks.set(season, (picks = new Map()));
+  const hit = picks.get(team.id);
+  if (hit?.key === key) return hit.roster;
+  const roster = defaultPlayoffRoster(season, team);
+  picks.set(team.id, { key, roster });
+  return roster;
+}
+
+/**
+ * The playoff roster a club carries today: the user's pick, or the one its
+ * manager would carry (the same 26, at most 13 pitchers, for every club).
+ */
+export function playoffRoster(season: Season, team: Team, plan: PlayoffPlan | null = season.bracket?.plan ?? null): number[] {
+  const mine = plan && team.id === season.league.userTeamId ? plan.roster : null;
+  return mine ?? managersRoster(season, team);
+}
+
+/**
+ * A club's depth chart for October: its playoff roster, four starters in the
+ * rotation (the user's order, or its best four), and the rest of the starters
+ * in the bullpen as long men.
  */
 export function playoffDepth(season: Season, team: Team, plan: PlayoffPlan | null): DepthChart {
   const league = season.league;
-  const mine = plan && team.id === league.userTeamId ? plan : null;
-  const roster = mine?.roster ? new Set(mine.roster) : null;
-  const has = (id: number) => id >= 0 && (!roster || roster.has(id));
+  const user = team.id === league.userTeamId;
+  const mine = plan && user ? plan : null;
+  const roster = new Set(playoffRoster(season, team, plan));
+  const has = (id: number) => id >= 0 && roster.has(id);
   let depth = team.depth;
   // The manager draws his October depth chart from the playoff roster, so a
   // regular back from the injured list gets his place back. A chart the user
   // set by hand stands, unless a regular is left off: then the manager redraws it.
-  const handSet = team.manualDepth && Object.values(depth.starters).every(has) && has(depth.dh);
-  if (roster && !handSet) depth = autoDepthChart([...roster].map((id) => league.players[id]!));
+  const handSet = user && team.manualDepth && Object.values(depth.starters).every(has) && has(depth.dh);
+  if (!handSet) depth = autoDepthChart([...roster].map((id) => league.players[id]!));
   const wanted = (mine?.rotation ?? depth.rotation.slice(0, 4)).filter((id) => has(id) && league.players[id]?.pitching);
   const rotation = wanted.length ? wanted : depth.rotation.filter(has).slice(0, 4);
   const inLineup = new Set([...Object.values(depth.starters), depth.dh]);
   const bench = depth.bench.filter(has);
   const bullpen = [...depth.bullpen.filter((id) => has(id) && !rotation.includes(id)), ...depth.rotation.filter((id) => has(id) && !rotation.includes(id))];
-  if (roster) {
-    for (const id of roster) {
-      if (inLineup.has(id) || bench.includes(id) || bullpen.includes(id) || rotation.includes(id)) continue;
-      (isPitcher(league.players[id]!) ? bullpen : bench).push(id);
-    }
+  for (const id of roster) {
+    if (inLineup.has(id) || bench.includes(id) || bullpen.includes(id) || rotation.includes(id)) continue;
+    (isPitcher(league.players[id]!) ? bullpen : bench).push(id);
   }
   return { starters: depth.starters, dh: depth.dh, bench, rotation, bullpen };
 }
@@ -198,7 +225,13 @@ export function playoffCandidates(league: League, team: Team): Player[] {
  */
 export function defaultPlayoffRoster(season: Season, team: Team): number[] {
   const league = season.league;
-  const war = (p: Player) => believedWar(season, team.id, p);
+  // Each read once: sorting asks for them again and again.
+  const wars = new Map<number, number>();
+  const war = (p: Player) => {
+    let w = wars.get(p.id);
+    if (w === undefined) wars.set(p.id, (w = believedWar(season, team.id, p)));
+    return w;
+  };
   const healthy = (p: Player) => !season.isOut(p.id);
   const candidates = playoffCandidates(league, team).filter(healthy);
   const active = candidates.filter((p) => p.level === "MLB");
@@ -235,7 +268,7 @@ export function defaultPlayoffRotation(season: Season, team: Team, roster: numbe
 /** What's wrong with a playoff plan, if anything. */
 export function planProblem(season: Season, team: Team, plan: PlayoffPlan): string | null {
   const league = season.league;
-  const roster = plan.roster ?? team.rosters.MLB;
+  const roster = plan.roster ?? managersRoster(season, team);
   if (plan.roster) {
     if (new Set(plan.roster).size !== plan.roster.length) return "Someone is on the roster twice.";
     const eligible = new Set(playoffCandidates(league, team).map((p) => p.id));

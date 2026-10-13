@@ -30,7 +30,7 @@ const team = season.team(USER);
 
 // Hurt as the regular season ends: the user's best hitter on the 10-day injured
 // list with two days to go, a regular hurt in the last game for two days, and
-// the top seed's best pitcher out another eight.
+// the top seed's best starter on the 15-day list with eight to go.
 const LAST = season.totalDays - 1;
 const hurt = (p: Player, daysLeft: number, startDay = LAST) => {
   p.injury = { name: "Hamstring strain", days: daysLeft + LAST - startDay, daysLeft, startDay };
@@ -47,6 +47,7 @@ hurt(lastGame, 2);
 const topSeed = season.team(playoffSeeds(season)[0]![0]!);
 const ace = topSeed.depth.rotation.map((id) => league.players[id]!).find((p) => !season.isOut(p.id))!;
 hurt(ace, 8);
+placeOnIl(season.rosterContext(), topSeed, ace);
 
 const bracket = startPostseason(season);
 hireGm(league, USER);
@@ -80,6 +81,17 @@ describe("a playoff roster", () => {
     expect(planProblem(season, team, { roster, rotation: [hitter, ...rotation.slice(1)] })).toMatch(/pitchers/);
     const outsider = league.players.find((p) => p.teamId !== USER && p.level === "MLB")!.id;
     expect(planProblem(season, team, { roster: [...roster.slice(1), outsider], rotation })).toMatch(/40-man/);
+  });
+});
+
+describe("every club in October", () => {
+  it("carries 26, at most 13 pitchers", () => {
+    for (const id of bracket.seeds.flat()) {
+      const d = playoffDepth(season, season.team(id), bracket.plan);
+      const carried = new Set([...Object.values(d.starters), d.dh, ...d.bench, ...d.rotation, ...d.bullpen].filter((x) => x >= 0));
+      expect(carried.size).toBe(26);
+      expect([...carried].filter((x) => league.players[x]!.pitching).length).toBeLessThanOrEqual(13);
+    }
   });
 });
 
@@ -160,6 +172,9 @@ describe("October, a game at a time", () => {
     }
     expect(post.series.at(-1)!.round).toBe("World Series");
     expect(post.champion).toBe(post.series.at(-1)!.winner);
+    // The top seed's ace healed on the injured list, and his manager put him back in the rotation.
+    expect(ace.injury).toBeNull();
+    expect(playoffDepth(season, topSeed, bracket.plan).rotation).toContain(ace.id);
     const late = bracket.series.filter((s) => s.round === "Championship Series" || s.round === "World Series");
     for (const s of late) {
       expect(s.mvp).not.toBeNull();
