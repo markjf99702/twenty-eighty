@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import { generateLeague } from "../src/league/generate";
 import type { League, Team } from "../src/league/types";
+import { budgetRoom, payroll } from "../src/org/contracts";
 import { slotValue } from "../src/org/depth";
 import {
   activateFromIl,
@@ -12,7 +13,9 @@ import {
   rosterProblems,
   type RosterContext,
 } from "../src/org/roster";
+import { playerValue } from "../src/org/value";
 import { FIELD_POSITIONS, type Player } from "../src/players/types";
+import { staffCost } from "../src/scouting/scouting";
 
 let league: League;
 let team: Team;
@@ -106,6 +109,23 @@ describe("roster rules", () => {
     expect(fringe.onFortyMan).toBe(false);
     expect(fringe.level).toBe("AAA");
     expect(team.fortyMan).toHaveLength(39);
+  });
+
+  it("lets a club claim a player off waivers only if it can afford his contract", () => {
+    // A good big leaguer on a big guaranteed deal, and two clubs with a 40-man spot open.
+    const vet = team.rosters.MLB.map(player).reduce((a, b) => (playerValue(b) > playerValue(a) ? b : a));
+    vet.contract = { type: "guaranteed", salary: 12, years: 3, signed: league.year - 1, total: 48 };
+    const [broke, flush] = [league.teams[1]!, league.teams[2]!];
+    for (const club of [broke, flush]) {
+      const spare = club.fortyMan.map(player).find((p) => p.level !== "MLB" && !p.il)!;
+      designateForAssignment(ctx, club, spare, []);
+    }
+    broke.budget = payroll(league, broke) + staffCost(league, broke) - 1;
+    flush.budget = payroll(league, flush) + staffCost(league, flush) + 30;
+    expect(budgetRoom(league, broke)).toBeLessThan(0);
+    designateForAssignment(ctx, team, vet, [broke, flush]);
+    expect(vet.teamId).toBe(flush.id);
+    expect(league.transactions.at(-1)?.text).toMatch(/^Claimed/);
   });
 
   it("logs every move", () => {

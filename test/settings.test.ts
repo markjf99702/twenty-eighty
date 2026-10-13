@@ -86,7 +86,7 @@ describe("difficulty", () => {
 
 describe("staff advice", () => {
   const league = generateLeague({ seed: "advice" });
-  hireGm(league, 4);
+  hireGm(league, 0);
   const season = new Season(league, { minors: false });
   season.simToEnd();
 

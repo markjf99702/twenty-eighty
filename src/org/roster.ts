@@ -14,7 +14,7 @@ import {
 import { maxAssignment } from "../core/assignment";
 import { canPlayPosition } from "../players/defense";
 import { autoDepthChart, slotValue } from "./depth";
-import { ensureMajorContract, outrightContract } from "./contracts";
+import { budgetRoom, ensureMajorContract, MIN_SALARY, outrightContract } from "./contracts";
 import { peakValue, playerValue } from "./value";
 
 /**
@@ -343,6 +343,12 @@ function weakestFortyMan(league: League, team: Team): number {
   return worst;
 }
 
+/** What claiming him adds to a payroll beyond a minimum-salary player: a guaranteed or arbitration salary over the minimum. */
+function claimCost(p: Player): number {
+  const c = p.contract;
+  return c && (c.type === "guaranteed" || c.type === "arb") ? Math.max(0, c.salary - MIN_SALARY) : 0;
+}
+
 export function designateForAssignment(
   ctx: RosterContext,
   team: Team,
@@ -358,11 +364,14 @@ export function designateForAssignment(
   const wasMlb = p.level === "MLB";
   logTransaction(league, ctx.day, team, p, "dfa", `Designated ${label(p)} for assignment`);
 
-  // Waivers: the first club (worst record first) that wants him and has room claims him.
+  // Waivers: the first club (worst record first) that wants him, has room
+  // and can fit his salary in its budget claims him.
   const value = playerValue(p);
+  const cost = claimCost(p);
   for (const other of waiverOrder) {
     if (other.id === team.id || other.fortyMan.length >= FORTY_MAN_LIMIT) continue;
     if (value <= weakestFortyMan(league, other) + 4) continue;
+    if (cost > Math.max(0, budgetRoom(league, other))) continue;
     for (const level of Object.keys(team.rosters) as Level[]) removeFrom(team.rosters[level], p.id);
     p.teamId = other.id;
     other.fortyMan.push(p.id);
