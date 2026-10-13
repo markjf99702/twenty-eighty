@@ -131,7 +131,8 @@ export function goalLabel(g: OwnerGoal): string {
     case "attendance":
       return `Draw ${(g.target / 1e6).toFixed(2)} million fans`;
     case "youth":
-      return `Give ${g.target} players 25 or younger regular big-league work`;
+      // What counts: youngRegulars' bar, in innings for pitchers.
+      return `Give ${g.target} players 25 or younger regular big-league work (${YOUTH_PA} PA or ${YOUTH_OUTS / 3} IP each)`;
     case "budget":
       return `Stay within the $${g.target}M budget`;
   }

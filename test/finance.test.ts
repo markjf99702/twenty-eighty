@@ -165,6 +165,10 @@ describe("the owner's goals during the season", () => {
     return m ? (m[1] ? -1 : 1) * Number(m[2]) : NaN;
   };
 
+  it("says what counts toward the youth goal", () => {
+    expect(card().youth!.label).toBe("Give 2 players 25 or younger regular big-league work (150 PA or 40 IP each)");
+  });
+
   it("paces profit from the business office's projection, and waits for some games to pace the rest", () => {
     s.simDays(1);
     const goals = card();
