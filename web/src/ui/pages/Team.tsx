@@ -253,6 +253,11 @@ function Depth({ d }: { d: TeamView }) {
     bump();
   };
 
+  const handBack = async () => {
+    await call("setFlags", { manualDepth: false });
+    bump();
+  };
+
   const slotId = (slot: (typeof SLOTS)[number]) => (slot === "DH" ? depth.dh : depth.starters[slot]);
 
   const setLineup = (slot: (typeof SLOTS)[number], id: number) => {
@@ -297,9 +302,16 @@ function Depth({ d }: { d: TeamView }) {
     <>
       {d.isUser ? (
         <div class="note">
-          {d.manualDepth
-            ? "You're setting the depth chart. Changes save immediately; the manager only fills holes when a player leaves the roster."
-            : "The manager is setting the depth chart. Change any slot to take it over."}
+          {d.manualDepth ? (
+            <>
+              You're setting the depth chart. Changes save immediately; the manager only fills holes when a player leaves the roster.{" "}
+              <button type="button" class="btn small" onClick={handBack}>
+                Let the manager set it
+              </button>
+            </>
+          ) : (
+            "The manager is setting the depth chart. Change any slot to take it over."
+          )}
         </div>
       ) : (
         <div class="note">This is how their manager lines them up today.</div>

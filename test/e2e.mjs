@@ -89,6 +89,16 @@ assert.match(asked, /Designate .+ for assignment\?/, 'designating a player did n
 await page.locator('tr.expand button', { hasText: 'Not yet' }).click();
 await page.waitForSelector('tr.expand .actions');
 await fits('the roster with a player\'s moves open');
+// One change to the depth chart makes it yours, and one tap hands it back to the manager.
+await page.goto(base + mine + '-depth');
+await page.locator('.depth button[aria-label="Move down"]').first().click();
+const handBack = page.locator('.note button', { hasText: 'Let the manager set it' });
+await handBack.waitFor({ timeout: 10000 });
+await fits('the depth chart');
+await handBack.click();
+await page.locator('.note', { hasText: 'The manager is setting the depth chart' }).waitFor({ timeout: 10000 });
+await page.goto(base + mine);
+await page.waitForSelector('.tbl tbody tr');
 await page.locator('.tbl td.name a').first().click();
 await page.waitForSelector('.player-head h1');
 await fits('a player page');
