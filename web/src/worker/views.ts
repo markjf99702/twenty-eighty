@@ -125,10 +125,10 @@ const WINTER_LABELS: Record<string, [string, string]> = {
 
 const f3 = (x: number) => (Number.isFinite(x) ? x.toFixed(3).replace(/^(-?)0\./, "$1.") : "---");
 
-/** Per-level season stats, cached until the next simulated day. */
 /** How much of a season a trade counts now: what's left of this one, or in the winter all of the next. */
 export const deskFraction = (season: Season): number => (season.league.offseason ? 1 : Math.max(0, 1 - season.day / season.totalDays));
 
+/** Per-level season stats, cached until the next simulated day. */
 export class StatsCache {
   private cache = new Map<Level, { day: number; stats: SeasonStats; hit: Map<number, number>; pit: Map<number, number> }>();
 
