@@ -953,6 +953,8 @@ export interface OwnerView {
   mood: string;
   hired: number;
   seasons: number;
+  /** Seasons a new GM can't be fired in, on this difficulty. */
+  graceSeasons: number;
   expectedWins: number | null;
   goalYear: number;
   goals: GoalView[];

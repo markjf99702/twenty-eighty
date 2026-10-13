@@ -16,6 +16,7 @@ import {
 } from "../../../src/finance/finance";
 import { goalLabel, goalProgress, mood, OWNER_PATIENCE, STYLE_LABEL, youngRegulars } from "../../../src/finance/owner";
 import type { FinanceYear, GoalResult, Ledger, Owner } from "../../../src/finance/types";
+import { dials } from "../../../src/league/settings";
 import type { League, Team } from "../../../src/league/types";
 import { WINTER_DAYS } from "../../../src/offseason/offseason";
 import { payroll } from "../../../src/org/contracts";
@@ -260,6 +261,7 @@ export function ownerView(season: Season): OwnerView | null {
     mood: mood(gm.confidence),
     hired: gm.hired,
     seasons: gm.seasons,
+    graceSeasons: dials(league).graceSeasons,
     expectedWins: stale ? null : gm.expectedWins,
     goalYear: stale ? league.year + 1 : gm.goalYear,
     goals: goalViews(league, season),

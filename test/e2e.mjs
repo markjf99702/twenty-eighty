@@ -112,6 +112,12 @@ await fits('the players on the block');
 await page.locator('.desk-switch button', { hasText: 'Make a deal' }).click();
 await page.waitForSelector('.trade-bar');
 
+// The owner's office says when a new GM can be let go (Normal: only below 10 in the first season).
+await page.goto(base + '#owner');
+await page.waitForSelector('.meter-wrap');
+assert.match(await page.textContent('main'), /below 10 in your first season/, 'the owner\'s office misstates when a new GM can be fired');
+await fits('the owner\'s office');
+
 // The league saves itself: a reload comes back to the same club.
 await page.reload();
 const nickname = club.split(' ').at(-1);

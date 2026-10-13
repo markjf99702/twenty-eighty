@@ -11,6 +11,14 @@ const WEIGHT: [number, string][] = [
 ];
 const weightWord = (w: number) => WEIGHT.find(([min]) => w >= min)![1];
 
+const NUMBERS = ["no", "one", "two", "three", "four", "five"];
+
+/** When the owner can let you go: on Easy not for a few seasons; otherwise a first-year GM only for a disaster. */
+function firingRule(grace: number): string {
+  if (grace > 0) return `Fall below 20 and you're out, though not in your first ${NUMBERS[grace] ?? grace} seasons.`;
+  return "Fall below 20 and you're out (below 10 in your first season).";
+}
+
 /** Where the owner's confidence stands, with the firing line marked. */
 export function ConfidenceMeter({ value, mood }: { value: number; mood: string }) {
   const tone = value < 30 ? "bad" : value < 45 ? "warn" : "ok";
@@ -126,7 +134,7 @@ export function Owner({ onStatus }: { onStatus: (s: Status) => void }) {
           <ConfidenceMeter value={v.confidence} mood={v.mood} />
           <p class="dim small" style={{ margin: 0 }}>
             Each winter the owner reviews your season: the goals below, your wins against the preseason projection, the postseason,
-            and whether you kept to the budget. Fall below 20 and you're out (a first-year GM gets some rope).
+            and whether you kept to the budget. {firingRule(v.graceSeasons)}
           </p>
         </Section>
         <Section title={`${v.goalYear} goals`}>
@@ -151,7 +159,7 @@ export function Owner({ onStatus }: { onStatus: (s: Status) => void }) {
         </Section>
         <Section title="Season reviews">
           {v.reviews.length === 0 ? (
-            <div class="empty">Your first review comes after the World Series.</div>
+            <div class="empty">Your first review comes when the offseason starts, after the World Series.</div>
           ) : (
             v.reviews.map((r) => (
               <div class="review" key={r.year}>
