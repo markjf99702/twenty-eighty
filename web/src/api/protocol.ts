@@ -976,7 +976,8 @@ export interface OwnerView {
   expectedWins: number | null;
   goalYear: number;
   goals: GoalView[];
-  messages: { date: string; tone: "good" | "bad" | "neutral"; text: string }[];
+  /** Newest first; `year` and `day` are when it was written (winter days run past the season's). */
+  messages: { date: string; year: number; day: number; tone: "good" | "bad" | "neutral"; text: string }[];
   reviews: ReviewView[];
   fired: boolean;
   offers: { team: TeamRef; record: string; market: number; budget: number; owner: OwnerCard; farm: number }[];

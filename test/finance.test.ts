@@ -204,6 +204,12 @@ describe("the owner's goals during the season", () => {
     l.gm!.teamId = seeded[0]!;
     expect(["met", "missed"]).toContain(card().profit!.status);
   });
+
+  it("dates the owner's midseason letter, for the front office to show it for two weeks", () => {
+    const letter = ownerView(s)!.messages.find((m) => m.text.startsWith("We're on pace for"))!;
+    expect(letter).toMatchObject({ year: l.year, day: Math.floor(s.totalDays / 2) });
+    expect(letter.date).toBe(`${letter.date.split(",")[0]}, ${l.year}`);
+  });
 });
 
 describe("the owner", () => {

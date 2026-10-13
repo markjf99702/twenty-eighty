@@ -271,6 +271,8 @@ export function ownerView(season: Season): OwnerView | null {
           : m.day >= season.totalDays
             ? `Winter ${m.year}-${String(m.year + 1).slice(2)}`
             : `${dateLabel(season, m.day)}, ${m.year}`,
+      year: m.year,
+      day: m.day,
       tone: m.tone,
       text: m.text,
     })),

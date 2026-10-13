@@ -182,8 +182,9 @@ the GM:
   prospects, your moves, and the league's headlines: trades, extensions, big free-agent
   deals, top picks and top prospects' debuts, injuries that change a season. The full
   wire (every big-league move, or everything down to minor league shuffles) is a click
-  away. For two weeks after the All-Star Game, its score, MVP and your All-Stars. **Around
-  the league** lists the latest moments.
+  away. For two weeks after the All-Star Game, its score, MVP and your All-Stars, and
+  after the owner's midseason letter, the letter. **Around the league** lists the latest
+  moments.
 - **Moments**, noticed game by game: no-hitters and perfect games (combined ones too; nine
   innings or more without a hit), cycles, four-homer games, 17-strikeout games, hitting
   streaks from 25 games on, career milestones (300/400/500 homers, 2,000 hits, 200 wins,

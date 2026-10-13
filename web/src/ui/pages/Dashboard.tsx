@@ -154,6 +154,19 @@ function AllStarNote({ day }: { day: number }) {
   );
 }
 
+/** For two weeks after the owner writes during the season (the midseason check-in), the letter. */
+function OwnerNote({ year, day }: { year: number; day: number }) {
+  const view = useApi("owner", undefined);
+  const m = view.data?.messages[0];
+  // Opening Day's letters (the welcome and the goals) are already on this page.
+  if (!m || m.year !== year || m.day <= 0 || m.day > day || day > m.day + 14) return null;
+  return (
+    <div class={`note${m.tone === "bad" ? " warn" : ""}`}>
+      <b>From the owner, {m.date.replace(/, \d{4}$/, "")}:</b> {m.text} <a href={href({ page: "owner" })}>Owner's office</a>
+    </div>
+  );
+}
+
 export function Dashboard({ status }: { status: Status }) {
   const view = useApi("dashboard", undefined);
   if (view.error) return <ErrorNote error={view.error} />;
@@ -219,6 +232,7 @@ export function Dashboard({ status }: { status: Status }) {
         </div>
       )}
       {status.phase === "regular" && <AllStarNote day={status.day ?? 0} />}
+      {status.phase === "regular" && status.owner && <OwnerNote year={status.year ?? 0} day={status.day ?? 0} />}
       {status.owner?.fired && (
         <div class="note alert">
           You've been let go. <a href={href({ page: "owner" })}>See which clubs called</a>.
