@@ -2,7 +2,9 @@ import { describe, expect, it } from "vitest";
 import { Rng } from "../src/core/rng";
 import { generateLeague } from "../src/league/generate";
 import type { League, Team } from "../src/league/types";
+import { springTraining } from "../src/offseason/spring";
 import { manageOrganization } from "../src/org/ai";
+import { seasonWar } from "../src/org/contracts";
 import { canStart } from "../src/org/value";
 import type { Player } from "../src/players/types";
 
@@ -68,5 +70,24 @@ describe("AI rotations", () => {
       manageOrganization({ league, day: 1, expanded: false }, team, { weekly: false, farmCheck: false, waiverOrder: league.teams, rng: new Rng(`fifth-${team.id}`) });
     }
     expect(short.filter((t) => startersActive(league, t).length < 5).map((t) => t.abbrev)).toEqual([]);
+  });
+});
+
+describe("spring training", () => {
+  it("places farm pitchers by their wins in their role, so useful starters aren't buried under relievers", () => {
+    const league = generateLeague({ seed: "spring-farm" });
+    springTraining({ league, day: 0, expanded: false }, league.teams);
+    const buried: string[] = [];
+    for (const team of league.teams) {
+      const arms = (level: "AAA" | "AA" | "A+" | "A") => team.rosters[level].map((id) => league.players[id]!).filter((p) => p.pitching);
+      const aaa = arms("AAA");
+      const weakest = aaa.reduce((a, b) => (seasonWar(b) < seasonWar(a) ? b : a));
+      for (const p of [...arms("AA"), ...arms("A+"), ...arms("A")]) {
+        if (p.age >= 21 && seasonWar(p) > seasonWar(weakest) + 0.5) {
+          buried.push(`${team.abbrev}: ${p.role} ${p.lastName} (${seasonWar(p).toFixed(1)} WAR) in ${p.level}, ${weakest.role} ${weakest.lastName} (${seasonWar(weakest).toFixed(1)}) in AAA`);
+        }
+      }
+    }
+    expect(buried).toEqual([]);
   });
 });

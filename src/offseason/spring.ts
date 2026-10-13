@@ -1,5 +1,5 @@
 import type { League, Team } from "../league/types";
-import { ensureMajorContract } from "../org/contracts";
+import { ensureMajorContract, seasonWar } from "../org/contracts";
 import { designateForAssignment, FORTY_MAN_LIMIT, refreshDepth, releasePlayer, type RosterContext } from "../org/roster";
 import { canStart, peakValue, playerValue } from "../org/value";
 import { defenseGrade } from "../players/defense";
@@ -182,7 +182,9 @@ function reorganize(ctx: RosterContext, team: Team): void {
   const keep = farm.filter((p, i) => p.onFortyMan || i < capacity);
   const cut = farm.filter((p) => !keep.includes(p));
   for (const kind of [true, false]) {
-    let pool = keep.filter((p) => Boolean(p.pitching) === kind).sort((a, b) => playerValue(b) - playerValue(a));
+    // Pitchers by wins in their role: a below-average starter still outranks a replacement-level reliever.
+    const rank = (p: Player) => (p.pitching ? seasonWar(p) : playerValue(p));
+    let pool = keep.filter((p) => Boolean(p.pitching) === kind).sort((a, b) => rank(b) - rank(a));
     for (const level of MINOR_LEVELS) {
       const last = level === "A";
       const eligible = pool.filter((p) => p.age >= MIN_AGE[level]);
