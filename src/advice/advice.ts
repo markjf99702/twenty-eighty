@@ -145,10 +145,20 @@ export function seasonAdvice(season: Season): void {
   if (team.manualRoster) housekeeping(season, team, day);
   if (day % 7 === 6 && team.manualRoster) callUps(season, team, day);
   if (day >= 95 && day < TRADE_DEADLINE_DAY && (day % 7 === 6 || day === TRADE_DEADLINE_DAY - 7)) deadline(season, team, day);
+  // The owner counts every dollar over the budget, so the business office says so from the first day.
+  if (day <= 1) budget(season, team, day);
   if (day >= 40 && day % 28 === 27) {
     analytics(season, team, day);
     business(season, team, day);
   }
+}
+
+/** Opening Day, before the first game (a new GM, or a new season): what the staff wants known from the start. */
+export function openingDayAdvice(season: Season): void {
+  const league = season.league;
+  const user = league.userTeamId;
+  if (user === null || league.offseason || !settingsOf(league).advice || league.gm?.fired) return;
+  budget(season, league.teams[user]!, season.day);
 }
 
 /** When the user runs the roster: players hurt on the active roster, and rule problems. */
@@ -378,17 +388,25 @@ function business(season: Season, team: Team, day: number): void {
       });
     }
   }
+  budget(season, team, day);
+}
+
+/** Payroll and the front office over the owner's budget: said once a season. */
+function budget(season: Season, team: Team, day: number): void {
+  const league = season.league;
   const spend = payroll(league, team) + staffCost(league, team);
-  if (spend > team.budget * 1.02) {
-    add(league, day, {
-      key: `budget:${league.year}`,
-      from: "business",
-      urgent: false,
-      title: "We're over budget",
-      text: `Payroll and the front office come to ${money(spend)} against a ${money(team.budget)} budget. The owner will hold the overage against us at season's end.`,
-      href: "#finances",
-    });
-  }
+  if (spend <= team.budget * 1.02) return;
+  add(league, day, {
+    key: `budget:${league.year}`,
+    from: "business",
+    urgent: false,
+    title: "We're over budget",
+    text:
+      day <= 1
+        ? `We open the season ${money(spend - team.budget)} over the owner's $${team.budget}M budget: payroll and the front office come to ${money(spend)}. The owner will hold the overage against us at season's end, and trading salary away is the surest way under.`
+        : `Payroll and the front office come to ${money(spend)} against a $${team.budget}M budget. The owner will hold the overage against us at season's end.`,
+    href: "#finances",
+  });
 }
 
 // ---------------------------------------------------------------------------

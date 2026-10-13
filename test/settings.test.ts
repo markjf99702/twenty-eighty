@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { seasonAdvice, winterAdvice } from "../src/advice/advice";
+import { openingDayAdvice, seasonAdvice, winterAdvice } from "../src/advice/advice";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { DIFFICULTY } from "../src/league/settings";
+import type { League } from "../src/league/types";
+import { payroll } from "../src/org/contracts";
 import { evaluateTrade, surplusValue, TRADE_DEADLINE_DAY } from "../src/org/trades";
 import { advanceOffseason, beginOffseason, offerClock } from "../src/offseason/offseason";
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
-import { uncertainty } from "../src/scouting/scouting";
+import { staffCost, uncertainty } from "../src/scouting/scouting";
 import { runPostseason } from "../src/season/postseason";
 import { Season } from "../src/season/season";
 
@@ -111,6 +113,13 @@ describe("staff advice", () => {
     expect(league.advice.some((a) => a.key.startsWith("fa:"))).toBe(true);
   });
 
+  it("opens the next season with a word on the budget when we're over it", () => {
+    league.teams[league.userTeamId!]!.budget = 50;
+    let next: Season | null = null;
+    while (!next) next = advanceOffseason(league, season);
+    expect(league.advice.some((a) => a.key === `budget:${league.year}` && a.at === 0 && a.text.startsWith("We open the season"))).toBe(true);
+  });
+
   it("doesn't talk up trade value once the deadline has passed", () => {
     const late = generateLeague({ seed: "advice" });
     hireGm(late, 9);
@@ -124,12 +133,37 @@ describe("staff advice", () => {
     }
   });
 
+  /** A club whose payroll and front office already run past its budget. */
+  const overBudget = (l: League) => l.teams.find((t) => payroll(l, t) + staffCost(l, t) > t.budget * 1.05)!.id;
+
   it("stays quiet when advice is off", () => {
     const quiet = generateLeague({ seed: "advice" });
     quiet.settings.advice = false;
-    hireGm(quiet, 4);
+    hireGm(quiet, overBudget(quiet));
     const s = new Season(quiet, { minors: false });
+    openingDayAdvice(s);
     s.simDays(60);
     expect(quiet.advice).toEqual([]);
+  });
+
+  it("tells a new GM on Opening Day that the club is over budget, once", () => {
+    const l = generateLeague({ seed: "advice" });
+    hireGm(l, overBudget(l));
+    const s = new Season(l, { minors: false });
+    openingDayAdvice(s);
+    const notes = () => l.advice.filter((a) => a.key === `budget:${l.year}`);
+    expect(notes()).toHaveLength(1);
+    expect(notes()[0]!.at).toBe(0);
+    expect(notes()[0]!.text).toMatch(/^We open the season \$[\d.]+M over the owner's \$\d+M budget/);
+    s.simDays(2);
+    expect(notes()).toHaveLength(1);
+  });
+
+  it("says so after the first day's games even when nobody asked on Opening Day", () => {
+    const l = generateLeague({ seed: "advice" });
+    hireGm(l, overBudget(l));
+    const s = new Season(l, { minors: false });
+    s.simDays(1);
+    expect(l.advice.some((a) => a.key === `budget:${l.year}` && a.at === 0)).toBe(true);
   });
 });

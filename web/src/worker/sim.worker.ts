@@ -5,7 +5,7 @@
  */
 import { bestTicketPrice } from "../../../src/finance/finance";
 import { acceptJob, hireGm } from "../../../src/finance/owner";
-import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
+import { openingDayAdvice, STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
 import { generateLeague } from "../../../src/league/generate";
 import { answerOffer } from "../../../src/org/offers";
@@ -384,6 +384,7 @@ const handlers: Handlers = {
     hireGm(l, teamId);
     league = l;
     season = new Season(l, { minors });
+    openingDayAdvice(season);
     attach(season);
     await persist();
     return currentStatus();

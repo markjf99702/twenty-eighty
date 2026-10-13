@@ -1,5 +1,5 @@
 import { holdHallVote } from "./hall";
-import { winterAdvice } from "../advice/advice";
+import { openingDayAdvice, winterAdvice } from "../advice/advice";
 import { clamp } from "../core/math";
 import { closeBooks, priceTickets } from "../finance/finance";
 import { acceptJob, reviewSeason, setGoals } from "../finance/owner";
@@ -293,8 +293,9 @@ function startSeason(league: League, minors: boolean): Season {
  */
 export function advanceOffseason(league: League, season: Season): Season | null {
   const next = advancePhase(league, season);
-  // The staff's notes for the phase that just opened.
-  if (!next) winterAdvice(league, season, offerClock(league, season));
+  // The staff's notes for the phase that just opened, or for Opening Day.
+  if (next) openingDayAdvice(next);
+  else winterAdvice(league, season, offerClock(league, season));
   return next;
 }
 
