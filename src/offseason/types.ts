@@ -63,7 +63,8 @@ export interface FreeAgencyState {
   asks: FreeAgentAsk[];
   /** The user's standing offers, resolved at the end of each week. */
   offers: FreeAgentAsk[];
-  signings: { playerId: number; teamId: number; years: number; salary: number; week: number }[];
+  /** `byUser` marks the user's own offers (the user's club's other signings are the assistant GM's). */
+  signings: { playerId: number; teamId: number; years: number; salary: number; week: number; byUser?: true }[];
 }
 
 export interface InternationalState {

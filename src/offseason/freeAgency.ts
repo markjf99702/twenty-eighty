@@ -122,14 +122,17 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
     bids.set(playerId, list);
   };
   for (const o of state.offers) if (user !== null && asks.has(o.playerId)) bid(o.playerId, { teamId: user, years: o.years, salary: o.salary });
+  // The user's offers still out: a season's salary and a 40-man spot each, which the assistant GM leaves alone.
+  const stillOut = () => state.offers.filter((o) => league.freeAgents.includes(o.playerId));
+  const promised = () => stillOut().reduce((sum, o) => sum + o.salary, 0);
 
-  // The user's club shops too when the assistant GM is running its roster.
+  // The user's club shops too when the assistant GM is running its roster, with what the user's offers leave.
   const clubs = rng.shuffle(league.teams.filter((t) => t.id !== user || !t.manualRoster));
   const userOffers = new Set(state.offers.map((o) => o.playerId));
   for (const team of clubs) {
     // Late in the winter, clubs will stretch a little past budget for a bargain.
     const stretch = state.week >= state.weeks / 2 ? 0.05 * team.budget : 0;
-    const room = budgetRoom(league, team) + stretch - 3;
+    const room = budgetRoom(league, team) + stretch - 3 - (team.id === user ? promised() : 0);
     if (room < MIN_SALARY) continue;
     const need = incumbents(league, team);
     const pay = wealth(team);
@@ -164,9 +167,12 @@ export function freeAgencyWeek(ctx: RosterContext, state: FreeAgencyState, rng: 
       const team = league.teams[b.teamId]!;
       const stretch = state.week >= state.weeks / 2 ? 0.05 * team.budget : 0;
       const assistant = b.teamId !== user || !userOffers.has(playerId);
-      if (assistant && (budgetRoom(league, team) + stretch < b.salary || !makeRoom(ctx, team, waiverOrder))) continue;
+      // The user's offers still out (whoever signs ahead of them) keep their money and spots from the assistant GM's bids.
+      const held = assistant && b.teamId === user ? stillOut() : [];
+      const full = held.length > 0 && team.fortyMan.length + held.length >= FORTY_MAN_LIMIT;
+      if (assistant && (budgetRoom(league, team) + stretch - held.reduce((sum, o) => sum + o.salary, 0) < b.salary || full || !makeRoom(ctx, team, waiverOrder))) continue;
       if (signFreeAgent(ctx, team, p, b.years, b.salary).ok) {
-        state.signings.push({ playerId, teamId: b.teamId, years: b.years, salary: b.salary, week: state.week });
+        state.signings.push({ playerId, teamId: b.teamId, years: b.years, salary: b.salary, week: state.week, ...(assistant ? {} : { byUser: true }) });
         break;
       }
     }

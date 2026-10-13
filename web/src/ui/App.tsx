@@ -240,6 +240,8 @@ export function App() {
     try {
       const st = await call(kind, undefined);
       setStatus(st);
+      // What free agency did for your club: your signings, your assistant GM's, and offers that went elsewhere.
+      if (st.news) notify(st.news);
       if (st.phase === "regular") {
         notify(`Welcome to ${st.year}. Opening Day is set.`);
         location.hash = "#home";

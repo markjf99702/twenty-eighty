@@ -424,7 +424,9 @@ Every winter the whole universe moves forward a year:
   raw, the most room to grow) and college players (21-22, closer to ready).
 - **Free agency**: every free agent asks for years and salary from his projected
   WAR over the deal. Clubs with a hole he fills and budget room bid; his price
-  softens week by week. Leftover veterans take minor league deals or retire.
+  softens week by week. Leftover veterans take minor league deals or retire. Unless
+  you run your roster yourself, your assistant GM bids for your club too, with the
+  money and 40-man spots your own offers leave, and each week ends with what you signed.
 - **International signings**: 17-year-olds with bonus asks, and bonus pools that are
   bigger for worse teams.
 - **Trades** are valued by **surplus**: projected WAR over the years a club controls

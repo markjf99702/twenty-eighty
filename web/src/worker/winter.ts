@@ -12,6 +12,7 @@ import { overallGrade } from "../../../src/org/value";
 import { boardValue, onTheClock } from "../../../src/offseason/draft";
 import { acceptBar, offerScore } from "../../../src/offseason/freeAgency";
 import { MAX_INTERNATIONAL_SIGNINGS } from "../../../src/offseason/international";
+import type { FreeAgencyState, FreeAgentAsk } from "../../../src/offseason/types";
 import { playerName, type Player } from "../../../src/players/types";
 import { believedWar, warShift } from "../../../src/scouting/analytics";
 import { staffCost, valueShift } from "../../../src/scouting/scouting";
@@ -23,6 +24,35 @@ import { STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
 
 const abbrev = (league: League, id: number | null) => (id === null ? "FA" : (league.teams[id]?.abbrev ?? "FA"));
+
+const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
+const names = (xs: string[]) => (xs.length <= 2 ? xs.join(" and ") : `${xs.slice(0, -1).join(", ")} and ${xs.at(-1)}`);
+
+/**
+ * The user's club's free-agent signings in the weeks `weeks` picks, in a sentence each for the user's offers and the
+ * assistant GM's: "Signed Bo Knight (3 yr, $61.1M). Your assistant GM signed Alexis Vasquez (4 yr, $95.0M)." Null if none.
+ */
+function userSignings(league: League, fa: FreeAgencyState, weeks: (week: number) => boolean): string | null {
+  const mine = fa.signings.filter((x) => x.teamId === league.userTeamId && weeks(x.week));
+  const deals = (xs: typeof mine) => names(xs.map((x) => `${playerName(league.players[x.playerId]!)} (${x.years} yr, ${money(x.salary * x.years)})`));
+  const own = mine.filter((x) => x.byUser);
+  const assistant = mine.filter((x) => !x.byUser);
+  const text = [own.length > 0 ? `Signed ${deals(own)}.` : "", assistant.length > 0 ? `Your assistant GM signed ${deals(assistant)}.` : ""];
+  return mine.length > 0 ? text.filter(Boolean).join(" ") : null;
+}
+
+/**
+ * What a week of free agency (or the rest of it, `finished`) did for the user's club: its signings, and where the players
+ * it made offers to went instead.
+ */
+export function freeAgencyNews(league: League, fa: FreeAgencyState, before: { week: number; offers: FreeAgentAsk[] }, finished: boolean): string {
+  const signed = userSignings(league, fa, (week) => week >= before.week) ?? (finished ? "No more signings for you." : "No signings for you this week.");
+  const lost = before.offers
+    .map((o) => fa.signings.find((x) => x.playerId === o.playerId && x.week >= before.week && x.teamId !== league.userTeamId))
+    .filter((x): x is FreeAgencyState["signings"][number] => x !== undefined)
+    .map((x) => `${playerName(league.players[x.playerId]!)} signed with the ${league.teams[x.teamId]!.nickname} (${x.years} yr, ${money(x.salary * x.years)}).`);
+  return [signed, ...lost].join(" ");
+}
 
 /** The Hall of Fame vote held this winter. */
 function hallResult(league: League, year: number): NonNullable<OffseasonView["review"]>["hall"] {
@@ -157,6 +187,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
         .slice()
         .reverse()
         .map((x) => ({ playerId: x.playerId, name: playerName(league.players[x.playerId]!), team: abbrev(league, x.teamId), years: x.years, salary: x.salary, week: x.week })),
+      lastWeek: fa.week > 0 && user !== null ? (userSignings(league, fa, (week) => week === fa.week - 1) ?? "No signings for you.") : null,
     };
   }
 

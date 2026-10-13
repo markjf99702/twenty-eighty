@@ -75,7 +75,7 @@ import type {
 } from "../api/protocol";
 import { clearSave, decodeLeague, encodeLeague, hasSave, readSave, writeSave } from "./storage";
 import { financeView, ownerView } from "./business";
-import { askingView, blockView, historyView, offerViews, offseasonView, tradeAdviceView, tradeSide } from "./winter";
+import { askingView, blockView, freeAgencyNews, historyView, offerViews, offseasonView, tradeAdviceView, tradeSide } from "./winter";
 import {
   boxScoreView,
   dashboardView,
@@ -660,8 +660,11 @@ const handlers: Handlers = {
 
   async advance() {
     const s = requireSeason();
-    winter();
+    const w = winter();
     if (s.league.gm?.fired) throw new Error("You need a new job first: pick one of the clubs that called.");
+    // Finishing free agency plays its last weeks: say what they did for the user's club.
+    const fa = w.phase === "freeAgency" ? w.freeAgency : null;
+    const before = fa ? { week: fa.week, offers: [...fa.offers] } : null;
     const next = advanceOffseason(s.league, s);
     if (next) {
       season = next;
@@ -669,16 +672,18 @@ const handlers: Handlers = {
     }
     stats.clear();
     await persist();
-    return currentStatus();
+    return fa && before ? { ...currentStatus(), news: freeAgencyNews(s.league, fa, before, true) } : currentStatus();
   },
 
   async winterWeek() {
     const s = requireSeason();
-    if (winter().phase !== "freeAgency") throw new Error("Free agency isn't open.");
+    const fa = winter().freeAgency;
+    if (winter().phase !== "freeAgency" || !fa) throw new Error("Free agency isn't open.");
+    const before = { week: fa.week, offers: [...fa.offers] };
     winterWeek(s.league, s);
     stats.clear();
     await persist();
-    return currentStatus();
+    return { ...currentStatus(), news: freeAgencyNews(s.league, fa, before, false) };
   },
 
   offseason() {

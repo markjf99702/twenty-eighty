@@ -445,7 +445,9 @@ function OfferCell({ row, offer }: { row: NonNullable<OffseasonView["freeAgency"
 function FreeAgency({ v, onWinter }: { v: OffseasonView; onWinter: (kind: WinterAction) => void }) {
   const fa = v.freeAgency!;
   const offers = new Map(fa.offers.map((o) => [o.playerId, o]));
-  const room = v.payroll.budget - v.payroll.payroll;
+  // Room under the budget (which pays the departments too) after a season of what your offers promise.
+  const promised = fa.offers.reduce((s, o) => s + o.salary, 0);
+  const room = v.payroll.budget - v.payroll.payroll - v.payroll.staff - promised;
   type Row = (typeof fa.agents)[number];
   const columns: Column<Row>[] = [
     { key: "name", label: "Name", cls: "name", sort: (r) => r.player.name, asc: true, render: (r) => <a href={playerHref(r.player.id)}>{r.player.name}</a> },
@@ -459,10 +461,20 @@ function FreeAgency({ v, onWinter }: { v: OffseasonView; onWinter: (kind: Winter
   return (
     <>
       <div class="note">
+        {fa.lastWeek && (
+          <div class="fa-week">
+            <b>Last week:</b> {fa.lastWeek}
+          </div>
+        )}
         Week {Math.min(fa.week + 1, fa.weeks)} of {fa.weeks}. Offers are answered at the end of each week; a player takes the best one that
-        clears his bar, and his demands soften as the winter goes on. You have {$(Math.max(0, room))} of room under your budget and{" "}
-        {fa.offers.length} offer{fa.offers.length === 1 ? "" : "s"} out. Unless you've taken over roster moves on My club, your
-        assistant GM also bids on players who'd upgrade your roster.{" "}
+        clears his bar, and his demands soften as the winter goes on.{" "}
+        {fa.offers.length === 0
+          ? `You have ${$(Math.max(0, room))} of room under your budget and no offers out.`
+          : `Your ${fa.offers.length === 1 ? "offer" : `${fa.offers.length} offers`} would add ${$(promised)} to next season's payroll, ${
+              room >= 0 ? `leaving ${$(room)} of room under your budget` : `${$(-room)} more than the room under your budget`
+            }.`}{" "}
+        Unless you've taken over roster moves on My club, your assistant GM also bids on players who'd upgrade your roster, with the
+        money and 40-man spots your offers leave.{" "}
         {fa.week < fa.weeks && (
           <button type="button" class="btn small" onClick={() => onWinter("winterWeek")}>
             Play the week

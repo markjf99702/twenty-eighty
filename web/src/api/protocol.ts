@@ -67,6 +67,8 @@ export interface Status {
   deadline?: { date: string; daysLeft: number } | null;
   /** Why the last sim stopped early (a stop trigger), if it did. */
   stop?: StopNote;
+  /** What a winter step did for the user's club, said once: free agency's signings and lost offers. */
+  news?: string;
   settings?: GameSettings;
   /** Staff notes not yet read. */
   staffUnread?: number;
@@ -590,6 +592,8 @@ export interface OffseasonView {
     agents: FreeAgentRow[];
     offers: { playerId: number; years: number; salary: number }[];
     signings: { playerId: number; name: string; team: string; years: number; salary: number; week: number }[];
+    /** What the last week brought the user's club: "Signed Bo Knight (3 yr, $61.1M). Your assistant GM signed ..." */
+    lastWeek: string | null;
   };
   international?: {
     pool: number;
