@@ -62,7 +62,7 @@ export function Scores({ day, status }: { day: number | null; status: Status }) 
               );
             })}
           </div>
-          <div class="small muted">Box scores are kept for the last week of games, and for every one of your club's games.</div>
+          <div class="small muted">Box scores are kept for the last week of games, and for every one of your club's games, until you close or reload the page.</div>
         </>
       )}
     </>
