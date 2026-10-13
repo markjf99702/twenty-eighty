@@ -421,13 +421,14 @@ main > * { min-width: 0; }
 @media (max-width: 820px) {
   .app {
     grid-template-columns: minmax(0, 1fr);
+    /* The page takes the spare height, so a short one starts right under the section strip. */
+    grid-template-rows: auto auto 1fr;
     grid-template-areas: "board" "rail" "main";
   }
   .board { position: static; padding: 8px 16px; gap: 8px 14px; }
   /* While a sim runs, keep the Stop button in reach. */
   .board.simming { position: sticky; }
   .sim { margin-left: 0; width: 100%; }
-  .sim .label { display: none; }
   .board .btn { padding: 3px 10px; }
   .rail {
     border-right: 0;
@@ -439,6 +440,10 @@ main > * { min-width: 0; }
   .rail a { padding: 6px 10px; white-space: nowrap; }
   .rail .sep, .rail .club-tag { display: none; }
   main { padding: 16px 16px 48px; gap: 18px; }
+}
+/* The smallest phones: the Sim label would push To end onto a second row. */
+@media (max-width: 340px) {
+  .sim .label { display: none; }
 }
 
 /* ------------------------------------------------------------------ page parts */

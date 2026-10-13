@@ -57,6 +57,13 @@ const record = (await page.textContent('.board-cells')).replace(/\s+/g, ' ');
 assert.match(record, /\d+[–-]\d+/, 'no record after a week');
 await fits('the front office');
 
+// A short page starts right under the section strip (which once stretched into a blank band on phones).
+await page.goto(base + '#history');
+await page.waitForSelector('main h1');
+const shell = await page.evaluate(() => ({ strip: document.querySelector('.rail').getBoundingClientRect().height, heading: document.querySelector('main h1').getBoundingClientRect().top }));
+assert.ok(shell.strip < 80 && shell.heading < 500, `League history sits under a blank band (strip ${Math.round(shell.strip)}px tall, heading ${Math.round(shell.heading)}px down)`);
+await fits('league history');
+
 // The roster, a player's page and the trade desk.
 await page.goto(base + '#standings');
 await page.waitForSelector('.tbl tbody tr');
