@@ -3,12 +3,12 @@ import { withArticle } from "../core/text";
 import { expectedGate, formFactor, referencePrice } from "../finance/finance";
 import { settingsOf } from "../league/settings";
 import type { AdviceNote, League, Team } from "../league/types";
-import { arbCase, arbitrationSalary, budgetRoom, FREE_AGENT_YEARS, orgPlayers, payroll, serviceYears, tenderWorth } from "../org/contracts";
+import { arbCase, arbitrationSalary, budgetRoom, orgPlayers, payroll, tenderWorth } from "../org/contracts";
 import { extensionCandidates } from "../org/extensions";
 import { onTheBlock } from "../org/market";
 import { gamesOut } from "../org/offers";
 import { rosterProblems } from "../org/roster";
-import { TRADE_DEADLINE_DAY } from "../org/trades";
+import { freeAfterSeason, TRADE_DEADLINE_DAY } from "../org/trades";
 import { canStart, overallGrade } from "../org/value";
 import { boardValue } from "../offseason/draft";
 import type { Tender } from "../offseason/types";
@@ -91,13 +91,6 @@ function lineFor(season: Season, p: Player): string | null {
   const ls = season.levels[p.level as Level];
   if (!ls) return null;
   return p.pitching ? era(ls.pitching.lines.get(p.id)) : slash(ls.batting.lines.get(p.id));
-}
-
-/** A contract that runs out after this season (he can leave as a free agent). */
-function expiring(p: Player): boolean {
-  const c = p.contract;
-  if (!c || c.type === "minor") return false;
-  return c.type === "guaranteed" ? c.years <= 1 : serviceYears(p) >= FREE_AGENT_YEARS - 1;
 }
 
 interface Spot {
@@ -242,7 +235,8 @@ function deadline(season: Season, team: Team, day: number): void {
     const vets = orgPlayers(league, team)
       .filter((p) => p.level === "MLB" && !p.injury && p.age >= 26 && believedWar(season, user, p) >= 1)
       .sort((a, b) => believedWar(season, user, b) - believedWar(season, user, a));
-    const rentals = vets.filter(expiring).slice(0, 2);
+    const left = Math.max(0, 1 - day / season.totalDays);
+    const rentals = vets.filter((p) => freeAfterSeason(p, left)).slice(0, 2);
     const pool = rentals.length ? rentals : vets.filter((p) => p.age >= 30).slice(0, 2);
     if (pool.length === 0) return;
     add(league, day, {

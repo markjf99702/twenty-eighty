@@ -75,6 +75,19 @@ export function serviceAt(p: Player, fraction: number, eta = yearsToMajors(p)): 
 }
 
 /**
+ * Whether he can leave as a free agent after this season (a rental): his deal
+ * runs out (anything but a guaranteed contract with years to go) and he'll have
+ * six years of service banked when it ends, as the winter decides it. Someone
+ * who reaches five years during the season goes to arbitration again.
+ * `fraction` is how much of the season is left.
+ */
+export function freeAfterSeason(p: Player, fraction: number): boolean {
+  const c = p.contract;
+  if (!c || c.type === "minor" || (c.type === "guaranteed" && c.years > 1)) return false;
+  return serviceAt(p, fraction)(1) >= FREE_AGENT_YEARS;
+}
+
+/**
  * The seasons a club controls a player, with projected WAR and salary.
  * `fraction` is how much of the current season is left (1 in the offseason).
  * Control runs through a guaranteed deal and until six years of service; a

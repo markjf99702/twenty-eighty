@@ -1,9 +1,9 @@
 import { clamp } from "../core/math";
 import { withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
-import { budgetRoom, FREE_AGENT_YEARS, pendingContract, serviceYears } from "../org/contracts";
+import { budgetRoom, pendingContract } from "../org/contracts";
 import { gamesOut } from "../org/offers";
-import { tradeValue } from "../org/trades";
+import { freeAfterSeason, tradeValue } from "../org/trades";
 import { isProspect, overallGrade } from "../org/value";
 import { FIELD_POSITIONS, type FieldPosition, type Level, playerName, type Player } from "../players/types";
 import { belief, believedWar, warShift } from "../scouting/analytics";
@@ -126,7 +126,7 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
   }
   for (const p of ins) {
     if (p.injury && p.injury.daysLeft > 0) notes.push({ from: "assistant", text: `${playerName(p)} is hurt (${p.injury.name.toLowerCase()}, about ${p.injury.daysLeft} days to go).` });
-    else if (inSeason && rental(p)) notes.push({ from: "assistant", text: `${playerName(p)} can be a free agent after the season, so he's a rental.` });
+    else if (inSeason && freeAfterSeason(p, fraction)) notes.push({ from: "assistant", text: `${playerName(p)} can be a free agent after the season, so he's a rental.` });
   }
 
   // Money.
@@ -213,13 +213,6 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
   }
 
   return { verdict, headline, confidence, notes: notes.slice(0, 6) };
-}
-
-/** A contract that runs out after this season. */
-function rental(p: Player): boolean {
-  const c = p.contract;
-  if (!c || c.type === "minor") return false;
-  return c.type === "guaranteed" ? c.years <= 1 : serviceYears(p) >= FREE_AGENT_YEARS - 1;
 }
 
 type Spot = FieldPosition | "DH" | "rotation" | "pen";

@@ -11,6 +11,7 @@ import {
   aiTradeMarket,
   evaluateTrade,
   executeTrade,
+  freeAfterSeason,
   marketSides,
   teamStrength,
   tradeValue,
@@ -212,7 +213,8 @@ function sellOffer(league: League, user: Team, sellers: Team[], rng: Rng, now: n
 /** Before June the standings don't say much: clubs are adding or listening, not racing. */
 const EARLY_SEASON_DAY = 68;
 
-function pitch(d: Draft, inSeason: boolean, now: number): string {
+/** The club's pitch, as the offer reads. `fraction` is how much of the season is left. */
+export function pitch(d: Draft, inSeason: boolean, now: number, fraction: number): string {
   const club = `The ${d.partner.nickname}`;
   const early = inSeason && now < EARLY_SEASON_DAY;
   if (d.kind === "buy") {
@@ -223,8 +225,7 @@ function pitch(d: Draft, inSeason: boolean, now: number): string {
       : `${club} are chasing a playoff spot and want ${labeled(target)}. They'll send ${list(d.get)}.`;
   }
   const vet = d.get[0]!;
-  const c = vet.contract;
-  const rental = inSeason && c && (c.type !== "guaranteed" || c.years <= 1) && c.type !== "pre-arb" ? " (a rental: his contract is up after the season)" : "";
+  const rental = inSeason && freeAfterSeason(vet, fraction) ? " (a rental: his contract is up after the season)" : "";
   if (!inSeason) return `${club} would move ${labeled(vet)} for ${list(d.give)}.`;
   return early
     ? `${club} are listening on ${labeled(vet)}${rental}. They want ${list(d.give)}.`
@@ -286,7 +287,7 @@ export function proposeToUser(
       give,
       get,
       kind: d.kind,
-      pitch: pitch(d, inSeason, now),
+      pitch: pitch(d, inSeason, now, fraction),
       year: league.year,
       made: now,
       expires,
