@@ -141,6 +141,8 @@ export function startPostseason(season: Season): Bracket {
   seeds.forEach((s, lg) => {
     series.push(newSeries("Wild Card Series", lg, s[2]!, s[5]!, start), newSeries("Wild Card Series", lg, s[3]!, s[4]!, start));
   });
+  // Injuries keep healing through October: the days from the last regular-season game to the first Wild Card game.
+  season.heal(start - (season.totalDays - 1));
   season.bracket = { seeds, series, day: start, champion: null, plan: { roster: null, rotation: null } };
   return season.bracket;
 }
@@ -162,10 +164,11 @@ export function playoffDepth(season: Season, team: Team, plan: PlayoffPlan | nul
   const roster = mine?.roster ? new Set(mine.roster) : null;
   const has = (id: number) => id >= 0 && (!roster || roster.has(id));
   let depth = team.depth;
-  // A regular left off the playoff roster: the manager redraws the lineup from who's there.
-  if (roster && !(Object.values(depth.starters).every(has) && has(depth.dh))) {
-    depth = autoDepthChart([...roster].map((id) => league.players[id]!));
-  }
+  // The manager draws his October depth chart from the playoff roster, so a
+  // regular back from the injured list gets his place back. A chart the user
+  // set by hand stands, unless a regular is left off: then the manager redraws it.
+  const handSet = team.manualDepth && Object.values(depth.starters).every(has) && has(depth.dh);
+  if (roster && !handSet) depth = autoDepthChart([...roster].map((id) => league.players[id]!));
   const wanted = (mine?.rotation ?? depth.rotation.slice(0, 4)).filter((id) => has(id) && league.players[id]?.pitching);
   const rotation = wanted.length ? wanted : depth.rotation.filter(has).slice(0, 4);
   const inLineup = new Set([...Object.values(depth.starters), depth.dh]);
@@ -181,15 +184,25 @@ export function playoffDepth(season: Season, team: Team, plan: PlayoffPlan | nul
 }
 
 /**
- * The playoff roster a club would carry: its healthy active roster, trimmed to
- * 26 (at most 13 pitchers) or filled from the 40-man, best first by its own read.
+ * Who can be on a club's playoff roster: its 40-man, including players on the
+ * short injured lists (the 60-day list is off the 40-man).
+ */
+export function playoffCandidates(league: League, team: Team): Player[] {
+  return orgPlayers(league, team).filter((p) => p.onFortyMan || (p.level === "MLB" && !p.il));
+}
+
+/**
+ * The playoff roster a club would carry: its healthy active roster and anyone
+ * healthy again on the injured list, trimmed to 26 (at most 13 pitchers) or
+ * filled from the 40-man, best first by its own read.
  */
 export function defaultPlayoffRoster(season: Season, team: Team): number[] {
   const league = season.league;
   const war = (p: Player) => believedWar(season, team.id, p);
   const healthy = (p: Player) => !season.isOut(p.id);
-  const active = team.rosters.MLB.map((id) => league.players[id]!).filter(healthy);
-  const reserves = orgPlayers(league, team).filter((p) => p.onFortyMan && p.level !== "MLB" && healthy(p));
+  const candidates = playoffCandidates(league, team).filter(healthy);
+  const active = candidates.filter((p) => p.level === "MLB");
+  const reserves = candidates.filter((p) => p.level !== "MLB");
   const pool = [...active.sort((a, b) => war(b) - war(a)), ...reserves.sort((a, b) => war(b) - war(a))];
   const out: Player[] = [];
   const pitchers = () => out.filter(isPitcher).length;
@@ -225,10 +238,8 @@ export function planProblem(season: Season, team: Team, plan: PlayoffPlan): stri
   const roster = plan.roster ?? team.rosters.MLB;
   if (plan.roster) {
     if (new Set(plan.roster).size !== plan.roster.length) return "Someone is on the roster twice.";
-    for (const id of plan.roster) {
-      const p = league.players[id];
-      if (!p || p.teamId !== team.id || !(p.onFortyMan || p.level === "MLB")) return "Only players on your 40-man roster can be on the playoff roster.";
-    }
+    const eligible = new Set(playoffCandidates(league, team).map((p) => p.id));
+    if (!plan.roster.every((id) => eligible.has(id))) return "Only players on your 40-man roster can be on the playoff roster.";
     if (plan.roster.length !== PLAYOFF_ROSTER) return `The playoff roster is ${PLAYOFF_ROSTER} players (you have ${plan.roster.length}).`;
     const pitchers = plan.roster.filter((id) => league.players[id]!.pitching).length;
     if (pitchers > PLAYOFF_PITCHERS) return `At most ${PLAYOFF_PITCHERS} pitchers (you have ${pitchers}).`;
@@ -442,6 +453,8 @@ export function playPostseasonDay(season: Season): PostGame[] {
   openRounds(season, b);
   const upcoming = b.series.map((s) => s.next).filter((d): d is number => d !== null);
   b.day = upcoming.length ? Math.min(...upcoming) : today + 1;
+  // Through the travel days and the waits between rounds to the next game.
+  season.heal(b.day - today);
   if (b.champion !== null) finish(season, b);
   return played;
 }

@@ -176,7 +176,8 @@ function PlanEditor({ onClose }: { onClose: () => void }) {
       ),
     },
     { key: "pos", label: "Pos", render: (p) => p.pos },
-    { key: "lvl", label: "Lvl", render: (p) => LEVEL_NAMES[p.level] },
+    // A player on the injured list can be on the playoff roster; he plays once he's healthy.
+    { key: "lvl", label: "Lvl", render: (p) => p.status.il ?? LEVEL_NAMES[p.level] },
     { key: "proj", label: "Proj", cls: "num", sort: (p) => p.proj ?? -99, render: (p) => <Proj p={p} word={false} /> },
   ];
   const rows = (pitching: boolean) => d.players.filter((p) => p.pitcher === pitching);

@@ -16,6 +16,7 @@ import {
   nextHome,
   PLAYOFF_PITCHERS,
   PLAYOFF_ROSTER,
+  playoffCandidates,
   probableStarter,
   seriesOf,
   stillAlive,
@@ -179,9 +180,8 @@ export function playoffPlanView(season: Season, stats: StatsCache, team: Team): 
   const league = season.league;
   const roster = b.plan.roster ?? defaultPlayoffRoster(season, team);
   const rotation = b.plan.rotation ?? defaultPlayoffRotation(season, team, roster);
-  const pool = [...new Set([...team.rosters.MLB, ...team.rosters.AAA, ...team.rosters.AA, ...team.rosters["A+"], ...team.rosters.A])]
-    .map((id) => league.players[id]!)
-    .filter((p) => p.onFortyMan || p.level === "MLB");
+  // The 40-man, with anyone on the short injured lists (healthy again, or on his way back).
+  const pool = playoffCandidates(league, team);
   return {
     editable: stillAlive(b, team.id),
     players: pool.map((p) => playerSummary(p, season, stats)),

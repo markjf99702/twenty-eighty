@@ -1,10 +1,15 @@
 import { describe, expect, it } from "vitest";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
+import { placeOnIl } from "../src/org/roster";
+import { playerValue } from "../src/org/value";
+import type { Player } from "../src/players/types";
 import {
   defaultPlayoffRoster,
   defaultPlayoffRotation,
   planProblem,
+  playoffDepth,
+  playoffSeeds,
   playPostseason,
   seriesOf,
   startPostseason,
@@ -13,16 +18,38 @@ import {
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
 import { Season } from "../src/season/season";
 import type { GameResult } from "../src/sim/game";
-import { postseasonView } from "../web/src/worker/october";
+import { playoffPlanView, postseasonView } from "../web/src/worker/october";
+import { StatsCache } from "../web/src/worker/views";
 
 const league = generateLeague({ seed: "october" });
 const season = new Season(league, { minors: false });
 season.simToEnd();
-const bracket = startPostseason(season);
 // The user runs the 2 seed (a bye) in the first league.
-const USER = bracket.seeds[0]![1]!;
-hireGm(league, USER);
+const USER = playoffSeeds(season)[0]![1]!;
 const team = season.team(USER);
+
+// Hurt as the regular season ends: the user's best hitter on the 10-day injured
+// list with two days to go, a regular hurt in the last game for two days, and
+// the top seed's best pitcher out another eight.
+const LAST = season.totalDays - 1;
+const hurt = (p: Player, daysLeft: number, startDay = LAST) => {
+  p.injury = { name: "Hamstring strain", days: daysLeft + LAST - startDay, daysLeft, startDay };
+  season.injured.add(p.id);
+};
+const regulars = team.rosters.MLB.map((id) => league.players[id]!)
+  .filter((p) => !p.pitching && !season.isOut(p.id))
+  .sort((a, b) => playerValue(b) - playerValue(a));
+const onIl = regulars[0]!;
+hurt(onIl, 2, LAST - 8);
+placeOnIl(season.rosterContext(), team, onIl);
+const lastGame = regulars[1]!;
+hurt(lastGame, 2);
+const topSeed = season.team(playoffSeeds(season)[0]![0]!);
+const ace = topSeed.depth.rotation.map((id) => league.players[id]!).find((p) => !season.isOut(p.id))!;
+hurt(ace, 8);
+
+const bracket = startPostseason(season);
+hireGm(league, USER);
 const roster = defaultPlayoffRoster(season, team);
 const rotation = defaultPlayoffRotation(season, team, roster);
 bracket.plan = { roster, rotation };
@@ -56,6 +83,28 @@ describe("a playoff roster", () => {
   });
 });
 
+describe("injuries in October", () => {
+  it("keep healing from the last game of the season to the first of the postseason", () => {
+    expect(lastGame.injury).toBeNull();
+    expect(season.isOut(lastGame.id)).toBe(false);
+    // Three days on, from the last regular-season game to the Wild Card Series.
+    expect(ace.injury?.daysLeft).toBe(5);
+    expect(onIl.injury).toBeNull();
+    expect(onIl.il).toBe("IL10");
+  });
+
+  it("let a player healthy again on the injured list onto the playoff roster", () => {
+    expect(roster).toContain(onIl.id);
+    expect(planProblem(season, team, { roster, rotation: null })).toBeNull();
+    const view = playoffPlanView(season, new StatsCache(() => season), team)!;
+    expect(view.players.map((p) => p.id)).toContain(onIl.id);
+    expect(view.roster).toContain(onIl.id);
+    // And he has his place in the lineup again.
+    const depth = playoffDepth(season, team, { roster, rotation: null });
+    expect([...Object.values(depth.starters), depth.dh]).toContain(onIl.id);
+  });
+});
+
 describe("October, a game at a time", () => {
   it("waits out the bye, then stops before Game 1 of the Division Series", () => {
     expect(stillAlive(bracket, USER)).toBe(true);
@@ -66,6 +115,10 @@ describe("October, a game at a time", () => {
     const s = seriesOf(bracket, USER)!;
     expect(s.round).toBe("Division Series");
     expect(s.games).toHaveLength(0);
+    // Every day from the last game of the season to the next day of games has healed a day, off days and all.
+    expect(bracket.day).toBeGreaterThan(LAST + 4);
+    expect(ace.injury?.daysLeft ?? 0).toBe(Math.max(0, 8 - (bracket.day - LAST)));
+    expect(season.isOut(ace.id)).toBe(bracket.day - LAST < 8);
   });
 
   it("plays the user's series one game per step", () => {

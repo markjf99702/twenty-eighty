@@ -564,7 +564,13 @@ export class Season {
     return [...this.records].sort((a, b) => this.compare(b, a)).map((r) => this.team(r.teamId));
   }
 
-  private heal(): void {
+  /**
+   * A day's healing, or `days` of them: every injury that didn't start today
+   * loses a day, and a player whose time is up is healthy again. The regular
+   * season heals each morning; October heals through its off days too
+   * (src/season/postseason.ts).
+   */
+  heal(days = 1): void {
     for (const id of [...this.injured]) {
       const inj = this.league.players[id]!.injury;
       if (!inj) {
@@ -572,7 +578,7 @@ export class Season {
         continue;
       }
       if (inj.startDay >= this.day) continue;
-      inj.daysLeft = Math.max(0, inj.daysLeft - 1);
+      inj.daysLeft = Math.max(0, inj.daysLeft - days);
       if (inj.daysLeft === 0) {
         this.league.players[id]!.injury = null;
         this.injured.delete(id);
