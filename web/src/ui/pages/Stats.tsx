@@ -26,6 +26,8 @@ function hitterColumns(level: Level): Column<HitterRow>[] {
     { key: "name", label: "Name", cls: "name", sort: (h) => h.name, asc: true, render: (h) => <a href={playerHref(h.id)}>{h.name}</a> },
     { key: "team", label: "Team", sort: (h) => h.team, asc: true, render: (h) => h.team },
     { key: "pos", label: "Pos", sort: (h) => h.pos, asc: true, render: (h) => h.pos },
+    // The boards rank by WAR, so it sits by the name: in view on a phone and inside the box on a laptop.
+    n("WAR", "WAR", (h) => h.WAR, (x) => fixed(x), "Wins above replacement"),
     n("G", "G", (h) => h.line.G, int),
     n("PA", "PA", (h) => h.PA, int),
     n("AVG", "AVG", (h) => h.AVG, rate3),
@@ -48,7 +50,6 @@ function hitterColumns(level: Level): Column<HitterRow>[] {
     n("Chase", "Chase%", (h) => h.chasePct, (x) => pct(x), "Swings at pitches outside the zone", true),
     n("BsR", "BsR", (h) => h.baserunningRuns, (x) => fixed(x), "Baserunning runs"),
     n("Fld", "Fld", (h) => h.fieldingRuns, (x) => fixed(x), "Fielding runs above average"),
-    n("WAR", "WAR", (h) => h.WAR, (x) => fixed(x), "Wins above replacement"),
   ];
   return cols.filter((c) => level === "MLB" || !MLB_ONLY.has(c.key));
 }
@@ -69,6 +70,7 @@ function pitcherColumns(level: Level): Column<PitcherRow>[] {
     { key: "name", label: "Name", cls: "name", sort: (p) => p.name, asc: true, render: (p) => <a href={playerHref(p.id)}>{p.name}</a> },
     { key: "team", label: "Team", sort: (p) => p.team, asc: true, render: (p) => p.team },
     { key: "role", label: "Role", sort: (p) => p.role, asc: true, render: (p) => p.role },
+    n("WAR", "WAR", (p) => p.WAR, (x) => fixed(x), "FIP-based wins above replacement"),
     n("G", "G", (p) => p.line.G, int),
     n("GS", "GS", (p) => p.line.GS, int),
     n("W", "W", (p) => p.line.W, int),
@@ -92,7 +94,6 @@ function pitcherColumns(level: Level): Column<PitcherRow>[] {
     n("ERAm", "ERA-", (p) => p.ERAminus, whole, "Park-adjusted ERA, 100 = average, lower is better", true),
     n("FIPm", "FIP-", (p) => p.FIPminus, whole, "Park-adjusted FIP, 100 = average, lower is better", true),
     n("SO", "SO", (p) => p.line.SO, int),
-    n("WAR", "WAR", (p) => p.WAR, (x) => fixed(x), "FIP-based wins above replacement"),
   ];
   return cols.filter((c) => level === "MLB" || !MLB_ONLY.has(c.key));
 }

@@ -86,6 +86,15 @@ await page.goto(base + '#standings');
 await page.waitForSelector('.tbl tbody tr');
 assert.ok((await page.locator('.tbl tbody tr').count()) >= 15, 'the standings are short');
 await fits('the standings');
+// The leaderboards rank by WAR, and on a phone WAR is in view beside the names.
+await page.goto(base + '#stats-mlb-hitters');
+await page.waitForSelector('main .tbl th.sorted');
+const ranked = await page.evaluate(() => {
+  const th = document.querySelector('main .tbl th.sorted');
+  return { label: th.textContent, right: th.getBoundingClientRect().right, edge: th.closest('.tbl-wrap').getBoundingClientRect().right };
+});
+assert.ok(ranked.right <= ranked.edge, `the leaderboard is ranked by ${ranked.label}, off the edge of the table on a phone`);
+await fits('the stats leaderboard');
 const mine = await page.evaluate(() => document.querySelector("a[href^='#team-']")?.getAttribute('href'));
 await page.goto(base + mine);
 await page.waitForSelector('.tbl tbody tr');
