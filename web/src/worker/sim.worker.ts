@@ -5,7 +5,7 @@
  */
 import { bestTicketPrice } from "../../../src/finance/finance";
 import { acceptJob, hireGm } from "../../../src/finance/owner";
-import { openingDayAdvice, STAFF_TITLES, staffName } from "../../../src/advice/advice";
+import { notesSince, openingDayAdvice, STAFF_TITLES, staffName } from "../../../src/advice/advice";
 import { tradeAdvice, tradeAdviceOn } from "../../../src/advice/trades";
 import { generateLeague } from "../../../src/league/generate";
 import { answerOffer } from "../../../src/org/offers";
@@ -121,13 +121,13 @@ function offerVerdict(s: Season, o: League["tradeOffers"][number]): "take" | "co
 const VERDICT_LINE = { take: "Your staff says take it.", consider: "Your staff thinks it's worth a look.", pass: "Your staff would pass." } as const;
 
 /** What the day just played changed that the user asked to be stopped for. */
-function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: number; allStar: boolean; moments: number }): StopNote | null {
+function stopCheck(s: Season, before: { tx: number; offers: Set<number>; streak: number; start: number; notes: Set<string>; allStar: boolean; moments: number }): StopNote | null {
   const league = s.league;
   const user = league.userTeamId;
   if (user === null) return null;
   const team = s.team(user);
   if (stops.staff) {
-    const urgent = league.advice.slice(before.notes).find((a) => a.urgent);
+    const urgent = notesSince(league, before.notes).find((a) => a.urgent);
     if (urgent) return { kind: "staff", text: `${STAFF_TITLES[urgent.from]}: ${urgent.title}. ${urgent.text}`, href: urgent.href ?? "#staff" };
   }
   if (stops.offer !== "off") {
@@ -457,7 +457,7 @@ const handlers: Handlers = {
           offers: new Set(s.league.tradeOffers.map((o) => o.id)),
           streak: user !== null ? s.records[user]!.streak : 0,
           start,
-          notes: s.league.advice.length,
+          notes: new Set(s.league.advice.map((a) => a.key)),
           allStar: s.allStar !== null,
           moments: s.league.moments.length,
         };

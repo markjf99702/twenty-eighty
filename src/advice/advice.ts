@@ -53,6 +53,12 @@ function add(league: League, now: number, n: Omit<AdviceNote, "year" | "at" | "r
   return true;
 }
 
+/**
+ * The notes added since the staff had only those keyed in `seen`, oldest first.
+ * (Counting won't do: once the list is full, each new note pushes the oldest out.)
+ */
+export const notesSince = (league: League, seen: ReadonlySet<string>): AdviceNote[] => league.advice.filter((a) => !seen.has(a.key));
+
 const POS_NAMES: Record<FieldPosition | "DH", string> = {
   C: "catcher",
   "1B": "first base",

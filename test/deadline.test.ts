@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { seasonAdvice } from "../src/advice/advice";
+import { notesSince, seasonAdvice } from "../src/advice/advice";
 import { tradeAdvice } from "../src/advice/trades";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
@@ -83,5 +83,18 @@ describe("rentals", () => {
     league.advice = [];
     seasonAdvice(season);
     expect(league.advice.find((a) => a.key.startsWith("sell"))!.text).toMatch(/can walk as free agents after the season/);
+  });
+});
+
+describe("the staff's urgent notes", () => {
+  it("are found to stop the sim even once the list of notes is full", () => {
+    // Sixty kept (the most there are): a new note pushes the oldest out, so the list is no longer than before.
+    league.advice = Array.from({ length: 60 }, (_, i) => ({ key: `old:${i}`, from: "assistant" as const, urgent: false, title: "An old note", text: "From last season.", year: league.year - 1, at: 50, read: true }));
+    const seen = new Set(league.advice.map((a) => a.key));
+    standings(12);
+    season.day = TRADE_DEADLINE_DAY - 7;
+    seasonAdvice(season);
+    expect(league.advice).toHaveLength(60);
+    expect(notesSince(league, seen).find((a) => a.urgent)?.key).toBe(`sell-last:${league.year}`);
   });
 });
