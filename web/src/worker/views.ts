@@ -755,6 +755,8 @@ export function teamView(season: Season, stats: StatsCache, teamId: number, ctx:
       fortyMan: team.fortyMan.length,
     },
     problems: rosterProblems(ctx, team),
+    // A league's first season (and its winter) has no season before it on anyone's record.
+    hasLastSeason: league.history.some((h) => h.year === league.year - 1),
     depth: team.depth,
     active: team.rosters.MLB.map(summarize),
     injured: team.injured.map(summarize),

@@ -10,7 +10,7 @@ import { evaluateTrade, tradeValue } from "../src/org/trades";
 import { warShift } from "../src/scouting/analytics";
 import { blockView, historyView, tradeSide } from "../web/src/worker/winter";
 import { acceptJob } from "../src/finance/owner";
-import { dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, transactions } from "../web/src/worker/views";
+import { dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, teamView, transactions } from "../web/src/worker/views";
 import { budgetRoom } from "../src/org/contracts";
 import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
 import { playerValue } from "../src/org/value";
@@ -121,6 +121,19 @@ describe("league history", () => {
     const season = historyView(l).seasons[0]!;
     expect(season.mine).toEqual({ record: "74-88", finish: "Missed postseason", team: old.abbrev });
     expect(season.awards[0]!.mine).toBe(true);
+  });
+});
+
+describe("a club's tables", () => {
+  it("offer last season's stats only once there's a last season on record", () => {
+    const l = generateLeague({ seed: "last-season" });
+    hireGm(l, 1);
+    const s = new Season(l, { minors: false });
+    const view = () => teamView(s, new StatsCache(() => s), 1, s.rosterContext());
+    expect(view().hasLastSeason).toBe(false);
+    l.history.push({ year: l.year - 1, champion: 2, pennants: [], standings: [], awards: [], userTeamId: 1 });
+    expect(view().hasLastSeason).toBe(true);
+    l.history.pop();
   });
 });
 

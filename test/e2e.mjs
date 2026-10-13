@@ -99,6 +99,9 @@ const mine = await page.evaluate(() => document.querySelector("a[href^='#team-']
 await page.goto(base + mine);
 await page.waitForSelector('.tbl tbody tr');
 await fits('the roster');
+// A new league has no season before this one, so the tables offer this season's stats and not last season's.
+const statViews = await page.locator('.seg[aria-label="Show"] button').allTextContents();
+assert.deepEqual(statViews.filter((t) => / stats$/.test(t)).length, 1, `the roster offers ${statViews.join(', ')}`);
 // A player's roster moves open on screen (the table scrolls sideways to reach them), and designating him asks first.
 await page.locator('.tbl tbody tr').first().locator('button', { hasText: 'Moves' }).click();
 const moves = await page.locator('tr.expand .actions').boundingBox();

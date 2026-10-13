@@ -300,6 +300,8 @@ export interface TeamView {
   record: { w: number; l: number; rs: number; ra: number } | null;
   counts: { active: number; activeLimit: number; pitchers: number; pitcherLimit: number; fortyMan: number };
   problems: string[];
+  /** Whether last season is on the record (the tables' "last season" view); not in a league's first year. */
+  hasLastSeason: boolean;
   depth: DepthChart;
   /** MLB active roster, injured list, and each affiliate. */
   active: PlayerSummary[];

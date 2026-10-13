@@ -37,21 +37,19 @@ function useRosterView(): [RosterView, (v: RosterView) => void] {
   return [view, set];
 }
 
-function ViewSwitch({ view, onChange, year }: { view: RosterView; onChange: (v: RosterView) => void; year: number }) {
-  return (
-    <Seg<RosterView>
-      label="Show"
-      value={view}
-      options={[
-        ["scouting", "Scouting report"],
-        ["recent", "Last 15"],
-        ["stats", `${year} stats`],
-        ["last", `${year - 1} stats`],
-      ]}
-      onChange={onChange}
-    />
-  );
+function ViewSwitch({ view, onChange, year, last }: { view: RosterView; onChange: (v: RosterView) => void; year: number; last: boolean }) {
+  const options: [RosterView, string][] = [
+    ["scouting", "Scouting report"],
+    ["recent", "Last 15"],
+    ["stats", `${year} stats`],
+  ];
+  // Last season's view only once there's a last season on record (a new league's first year has none).
+  if (last) options.push(["last", `${year - 1} stats`]);
+  return <Seg<RosterView> label="Show" value={view} options={options} onChange={onChange} />;
 }
+
+/** The view chosen, unless it's last season's and there isn't one yet (the choice is kept for when there is). */
+const shownView = (view: RosterView, d: TeamView): RosterView => (view === "last" && !d.hasLastSeason ? "scouting" : view);
 
 export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; status: Status }) {
   const view = useApi("team", { teamId }, [teamId]);
@@ -158,13 +156,14 @@ function Flags({ d }: { d: TeamView }) {
 function Roster({ d, year }: { d: TeamView; year: number }) {
   const hitters = d.active.filter((p) => !p.pitcher);
   const pitchers = d.active.filter((p) => p.pitcher);
-  const [view, setView] = useRosterView();
+  const [chosen, setView] = useRosterView();
+  const view = shownView(chosen, d);
   const statSort = view === "scouting" ? undefined : "WAR";
   return (
     <>
       <div class="toolbar" style={{ justifyContent: "space-between" }}>
         <Counts d={d} />
-        <ViewSwitch view={view} onChange={setView} year={year} />
+        <ViewSwitch view={view} onChange={setView} year={year} last={d.hasLastSeason} />
       </div>
       {view !== "scouting" && <StatsKey recent={view === "recent"} />}
       {d.isUser && d.problems.length > 0 && (
@@ -190,7 +189,8 @@ function Roster({ d, year }: { d: TeamView; year: number }) {
 
 function Farm({ d, year }: { d: TeamView; year: number }) {
   const [level, setLevel] = useState<(typeof MINOR_LEVELS)[number]>("AAA");
-  const [view, setView] = useRosterView();
+  const [chosen, setView] = useRosterView();
+  const view = shownView(chosen, d);
   const rows = d.minors[level];
   const sort = view === "scouting" ? "fv" : "WAR";
   return (
@@ -202,7 +202,7 @@ function Farm({ d, year }: { d: TeamView; year: number }) {
             {d.team.affiliates[level]} · {rows.length} players
           </span>
         </div>
-        <ViewSwitch view={view} onChange={setView} year={year} />
+        <ViewSwitch view={view} onChange={setView} year={year} last={d.hasLastSeason} />
       </div>
       {view !== "scouting" && <StatsKey minors recent={view === "recent"} />}
       <Section title="Position players">
