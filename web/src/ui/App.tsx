@@ -175,7 +175,10 @@ export function App() {
 
   const runSim = async (days: number | "end") => {
     if (sim) return;
-    setSim({ done: 0, total: 1 });
+    // The real length from the start (as the worker counts it), so Stop, the speed and the stops show
+    // before the first day is done.
+    const left = (status?.totalDays ?? 0) - (status?.day ?? 0);
+    setSim({ done: 0, total: Math.max(1, days === "end" ? left : Math.min(days, left)) });
     setStopNote(null);
     let lastBump = 0;
     try {

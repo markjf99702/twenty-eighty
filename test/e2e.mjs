@@ -52,6 +52,9 @@ await page.waitForSelector('.club-hero', { timeout: 60000 });
 
 // A week of games: scores go up and the standings move.
 await board('Week').click();
+// The progress line knows the week's length from the start, so Stop is there at once.
+const starting = await page.locator('.board .progress').textContent({ timeout: 2000 }).catch(() => null);
+if (starting !== null) assert.match(starting, /of 7.*Stop/, `the sim started as "${starting.replace(/\s+/g, ' ')}"`);
 await idle();
 const record = (await page.textContent('.board-cells')).replace(/\s+/g, ' ');
 assert.match(record, /\d+[–-]\d+/, 'no record after a week');
