@@ -355,7 +355,8 @@ The roster rules are the ones a GM has to work around:
   with five years of service can't be optioned.
 - Injured list: 10-day (position players), 15-day (pitchers), 60-day (frees a 40-man spot).
 - Designating a player for assignment exposes him to waivers. Other clubs claim him if he
-  beats their weakest 40-man player; otherwise he's outrighted to AAA.
+  beats their weakest 40-man player and his salary fits in their budget; otherwise he's
+  outrighted to AAA.
 
 **Injuries** strike during games. Pitchers face a per-pitch and per-appearance risk,
 hitters a per-plate-appearance risk, and both scale with age and the durability trait.
@@ -557,13 +558,13 @@ runs** (this fielder vs. a league-average fielder on the same ball).
 
 | | Sim | MLB | | Sim | MLB |
 |---|---:|---:|---|---:|---:|
-| Runs/game | 4.44 | 4.40 | Avg exit velo | 89.3 | 88.7 |
-| AVG / OBP / SLG | .249/.320/.403 | .244/.313/.401 | Hard-hit % | 39.4 | 38.5 |
-| K% / BB% | 22.4 / 8.5 | 22.4 / 8.3 | Barrel % | 7.7 | 7.8 |
-| HR% of PA | 3.07 | 3.00 | GB / LD / FB % | 43.8 / 24.9 / 22.5 | 43 / 24.5 / 24.5 |
-| BABIP | .298 | .291 | SB per game / SB% | 0.65 / 77% | 0.72 / 79% |
-| Pitches per PA | 3.99 | 3.90 | Errors per game | 0.51 | 0.52 |
-| Swing % / CSW % | 48.1 / 27.7 | 47.3 / 28.2 | SP innings per start | 5.0 | 5.3 |
+| Runs/game | 4.42 | 4.40 | Avg exit velo | 89.0 | 88.7 |
+| AVG / OBP / SLG | .247/.319/.403 | .244/.313/.401 | Hard-hit % | 38.3 | 38.5 |
+| K% / BB% | 22.6 / 8.6 | 22.4 / 8.3 | Barrel % | 7.5 | 7.8 |
+| HR% of PA | 3.01 | 3.00 | GB / LD / FB % | 43.4 / 25.1 / 22.6 | 43 / 24.5 / 24.5 |
+| BABIP | .296 | .291 | SB per game / SB% | 0.74 / 77% | 0.72 / 79% |
+| Pitches per PA | 3.99 | 3.90 | Errors per game | 0.47 | 0.52 |
+| Swing % / CSW % | 48.1 / 27.8 | 47.3 / 28.2 | SP innings per start | 5.3 | 5.3 |
 
 It also checks the *spread*, which is what makes the 20-80 scale honest. A typical
 season has a 50-56 HR leader, a batting champion around .330, a 250-strikeout ace, a
