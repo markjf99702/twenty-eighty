@@ -923,7 +923,8 @@ export interface FinanceView {
   }[];
 }
 
-export type GoalStatus = "met" | "missed" | "on track" | "behind" | "not started";
+/** "early": too few games played for a pace to mean much. */
+export type GoalStatus = "met" | "missed" | "on track" | "behind" | "not started" | "early";
 
 export interface GoalView {
   kind: string;

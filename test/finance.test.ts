@@ -6,15 +6,22 @@ import {
   CASH_RESERVE,
   expectedGate,
   NATIONAL_REVENUE,
+  operations,
+  profitOf,
+  projectedRevenue,
   referencePrice,
+  restOfSeason,
   revenueOf,
 } from "../src/finance/finance";
 import { acceptJob, FIRING_LINE, hireGm, reviewSeason } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { advanceOffseason, beginOffseason } from "../src/offseason/offseason";
+import { payroll } from "../src/org/contracts";
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
-import { runPostseason } from "../src/season/postseason";
+import { staffCost } from "../src/scouting/scouting";
+import { playoffSeeds, runPostseason } from "../src/season/postseason";
 import { Season } from "../src/season/season";
+import { ownerView } from "../web/src/worker/business";
 
 const USER = 5;
 const league = generateLeague({ seed: "finance-test" });
@@ -23,6 +30,7 @@ const goalsAtHire = league.gm!.goals.length;
 const season = new Season(league, { minors: false });
 season.simDays(30);
 const early = league.teams.map((t) => ({ ...t.finance.ledger }));
+const projected = league.teams.map((t) => profitOf(t.finance.ledger) + restOfSeason(season, t).profit);
 const midSave = serialize(saveGame(league, season));
 season.simToEnd();
 runPostseason(season);
@@ -76,6 +84,12 @@ describe("the books", () => {
     }
   });
 
+  it("project the rest of the season from today's rates and the home dates left", () => {
+    // A month in, the books so far plus the rest at today's rates land near the regular season's final profit.
+    const misses = league.teams.map((t) => Math.abs(projected[t.id]! - (profitOf(closing[t.id]!) - closing[t.id]!.postseason)));
+    expect(misses.reduce((a, b) => a + b, 0) / misses.length).toBeLessThan(10);
+  });
+
   it("pay postseason hosts a sold-out playoff gate", () => {
     const hosts = new Set(season.postseason!.series.flatMap((s) => s.games.map((g) => g.homeId)));
     for (const t of league.teams) {
@@ -125,6 +139,59 @@ describe("the winter", () => {
     while (league.offseason!.phase !== "spring") advanceOffseason(league, season);
     expect(league.gm!.goalYear).toBe(year + 1);
     expect(league.gm!.goals.length).toBeGreaterThanOrEqual(2);
+  });
+});
+
+describe("the owner's goals during the season", () => {
+  const l = generateLeague({ seed: "owner-card" });
+  hireGm(l, 3);
+  const s = new Season(l, { minors: false });
+  l.gm!.goals = [
+    { kind: "wins", target: 85, weight: 1 },
+    { kind: "profit", target: 0, weight: 1 },
+    { kind: "attendance", target: 2_000_000, weight: 1 },
+    { kind: "youth", target: 2, weight: 1 },
+  ];
+  const card = () => Object.fromEntries(ownerView(s)!.goals.map((g) => [g.kind, g]));
+  const paceOf = (progress: string) => {
+    const m = /on pace for (-?)\$([\d.]+)M/.exec(progress);
+    return m ? (m[1] ? -1 : 1) * Number(m[2]) : NaN;
+  };
+
+  it("paces profit from the business office's projection, and waits for some games to pace the rest", () => {
+    s.simDays(1);
+    const goals = card();
+    for (const kind of ["wins", "attendance", "youth"]) expect(goals[kind]!.status).toBe("early");
+    expect(goals.wins!.progress).toMatch(/^\d-\d so far$/);
+    // One day's books aren't stretched over the season: the pace is about the full season's projection.
+    const team = l.teams[3]!;
+    const season = projectedRevenue(team) - operations(team) - payroll(l, team) - staffCost(l, team);
+    expect(Math.abs(paceOf(goals.profit!.progress) - season)).toBeLessThan(10);
+    expect(["on track", "behind"]).toContain(goals.profit!.status);
+  });
+
+  it("paces everything once the season is going", () => {
+    while (s.records[3]!.w + s.records[3]!.l < 20) s.simDay();
+    const goals = card();
+    for (const kind of ["wins", "profit", "attendance", "youth"]) {
+      expect(["on track", "behind"]).toContain(goals[kind]!.status);
+      expect(goals[kind]!.progress).toMatch(/on pace for/);
+    }
+  });
+
+  it("doesn't call profit final while October's gates are still to come", () => {
+    s.simToEnd();
+    const seeded = playoffSeeds(s).flat();
+    const out = l.teams.find((t) => !seeded.includes(t.id))!.id;
+    l.gm!.teamId = seeded[0]!;
+    expect(["on track", "behind"]).toContain(card().profit!.status);
+    expect(card().profit!.progress).toMatch(/October's gates still to come/);
+    expect(["met", "missed"]).toContain(card().wins!.status);
+    l.gm!.teamId = out;
+    expect(["met", "missed"]).toContain(card().profit!.status);
+    runPostseason(s);
+    l.gm!.teamId = seeded[0]!;
+    expect(["met", "missed"]).toContain(card().profit!.status);
   });
 });
 

@@ -10,10 +10,11 @@ import {
   profitOf,
   projectedRevenue,
   referencePrice,
+  restOfSeason,
   revenueOf,
   expensesOf,
 } from "../../../src/finance/finance";
-import { goalLabel, goalProgress, mood, OWNER_PATIENCE, STYLE_LABEL } from "../../../src/finance/owner";
+import { goalLabel, goalProgress, mood, OWNER_PATIENCE, STYLE_LABEL, youngRegulars } from "../../../src/finance/owner";
 import type { FinanceYear, GoalResult, Ledger, Owner } from "../../../src/finance/types";
 import type { League, Team } from "../../../src/league/types";
 import { WINTER_DAYS } from "../../../src/offseason/offseason";
@@ -23,7 +24,7 @@ import { MINOR_LEVELS } from "../../../src/players/types";
 import { staffCost } from "../../../src/scouting/scouting";
 import { playoffSeeds } from "../../../src/season/postseason";
 import type { Season } from "../../../src/season/season";
-import type { FinanceView, FinanceYearView, GoalView, LedgerView, OwnerCard, OwnerView, ReviewView } from "../api/protocol";
+import type { FinanceView, FinanceYearView, GoalStatus, GoalView, LedgerView, OwnerCard, OwnerView, ReviewView } from "../api/protocol";
 import { dateLabel, teamRef } from "./views";
 
 const m1 = (x: number) => Math.round(x * 10) / 10;
@@ -154,6 +155,9 @@ function actualText(kind: string, actual: number): string {
   }
 }
 
+/** Games a club plays before its record, crowds and young players' work say much about the season ahead. */
+const EARLY_GAMES = 15;
+
 /** Goals for the season in progress (or just finished), with pace where there's a season to pace. */
 function goalViews(league: League, season: Season): GoalView[] {
   const gm = league.gm!;
@@ -165,18 +169,23 @@ function goalViews(league: League, season: Season): GoalView[] {
   }
   if (gm.goalYear !== league.year) return [];
   const done = season.done;
-  const frac = Math.max(season.day / season.totalDays, 1e-6);
   const rec = season.records[team.id]!;
+  const early = !done && rec.w + rec.l < EARLY_GAMES;
   const l = team.finance.ledger;
+  // The business office's projection: the books so far plus the rest of the season at today's rates.
+  const rest = restOfSeason(season, team);
+  // October's gates are booked when the World Series ends, so a club still in it has more money coming.
+  const october = done && !season.postseason && playoffSeeds(season).flat().includes(team.id);
   return goalProgress(league, season).map(({ goal, actual, met }) => {
     const base = { kind: goal.kind, label: goalLabel(goal), weight: goal.weight };
     if (season.day === 0) return { ...base, status: "not started" as const, progress: "Starts on Opening Day" };
     let pace: number;
     let progress: string;
+    let final = done;
     switch (goal.kind) {
       case "wins": {
         pace = rec.w + rec.l ? Math.round((rec.w / (rec.w + rec.l)) * 162) : 0;
-        progress = done ? `${rec.w} wins` : `${rec.w}-${rec.l}, on pace for ${pace}`;
+        progress = done ? `${rec.w} wins` : early ? `${rec.w}-${rec.l} so far` : `${rec.w}-${rec.l}, on pace for ${pace}`;
         break;
       }
       case "playoffs": {
@@ -187,19 +196,22 @@ function goalViews(league: League, season: Season): GoalView[] {
         break;
       }
       case "profit": {
-        // Season-long money accrues evenly; winter bonuses are already on the books.
-        pace = done ? actual : m1((actual + l.bonuses) / frac - l.bonuses);
-        progress = done ? `${actualText("profit", actual)} profit` : `${actualText("profit", actual)} so far, on pace for ${actualText("profit", pace)}`;
+        pace = m1(actual + rest.profit);
+        const so = `${actualText("profit", actual)} so far`;
+        if (october) final = false;
+        progress = october ? `${so}; October's gates still to come` : done ? `${actualText("profit", actual)} profit` : `${so}, on pace for ${actualText("profit", pace)}`;
         break;
       }
       case "attendance": {
-        pace = l.homeGames ? Math.round((l.attendance / l.homeGames) * 81) : 0;
-        progress = done ? `${fans(actual)} fans` : `${fans(actual)} so far, on pace for ${fans(pace)}`;
+        if (!done && l.homeGames === 0) return { ...base, status: "early" as const, progress: "No home games yet" };
+        pace = Math.round(actual + rest.fans);
+        progress = done ? `${fans(actual)} fans` : early ? `${fans(actual)} so far` : `${fans(actual)} so far, on pace for ${fans(pace)}`;
         break;
       }
       case "youth": {
-        pace = actual;
-        progress = `${actual} so far`;
+        // Young players already there, and those getting enough work to get there.
+        pace = done ? actual : youngRegulars(league, season, team, season.day / season.totalDays).length;
+        progress = done || early ? `${actual} so far` : `${actual} so far, on pace for ${pace}`;
         break;
       }
       case "budget": {
@@ -209,7 +221,12 @@ function goalViews(league: League, season: Season): GoalView[] {
         break;
       }
     }
-    const status = done ? (met ? "met" : "missed") : goal.kind === "budget" ? (pace <= goal.target ? "on track" : "behind") : pace >= goal.target ? "on track" : "behind";
+    let status: GoalStatus;
+    if (final) status = met ? "met" : "missed";
+    // Profit and spending follow from the books from the first day; the rest need some games first.
+    else if (early && goal.kind !== "profit" && goal.kind !== "budget") status = "early";
+    else if (goal.kind === "budget") status = pace <= goal.target ? "on track" : "behind";
+    else status = pace >= goal.target ? "on track" : "behind";
     return { ...base, status, progress };
   });
 }

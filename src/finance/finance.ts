@@ -137,6 +137,23 @@ export function projectedRevenue(team: Team, price = team.finance.ticketPrice): 
   return NATIONAL_REVENUE + localMedia(team) + sponsorship(team) + expectedGate(team, price).money;
 }
 
+/**
+ * What the rest of the regular season should add to a club's books at
+ * today's rates: the season-long money still to come in and go out, and a
+ * crowd at each home game left, at today's price and form. (Home dates come
+ * in bunches, so the season so far isn't a guide to the rest of it.)
+ */
+export function restOfSeason(season: Season, team: Team): { profit: number; fans: number } {
+  const league = season.league;
+  const share = Math.max(0, 1 - season.day / season.totalDays);
+  const steady = NATIONAL_REVENUE + localMedia(team) + sponsorship(team) - operations(team) - staffCost(league, team) - payroll(league, team);
+  let home = 0;
+  for (let d = season.day; d < season.totalDays; d++) for (const g of season.schedule.days[d]!) if (g.home === team.id) home++;
+  const rec = season.records[team.id]!;
+  const gate = expectedGate(team, team.finance.ticketPrice, formFactor(rec.w, rec.l));
+  return { profit: steady * share + (home * gate.money) / HOME_GAMES, fans: (home * gate.fans) / HOME_GAMES };
+}
+
 // ---------------------------------------------------------------------------
 // The season
 

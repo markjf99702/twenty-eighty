@@ -187,11 +187,15 @@ export function setGoals(league: League, day = 0): void {
   });
 }
 
-/** Young players who got real big-league work for the club this season. */
-export function youngRegulars(league: League, season: Season, team: Team): number[] {
+/**
+ * Young players who got real big-league work for the club this season, or
+ * with only `share` of the season played, the ones on pace to.
+ */
+export function youngRegulars(league: League, season: Season, team: Team, share = 1): number[] {
+  const enough = (done: number, full: number) => done > 0 && done >= full * share;
   return orgPlayers(league, team)
     .filter((p) => p.age <= 25)
-    .filter((p) => (season.batting.lines.get(p.id)?.PA ?? 0) >= YOUTH_PA || (season.pitching.lines.get(p.id)?.outs ?? 0) >= YOUTH_OUTS)
+    .filter((p) => enough(season.batting.lines.get(p.id)?.PA ?? 0, YOUTH_PA) || enough(season.pitching.lines.get(p.id)?.outs ?? 0, YOUTH_OUTS))
     .map((p) => p.id);
 }
 
