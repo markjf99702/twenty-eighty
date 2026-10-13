@@ -34,6 +34,9 @@ export function streak(s: number): string {
   return s > 0 ? `W${s}` : `L${-s}`;
 }
 
+/** A club nickname's possessive: "Summit's", "Ironmen's", but "Whales'". */
+export const possessive = (nickname: string) => (nickname.endsWith("s") ? `${nickname}'` : `${nickname}'s`);
+
 /** How a season ended, as saved ("Lost Division Series"), the way it reads in a sentence: "lost in the Division Series". */
 export function finishText(finish: string): string {
   if (finish === "Won World Series") return "won the World Series";

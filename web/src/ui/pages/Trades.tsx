@@ -5,7 +5,7 @@ import { ErrorNote, Loading, notify, Section, Seg } from "../components/Common";
 import { Headline, NowGrade, outlookColumns } from "../components/Outlook";
 import { type Column, Table } from "../components/Table";
 import { StaffTake } from "../components/StaffTake";
-import { LEVEL_NAMES, statBrief } from "../format";
+import { LEVEL_NAMES, possessive, statBrief } from "../format";
 import { BLOCK_SLUGS, type BlockSlug, go, playerHref } from "../router";
 import { useBasics } from "../settings";
 import { takePreset, tradeFor } from "../tradePreset";
@@ -232,7 +232,7 @@ function Offers({ canTrade, onAdjust }: { canTrade: boolean; onAdjust: (o: Offer
     else if (accept) {
       notify(`Done: the deal with the ${o.team.nickname} is made.`);
       if (res.warning) notify(res.warning, true);
-    } else notify(`You passed on the ${o.team.nickname}' offer.`);
+    } else notify(`You passed on the ${possessive(o.team.nickname)} offer.`);
     bump();
   };
   return (
