@@ -115,20 +115,23 @@ function Moments({ moments }: { moments: MomentView[] }) {
     <>
       {years.map((y) => (
         <Section key={y} title={String(y)} aside={`${moments.filter((m) => m.year === y).length}`}>
-          <MomentList moments={moments.filter((m) => m.year === y)} />
+          <MomentList moments={moments.filter((m) => m.year === y)} bare />
         </Section>
       ))}
     </>
   );
 }
 
-/** Moments as a list: the date, what happened, and the box score while it's kept. */
-export function MomentList({ moments }: { moments: MomentView[] }) {
+/**
+ * Moments as a list: the date, what happened, and the box score while it's kept. An earlier season's moment
+ * carries its year, except under a heading that already says it (`bare`).
+ */
+export function MomentList({ moments, bare = false }: { moments: MomentView[]; bare?: boolean }) {
   return (
     <ul class="moments">
       {moments.map((m, i) => (
         <li key={i} class={`${m.kind}${m.mine ? " mine" : ""}`}>
-          <span class="d dim">{m.date.replace(/, \d{4}$/, "")}</span>
+          <span class="d dim">{bare ? m.date.replace(/, \d{4}$/, "") : m.date}</span>
           <span class="t">
             <a href={playerHref(m.playerId)}>{m.text}</a>
           </span>
