@@ -154,6 +154,36 @@ describe("roster rules", () => {
     expect(league.transactions.at(-1)?.text).toMatch(/^Claimed/);
   });
 
+  it("claims for your club only while your assistant GM runs the roster", () => {
+    // Your club has a 40-man spot open, room in its budget, and the first claim.
+    const yours = league.teams[1]!;
+    league.userTeamId = yours.id;
+    const spare = yours.fortyMan.map(player).find((p) => p.level !== "MLB" && !p.il)!;
+    designateForAssignment(ctx, yours, spare, []);
+    yours.budget = payroll(league, yours) + staffCost(league, yours) + 30;
+    const [best, next, third] = team.rosters.MLB.map(player).sort((a, b) => playerValue(b) - playerValue(a));
+
+    // Running the roster yourself: nobody claims him for you.
+    yours.manualRoster = true;
+    designateForAssignment(ctx, team, best!, [yours]);
+    expect(best!.teamId).toBe(team.id);
+    expect(yours.fortyMan).toHaveLength(39);
+
+    // With the assistant on, he claims, and says so.
+    yours.manualRoster = false;
+    designateForAssignment(ctx, team, next!, [yours]);
+    expect(next!.teamId).toBe(yours.id);
+    expect(league.transactions.filter((t) => t.teamId === yours.id).at(-1)?.text).toMatch(/^Your assistant GM claimed .+ off waivers from /);
+
+    // And only if the salary fits the budget.
+    third!.contract = { type: "guaranteed", salary: 12, years: 3, signed: league.year - 1, total: 48 };
+    const room = yours.fortyMan.map(player).find((p) => p.level !== "MLB" && !p.il && p.id !== next!.id)!;
+    designateForAssignment(ctx, yours, room, []);
+    yours.budget = payroll(league, yours) + staffCost(league, yours) - 1;
+    designateForAssignment(ctx, team, third!, [yours]);
+    expect(third!.teamId).toBe(team.id);
+  });
+
   it("logs every move", () => {
     optionPlayer(ctx, team, optionable());
     expect(league.transactions.at(-1)?.text).toMatch(/^Optioned/);

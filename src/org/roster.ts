@@ -365,11 +365,14 @@ export function designateForAssignment(
   logTransaction(league, ctx.day, team, p, "dfa", `Designated ${label(p)} for assignment`);
 
   // Waivers: the first club (worst record first) that wants him, has room
-  // and can fit his salary in its budget claims him.
+  // and can fit his salary in its budget claims him. The user's club claims
+  // only through his assistant GM, as with its other roster moves.
   const value = playerValue(p);
   const cost = claimCost(p);
   for (const other of waiverOrder) {
     if (other.id === team.id || other.fortyMan.length >= FORTY_MAN_LIMIT) continue;
+    const yours = other.id === league.userTeamId;
+    if (yours && other.manualRoster) continue;
     if (value <= weakestFortyMan(league, other) + 4) continue;
     if (cost > Math.max(0, budgetRoom(league, other))) continue;
     for (const level of Object.keys(team.rosters) as Level[]) removeFrom(team.rosters[level], p.id);
@@ -379,7 +382,7 @@ export function designateForAssignment(
     other.rosters.AAA.push(p.id);
     p.level = "AAA";
     p.optionedDay = ctx.day;
-    logTransaction(league, ctx.day, other, p, "claim", `Claimed ${label(p)} off waivers from ${team.abbrev}`);
+    logTransaction(league, ctx.day, other, p, "claim", `${yours ? "Your assistant GM claimed" : "Claimed"} ${label(p)} off waivers from ${team.abbrev}`);
     if (wasMlb) refreshDepth(league, team);
     return ok;
   }

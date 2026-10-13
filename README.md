@@ -360,6 +360,7 @@ The roster rules are the ones a GM has to work around:
 - Designating a player for assignment exposes him to waivers. Other clubs claim him if he
   beats their weakest 40-man player and his salary fits in their budget; otherwise he's
   outrighted to AAA, and an arbitration salary or a guaranteed deal stays on your payroll.
+  Your own club claims other clubs' castoffs only while your assistant GM runs the roster.
 
 **Injuries** strike during games. Pitchers face a per-pitch and per-appearance risk,
 hitters a per-plate-appearance risk, and both scale with age and the durability trait.

@@ -139,8 +139,9 @@ function Flags({ d }: { d: TeamView }) {
       <label class="check">
         <input type="checkbox" checked={!d.manualRoster} onChange={(e) => set({ manualRoster: !(e.target as HTMLInputElement).checked })} />
         <span>
-          <b>Assistant GM handles roster moves.</b> Injuries, call-ups, weekly swaps with Triple-A and farm promotions happen
-          automatically. Your own moves still work, but he may undo them later. Turn this off to run everything yourself.
+          <b>Assistant GM handles roster moves.</b> Injuries, call-ups, weekly swaps with Triple-A, farm promotions and waiver
+          claims happen automatically. Your own moves still work, but he may undo them later. Turn this off to run everything
+          yourself.
         </span>
       </label>
       <label class="check">
