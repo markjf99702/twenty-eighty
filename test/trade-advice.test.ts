@@ -1,10 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { tradeAdvice, tradeAdviceOn } from "../src/advice/trades";
+import { tradeAdvice, tradeAdviceOn, winsThisSeason } from "../src/advice/trades";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
-import { orgPlayers, seasonWar } from "../src/org/contracts";
+import { orgPlayers } from "../src/org/contracts";
 import { surplusValue } from "../src/org/trades";
-import { playerName } from "../src/players/types";
+import { type Player, playerName } from "../src/players/types";
+import { believedWar } from "../src/scouting/analytics";
 import { Season } from "../src/season/season";
 
 const USER = 6;
@@ -20,6 +21,8 @@ const theirStar = byValue(orgPlayers(league, theirs).filter((p) => p.level === "
 const myScrub = byValue(orgPlayers(league, mine).filter((p) => p.onFortyMan)).at(-1)!;
 const myStar = byValue(orgPlayers(league, mine).filter((p) => p.level === "MLB"))[0]!;
 const theirScrub = byValue(orgPlayers(league, theirs).filter((p) => p.onFortyMan)).at(-1)!;
+const P = (id: number) => league.players[id]!;
+const war = (p: Player) => believedWar(season, USER, p);
 
 describe("the staff's take on a trade", () => {
   it("says take a steal and pass on a giveaway, and explains why", () => {
@@ -36,8 +39,48 @@ describe("the staff's take on a trade", () => {
   });
 
   it("counts this season's wins while the season is on", () => {
-    const a = tradeAdvice(season, [myScrub.id], [theirStar.id], fraction)!;
-    if (seasonWar(theirStar) > 1) expect(a.notes.some((n) => /rest of this season/.test(n.text))).toBe(true);
+    // A left fielder well ahead of ours would start, and that shows up this season.
+    const ours = P(mine.depth.starters.LF);
+    const better = league.players.find((p) => p.teamId !== null && p.teamId !== USER && p.level === "MLB" && p.position === "LF" && !p.injury && war(p) > war(ours) + 1)!;
+    const a = tradeAdvice(season, [myScrub.id], [better.id], fraction)!;
+    expect(a.notes.some((n) => n.text.startsWith("For the rest of this season it makes us about") && n.text.includes("better"))).toBe(true);
+  });
+
+  describe("this season's wins", () => {
+    const time = (p: Player) => fraction - (p.injury?.daysLeft ?? 0) / season.totalDays;
+
+    it("count nothing for a starter who wouldn't crack the rotation", () => {
+      const weakest = Math.min(...mine.depth.rotation.map((id) => war(P(id))));
+      const sp = league.players
+        .filter((p) => p.teamId !== null && p.teamId !== USER && p.level === "MLB" && p.role === "SP" && !p.injury && war(p) >= 0.6 && war(p) < weakest - 0.2)
+        .sort((a, b) => war(b) - war(a))[0]!;
+      const prospect = mine.rosters.AA.map(P).find((p) => !p.onFortyMan)!;
+      expect(winsThisSeason(season, [prospect.id], [sp.id], fraction)).toBe(0);
+      const take = tradeAdvice(season, [prospect.id], [sp.id], fraction)!;
+      expect(take.notes.some((n) => n.text.includes("wouldn't beat out"))).toBe(true);
+      expect(take.notes.some((n) => /rest of this season/.test(n.text))).toBe(false);
+    });
+
+    it("count a swap of regulars at one position as the difference between them", () => {
+      const ours = P(mine.depth.starters.SS);
+      const other = league.teams
+        .filter((t) => t.id !== USER)
+        .map((t) => P(t.depth.starters.SS))
+        .find((p) => p.position === "SS" && !p.injury && war(p) > war(ours) + 1)!;
+      expect(winsThisSeason(season, [ours.id], [other.id], fraction)).toBeCloseTo(war(other) * time(other) - war(ours) * time(ours), 6);
+    });
+
+    it("count a regular traded for a prospect as the drop to whoever's next up", () => {
+      const cf = P(mine.depth.starters.CF);
+      const starting = new Set([...Object.values(mine.depth.starters), mine.depth.dh, ...mine.depth.rotation]);
+      const next = [...mine.rosters.MLB, ...mine.rosters.AAA]
+        .map(P)
+        .filter((p) => !p.pitching && !(p.injury && p.injury.daysLeft > 0) && !starting.has(p.id) && (p.position === "CF" || p.positions.includes("CF")))
+        .sort((a, b) => war(b) - war(a))[0]!;
+      const prospect = theirs.rosters.AA.map(P)[0]!;
+      expect(war(next)).toBeGreaterThan(0.5);
+      expect(winsThisSeason(season, [cf.id], [prospect.id], fraction)).toBeCloseTo(war(next) * fraction - war(cf) * time(cf), 6);
+    });
   });
 
   it("is surer about other clubs' players with a better scouting department, or on Easy", () => {

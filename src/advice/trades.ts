@@ -74,10 +74,9 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
   const edge = Math.max(2, 0.1 * scale);
   let verdict: TradeAdvice["verdict"] = net >= edge ? "take" : net <= -edge ? "pass" : "consider";
 
-  // This season: wins over what's left of it, from big leaguers healthy enough to play.
+  // This season: what it does to the club's regulars over what's left of it.
   const inSeason = !league.offseason && season.day < season.totalDays;
-  const left = (p: Player) => (p.level === "MLB" ? Math.max(0, fraction - (p.injury?.daysLeft ?? 0) / season.totalDays) : 0);
-  const now = inSeason ? ins.reduce((s, p) => s + war(p) * left(p), 0) - outs.reduce((s, p) => s + war(p) * left(p), 0) : 0;
+  const now = winsThisSeason(season, give, get, fraction);
   const gb = inSeason ? gamesOut(season, user) : 0;
   const contending = inSeason && gb <= 4;
   // In a race, this season counts: a contender can pay a little for help now, and shouldn't give it away for a little.
@@ -99,7 +98,8 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
           : `A little short by our read (about ${money(net)} their way), but close enough to think about.`;
 
   if (inSeason && Math.abs(now) >= 0.2) {
-    const race = gb <= 0 ? "we're holding a playoff spot" : gb <= 4 ? `we're ${gb} game${gb === 1 ? "" : "s"} out of a playoff spot` : "";
+    const rec = season.records[user]!;
+    const race = rec.w + rec.l === 0 ? "" : gb <= 0 ? "we're holding a playoff spot" : gb <= 4 ? `we're ${gb} game${gb === 1 ? "" : "s"} out of a playoff spot` : "";
     const why = race ? `, and ${race}` : gb >= 8 ? `, but at ${gb} games out the seasons after this one matter more` : "";
     notes.push({ from: "assistant", text: `For the rest of this season it makes us about ${wins(now)} ${now > 0 ? "better" : "worse"}${why}.` });
   }
@@ -199,10 +199,85 @@ function rental(p: Player): boolean {
   return c.type === "guaranteed" ? c.years <= 1 : serviceYears(p) >= FREE_AGENT_YEARS - 1;
 }
 
-type Spot = FieldPosition | "DH" | "rotation";
+type Spot = FieldPosition | "DH" | "rotation" | "pen";
+/** A regular's job (a lineup spot, a rotation turn, a late-inning role) and who holds it. */
+type Job = { spot: Spot; holder: Player | null };
+
+/** The relievers trusted late in games: the closer and setup men. */
+const LATE_RELIEVERS = 4;
+/** How much better (wins a season, by our read) a newcomer has to be before he takes a regular's job. */
+const MARGIN = { lineup: 0.4, rotation: 0.3, pen: 0.2 };
+
+/**
+ * What a trade does to this season, in wins over what's left of it, by our
+ * read: the change in the club's regulars (the lineup, the rotation and the
+ * late relievers). A regular we trade away leaves his job to the best
+ * newcomer who plays it, or to whoever's next up if he's better; any other
+ * newcomer counts only for what he adds over the player he'd push out of a
+ * job, so one who wouldn't start adds nothing. Hurt players count for the
+ * time they'll play.
+ */
+export function winsThisSeason(season: Season, give: number[], get: number[], fraction: number): number {
+  const league = season.league;
+  const user = league.userTeamId;
+  if (user === null || league.offseason || season.day >= season.totalDays) return 0;
+  const team = league.teams[user]!;
+  const d = team.depth;
+  const P = (id: number) => league.players[id]!;
+  const war = (p: Player) => believedWar(season, user, p);
+  // Big leaguers play the rest of the season, less any time they'll miss; a call-up plays all of it.
+  const time = (p: Player) => (p.level === "MLB" ? Math.max(0, fraction - (p.injury?.daysLeft ?? 0) / season.totalDays) : fraction);
+  // Who holds each regular's job now.
+  const jobs = new Map<string, Job>();
+  for (const pos of FIELD_POSITIONS) jobs.set(pos, { spot: pos, holder: d.starters[pos] >= 0 ? P(d.starters[pos]) : null });
+  jobs.set("DH", { spot: "DH", holder: d.dh >= 0 ? P(d.dh) : null });
+  d.rotation.forEach((id, i) => jobs.set(`rotation${i}`, { spot: "rotation", holder: P(id) }));
+  d.bullpen.slice(0, LATE_RELIEVERS).forEach((id, i) => jobs.set(`pen${i}`, { spot: "pen", holder: P(id) }));
+  const before = new Map([...jobs].map(([k, j]) => [k, j.holder]));
+
+  const going = new Set(give);
+  const taken = new Set(give);
+  const newcomers = get.map(P).filter((p) => p.level === "MLB").sort((a, b) => war(b) - war(a));
+  const placed = new Set<number>();
+  const worth = (p: Player | null) => (p ? war(p) : -Infinity);
+  // The job of each regular we trade away: the better of the best newcomer who plays it and whoever's next up.
+  for (const job of jobs.values()) {
+    if (!job.holder || !going.has(job.holder.id)) continue;
+    const newcomer = newcomers.find((p) => !placed.has(p.id) && fits(p, job.spot)) ?? null;
+    const next = nextUp(season, team, job.spot, taken, war);
+    job.holder = worth(newcomer) >= worth(next) ? newcomer : next;
+    if (job.holder) (job.holder === newcomer ? placed : taken).add(job.holder.id);
+  }
+  // Every other newcomer takes the job of the weakest regular in his role, if he's clearly better.
+  for (const p of newcomers) {
+    if (placed.has(p.id)) continue;
+    const role: Spot = p.pitching ? (p.role === "SP" ? "rotation" : "pen") : FIELD_POSITIONS.includes(p.position as FieldPosition) ? (p.position as FieldPosition) : "DH";
+    let weakest: Job | undefined;
+    for (const j of jobs.values()) if (j.spot === role && (!weakest || worth(j.holder) < worth(weakest.holder))) weakest = j;
+    if (!weakest) continue;
+    if (!weakest.holder || war(p) > war(weakest.holder) + MARGIN[role === "rotation" || role === "pen" ? role : "lineup"]) {
+      weakest.holder = p;
+      placed.add(p.id);
+    }
+  }
+  let wins = 0;
+  for (const [key, job] of jobs) {
+    const was = before.get(key) ?? null;
+    if (job.holder === was) continue;
+    wins += (job.holder ? war(job.holder) * time(job.holder) : 0) - (was ? war(was) * time(was) : 0);
+  }
+  return wins;
+}
+
+/** Whether a player can take a regular's job: a hitter at a position he plays (anyone at DH), a starter in the rotation, a reliever in the pen. */
+function fits(p: Player, spot: Spot): boolean {
+  if (spot === "rotation") return Boolean(p.pitching) && p.role === "SP";
+  if (spot === "pen") return Boolean(p.pitching) && p.role !== "SP";
+  return !p.pitching && (spot === "DH" || p.position === spot || p.positions.includes(spot));
+}
 
 /** The lineup spot or rotation turn a player holds on the depth chart, if any. */
-function startingSpot(depth: Team["depth"], id: number): Spot | null {
+function startingSpot(depth: Team["depth"], id: number): Exclude<Spot, "pen"> | null {
   for (const pos of FIELD_POSITIONS) if (depth.starters[pos] === id) return pos;
   if (depth.dh === id) return "DH";
   if (depth.rotation.includes(id)) return "rotation";
@@ -218,13 +293,13 @@ function fitOf(season: Season, team: Team, p: Player, going: Set<number>, war: (
     if (p.role === "SP") {
       const weakest = others(d.rotation).sort((a, b) => war(a) - war(b))[0];
       if (!weakest) return `${tag(p)} would go straight into the rotation.`;
-      return war(p) > war(weakest) + 0.3
+      return war(p) > war(weakest) + MARGIN.rotation
         ? `${tag(p)} would take ${playerName(weakest)}'s turn in the rotation.`
         : `${tag(p)} wouldn't beat out ${playerName(weakest)} for a rotation spot.`;
     }
-    const pen = others(d.bullpen.slice(0, 4)).sort((a, b) => war(a) - war(b))[0];
+    const pen = others(d.bullpen.slice(0, LATE_RELIEVERS)).sort((a, b) => war(a) - war(b))[0];
     if (!pen) return null;
-    return war(p) > war(pen) + 0.2
+    return war(p) > war(pen) + MARGIN.pen
       ? `${tag(p)} would pitch late in games ahead of ${playerName(pen)}.`
       : `${tag(p)} would be a middle reliever for us.`;
   }
@@ -233,7 +308,7 @@ function fitOf(season: Season, team: Team, p: Player, going: Set<number>, war: (
   const incumbent = incumbentId >= 0 && !going.has(incumbentId) ? league.players[incumbentId]! : null;
   const where = POS_NAMES[pos] ?? "designated hitter";
   if (!incumbent) return `${tag(p)} would start at ${where}.`;
-  return war(p) > war(incumbent) + 0.4
+  return war(p) > war(incumbent) + MARGIN.lineup
     ? `${tag(p)} would start at ${where} over ${playerName(incumbent)}.`
     : `${tag(p)} would be behind ${playerName(incumbent)} at ${where}.`;
 }
@@ -247,14 +322,15 @@ function fillIn(w: number): string {
 
 function nextUp(season: Season, team: Team, spot: Spot, gone: Set<number>, war: (p: Player) => number): Player | null {
   const league = season.league;
+  const late = team.depth.bullpen.slice(0, LATE_RELIEVERS);
   const pool = [...team.rosters.MLB, ...team.rosters.AAA]
     .filter((id) => !gone.has(id))
     .map((id) => league.players[id]!)
     .filter((p) => !(p.injury && p.injury.daysLeft > 0));
-  const fits = pool.filter((p) =>
-    spot === "rotation" ? p.pitching && p.role === "SP" && !team.depth.rotation.includes(p.id) : !p.pitching && (spot === "DH" || p.position === spot || p.positions.includes(spot)) && startingSpot(team.depth, p.id) === null,
+  const candidates = pool.filter((p) =>
+    spot === "pen" ? fits(p, spot) && !team.depth.rotation.includes(p.id) && !late.includes(p.id) : fits(p, spot) && startingSpot(team.depth, p.id) === null,
   );
-  return fits.sort((a, b) => war(b) - war(a))[0] ?? null;
+  return candidates.sort((a, b) => war(b) - war(a))[0] ?? null;
 }
 
 /** An ERA far from FIP, or a wOBA far from xwOBA: the analysts' warning that luck is in the numbers. */
