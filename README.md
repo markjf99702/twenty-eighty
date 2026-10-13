@@ -243,19 +243,21 @@ the GM:
   (walk-offs, comebacks, shutouts, a starter's gem, a two-homer night) and a box score,
   the bracket as it fills in, and MVPs for the League Championship Series and the World
   Series.
-- **The offseason**, a phase at a time: the season in review (awards, who developed,
-  who retired), the tender deadline for your arbitration cases (each with the stat line
-  he takes into the hearing, and what his saves added to the award), the draft (pick when
-  you're on the clock), eight weeks of free agency (make offers; players take the best
-  one that clears their price), international signings against your bonus pool, and
-  spring training. Then the next season starts.
+- **The offseason**, a phase at a time: the season in review (awards, who developed by
+  your scouts' read, who retired), the tender deadline for your arbitration cases (each
+  with the stat line he takes into the hearing, and what his saves added to the award),
+  the draft (pick when you're on the clock), eight weeks of free agency (make offers;
+  players take the best one that clears their price), international signings against
+  your bonus pool, and spring training. Then the next season starts.
 - **Trades** at any time before the July 31 deadline or in the winter: pick players from
   both sides and the other club tells you whether it would say yes (and roughly how much
-  more it wants if not). Clubs call you, too: a contender asks for one of your veterans
-  who fills a hole on its roster, or a seller shops you one of theirs who fills one on
-  yours, each valuing players through its own scouts (so an offer can be a steal or a
-  trap). Interest spreads around: nobody is asked about twice within three weeks (or
-  twice in a winter), and players who've come up before come up less. Offers stand for three days (a week in the winter);
+  more it wants if not). Until the tender deadline, trades (and the payroll) go by next
+  season's contracts: a veteran whose deal is up can't be traded, and an arbitration
+  case counts at his award and takes his tender to his new club. Clubs call you, too: a
+  contender asks for one of your veterans who fills a hole on its roster, or a seller
+  shops you one of theirs who fills one on yours, each valuing players through its own
+  scouts (so an offer can be a steal or a trap). Interest spreads around: nobody is
+  asked about twice within three weeks (or twice in a winter), and players who've come up before come up less. Offers stand for three days (a week in the winter);
   accept, decline, or load one into the builder to counter. Either side can be filtered
   to the 40-man roster (a dot marks who's on it). A deal that would put you over 40
   still works: **Make room** lists your 40-man players, and whoever you mark to
