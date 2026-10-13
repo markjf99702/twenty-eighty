@@ -204,9 +204,12 @@ await board('Go to the tender deadline').click({ timeout: 60000 });
 await board('Tender contracts').click({ timeout: 60000 });
 await board('Finish the draft').waitFor({ timeout: 120000 });
 // On the clock, the Draft button is in view: under the name, which stays put while the board scrolls sideways.
+// The scoreboard can show the draft before the page does, so wait for the page's note either way.
 const toMyPick = page.locator('.note button', { hasText: 'Sim to my pick' });
+const onTheClock = page.locator('.note', { hasText: "You're on the clock" });
+await toMyPick.or(onTheClock).first().waitFor({ timeout: 60000 });
 if (await toMyPick.count()) await toMyPick.click();
-await page.locator('.note', { hasText: "You're on the clock" }).waitFor({ timeout: 60000 });
+await onTheClock.waitFor({ timeout: 60000 });
 const pick = await page.evaluate(() => {
   const btn = [...document.querySelectorAll('.tbl button')].find((b) => b.textContent.trim() === 'Draft' && !b.disabled);
   const box = (el) => el && el.getBoundingClientRect();
