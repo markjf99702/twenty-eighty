@@ -384,8 +384,8 @@ up replacements, activate players when they heal (optioning or DFA'ing someone t
 room), make weekly swaps between the majors and AAA, and promote players up the farm
 system every couple of weeks. They judge players by their grades blended with actual
 production, so a slumping veteran can lose his job and a hot prospect can force his way
-up. A typical season has about 550 IL placements, 900 call-ups and a steady stream of
-waiver claims, all in a transaction log.
+up. A typical season has about 530 IL placements, 780 call-ups and 220 designations
+for assignment (about half of them claimed off waivers), all in a transaction log.
 
 ## The offseason
 
@@ -578,13 +578,13 @@ runs** (this fielder vs. a league-average fielder on the same ball).
 
 | | Sim | MLB | | Sim | MLB |
 |---|---:|---:|---|---:|---:|
-| Runs/game | 4.44 | 4.40 | Avg exit velo | 89.0 | 88.7 |
-| AVG / OBP / SLG | .247/.319/.403 | .244/.313/.401 | Hard-hit % | 38.3 | 38.5 |
+| Runs/game | 4.41 | 4.40 | Avg exit velo | 89.1 | 88.7 |
+| AVG / OBP / SLG | .247/.319/.402 | .244/.313/.401 | Hard-hit % | 38.4 | 38.5 |
 | K% / BB% | 22.5 / 8.6 | 22.4 / 8.3 | Barrel % | 7.5 | 7.8 |
-| HR% of PA | 3.01 | 3.00 | GB / LD / FB % | 43.4 / 25.1 / 22.6 | 43 / 24.5 / 24.5 |
-| BABIP | .296 | .291 | SB per game / SB% | 0.74 / 77% | 0.72 / 79% |
+| HR% of PA | 2.99 | 3.00 | GB / LD / FB % | 43.6 / 25.0 / 22.4 | 43 / 24.5 / 24.5 |
+| BABIP | .296 | .291 | SB per game / SB% | 0.76 / 77% | 0.72 / 79% |
 | Pitches per PA | 3.99 | 3.90 | Errors per game | 0.47 | 0.52 |
-| Swing % / CSW % | 48.1 / 27.8 | 47.3 / 28.2 | SP innings per start | 5.3 | 5.3 |
+| Swing % / CSW % | 48.2 / 27.7 | 47.3 / 28.2 | SP innings per start | 5.3 | 5.3 |
 
 It also checks the *spread*, which is what makes the 20-80 scale honest. A typical
 season has a 50-56 HR leader, a batting champion around .330, a 250-strikeout ace, a

@@ -5,7 +5,8 @@ import type { League, Team } from "../src/league/types";
 import { springTraining } from "../src/offseason/spring";
 import { manageOrganization } from "../src/org/ai";
 import { seasonWar } from "../src/org/contracts";
-import { canStart } from "../src/org/value";
+import { canOption, refreshDepth } from "../src/org/roster";
+import { canStart, playerValue } from "../src/org/value";
 import type { Player } from "../src/players/types";
 
 const healthy = (p: Player) => !p.injury || p.injury.daysLeft <= 0;
@@ -89,5 +90,70 @@ describe("spring training", () => {
       }
     }
     expect(buried).toEqual([]);
+  });
+});
+
+describe("AI weekly swaps", () => {
+  it("send a slumping big leaguer down for a better Triple-A player, with a full active roster", () => {
+    const league = generateLeague({ seed: "swaps" });
+    const ctx = { league, day: 21, expanded: false };
+    const misses: string[] = [];
+    let checked = 0;
+    for (const team of league.teams) {
+      const active = team.rosters.MLB.map((id) => league.players[id]!);
+      if (active.length !== 26) continue;
+      // A bench bat who can be optioned has hit 80 runs below average over a season's worth of plate appearances.
+      const slumping = active
+        .filter((p) => !p.pitching && p.position !== "C" && canOption(ctx, team, p).ok && !Object.values(team.depth.starters).includes(p.id))
+        .sort((a, b) => playerValue(a) - playerValue(b))[0];
+      if (!slumping) continue;
+      const performance = (p: Player) => (p.id === slumping.id ? { runs: -80, sample: 1000 } : null);
+      const hitters = () => team.rosters.MLB.filter((id) => !league.players[id]!.pitching);
+      const before = new Set(hitters());
+      manageOrganization(ctx, team, { performance, weekly: true, farmCheck: false, waiverOrder: league.teams, rng: new Rng(`swaps-${team.id}`) });
+      checked++;
+      const up = hitters().filter((id) => !before.has(id));
+      expect(team.rosters.MLB).toHaveLength(26);
+      if (slumping.level === "MLB" || up.length !== 1) misses.push(`${team.abbrev}: ${slumping.lastName} ${slumping.level}, ${up.length} up`);
+    }
+    expect(checked).toBeGreaterThan(10);
+    expect(misses).toEqual([]);
+  });
+
+  it("don't send a starter in the rotation down for a reliever", () => {
+    const league = generateLeague({ seed: "swaps" });
+    const ctx = { league, day: 21, expanded: false };
+    const P = (id: number) => league.players[id]!;
+    let checked = 0;
+    for (const team of league.teams) {
+      // Six starters active, the sixth in the bullpen, and only relievers in the upper minors.
+      while (startersActive(league, team).length < 6) {
+        const arm = [...team.rosters.AAA, ...team.rosters.AA].map(P).find((p) => p.pitching && canStart(p) && p.onFortyMan && healthy(p));
+        const reliever = team.rosters.MLB.map(P).find((p) => p.pitching && !canStart(p));
+        if (!arm || !reliever) break;
+        team.rosters[arm.level] = team.rosters[arm.level].filter((id) => id !== arm.id);
+        team.rosters.MLB = team.rosters.MLB.map((id) => (id === reliever.id ? arm.id : id));
+        team.rosters.AAA.push(reliever.id);
+        arm.level = "MLB";
+        reliever.level = "AAA";
+      }
+      if (startersActive(league, team).length < 6) continue;
+      for (const level of ["AAA", "AA"] as const) {
+        for (const p of team.rosters[level].map(P).filter((x) => x.pitching && canStart(x))) {
+          team.rosters[level] = team.rosters[level].filter((id) => id !== p.id);
+          team.rosters.A.push(p.id);
+          p.level = "A";
+        }
+      }
+      refreshDepth(league, team);
+      // The fifth starter has been awful.
+      const fifth = P(team.depth.rotation[4]!);
+      if (!canOption(ctx, team, fifth).ok) continue;
+      const performance = (p: Player) => (p.id === fifth.id ? { runs: -150, sample: 1000 } : null);
+      manageOrganization(ctx, team, { performance, weekly: true, farmCheck: false, waiverOrder: league.teams, rng: new Rng(`rotation-${team.id}`) });
+      expect(fifth.level).toBe("MLB");
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(5);
   });
 });

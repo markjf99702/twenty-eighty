@@ -100,11 +100,15 @@ function callUpScore(p: Player, opts: AiOptions, preferPos?: FieldPosition): num
   return estimate(p, opts.performance) + (p.onFortyMan ? 4 : 0) + (preferPos && p.position === preferPos ? 15 : 0) - (p.level === "AA" ? 6 : 0);
 }
 
-/** Best call-up candidate of a type from the upper minors. */
-function bestCandidate(ctx: RosterContext, team: Team, wantPitcher: boolean, opts: AiOptions, preferPos?: FieldPosition): Player | undefined {
+/**
+ * Best call-up candidate of a type from the upper minors. In a swap (the weekly performance moves) someone of his
+ * type goes down first, so a full active roster doesn't rule anyone out, but he isn't replacing an injury: a player
+ * optioned lately waits out his stay.
+ */
+function bestCandidate(ctx: RosterContext, team: Team, wantPitcher: boolean, opts: AiOptions, preferPos?: FieldPosition, swap = false): Player | undefined {
   let pool = [...players(ctx, team.rosters.AAA), ...players(ctx, team.rosters.AA)].filter(
     // callUpBest makes room on the 40-man if the choice needs it.
-    (p) => isPitcher(p) === wantPitcher && healthy(p) && p.optionedDay !== ctx.day && canCallUp(ctx, team, p, true, true).ok,
+    (p) => isPitcher(p) === wantPitcher && healthy(p) && p.optionedDay !== ctx.day && canCallUp(ctx, team, p, !swap, true, swap).ok,
   );
   if (pool.length === 0) return undefined;
   // Short of starters: the call-up is a starter if there is one.
@@ -222,13 +226,19 @@ function performanceMoves(ctx: RosterContext, team: Team, opts: AiOptions): void
     const active = players(ctx, team.rosters.MLB)
       .filter((p) => isPitcher(p) === wantPitcher && healthy(p))
       .sort((a, b) => estimate(a, opts.performance) - estimate(b, opts.performance));
-    const candidate = bestCandidate(ctx, team, wantPitcher, opts);
+    // The incumbent goes down first, so the candidate is judged as if his spot were open.
+    const candidate = bestCandidate(ctx, team, wantPitcher, opts, undefined, true);
     if (!candidate) continue;
     // The weakest big leaguer who can go, keeping a second catcher around and
-    // five starters (unless the newcomer can start).
+    // five starters (unless the newcomer can start). A reliever coming up
+    // doesn't cost the rotation one of its five, as when one comes back from
+    // the injured list.
     const protectCatchers = candidate.position !== "C" && catchersActive(ctx, team) <= 2;
     const protectStarters = wantPitcher && !canStart(candidate) && startersActive(ctx, team) <= ROTATION;
-    const incumbent = active.find((p) => !(protectCatchers && p.position === "C") && !(protectStarters && canStart(p)));
+    const protectRotation = wantPitcher && !canStart(candidate);
+    const incumbent = active.find(
+      (p) => !(protectCatchers && p.position === "C") && !(protectStarters && canStart(p)) && !(protectRotation && team.depth.rotation.includes(p.id)),
+    );
     if (!incumbent) continue;
     const gain = estimate(candidate, opts.performance) - estimate(incumbent, opts.performance);
     const optionable = canOption(ctx, team, incumbent).ok;
@@ -237,7 +247,7 @@ function performanceMoves(ctx: RosterContext, team: Team, opts: AiOptions): void
     if (!candidate.onFortyMan && optionable && !openFortyManSpot(ctx, team, opts)) continue;
     if (optionable) optionPlayer(ctx, team, incumbent);
     else if (!designateForAssignment(ctx, team, incumbent, opts.waiverOrder).ok) continue;
-    callUp(ctx, team, candidate, true);
+    callUp(ctx, team, candidate);
   }
 }
 
