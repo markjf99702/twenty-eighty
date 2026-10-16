@@ -100,6 +100,15 @@ describe("the offseason", () => {
     for (const id of state.expiring) expect(league.freeAgents).toContain(id);
   });
 
+  it("owes nothing to its non-tenders or the veterans whose deals were up", () => {
+    // A non-tender is a release at the deadline, made while the tender window is still open, so it books no dead money
+    // even when his last deal was an arbitration salary.
+    const nonTenders = state.tenders.filter((t) => !t.tender).map((t) => t.playerId);
+    expect(nonTenders.length).toBeGreaterThan(0);
+    const gone = new Set([...nonTenders, ...state.expiring]);
+    for (const team of league.teams) expect(team.deadMoney.filter((d) => gone.has(d.playerId))).toEqual([]);
+  });
+
   it("counts each club's picks still to come, and none once the draft is over", () => {
     const d = league.offseason!.draft!;
     const first = d.order[0]!;
