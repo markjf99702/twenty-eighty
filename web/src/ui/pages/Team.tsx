@@ -128,7 +128,7 @@ function Counts({ d }: { d: TeamView }) {
 }
 
 function Flags({ d }: { d: TeamView }) {
-  const set = async (flags: { manualRoster?: boolean; manualDepth?: boolean }) => {
+  const set = async (flags: { manualRoster?: boolean; manualLineup?: boolean; manualPitching?: boolean }) => {
     await call("setFlags", flags);
     bump();
   };
@@ -143,10 +143,18 @@ function Flags({ d }: { d: TeamView }) {
         </span>
       </label>
       <label class="check">
-        <input type="checkbox" checked={!d.manualDepth} onChange={(e) => set({ manualDepth: !(e.target as HTMLInputElement).checked })} />
+        <input
+          type="checkbox"
+          checked={!d.manualLineup && !d.manualPitching}
+          onChange={(e) => {
+            const yours = !(e.target as HTMLInputElement).checked;
+            void set({ manualLineup: yours, manualPitching: yours });
+          }}
+        />
         <span>
-          <b>Manager sets the depth chart.</b> Turn this off (or edit the depth chart) to choose the lineup, rotation and bullpen order
-          yourself; he'll still fill holes when someone leaves the roster.
+          <b>Manager sets the depth chart.</b> Turn this off to choose the lineup, rotation and bullpen order yourself, or change the
+          lineup or the pitching staff on the depth chart to take over just that part. While someone you placed is hurt or sent down,
+          the manager fills in, and he gets his spot back when he returns.
         </span>
       </label>
     </div>
@@ -255,9 +263,11 @@ function Depth({ d }: { d: TeamView }) {
   };
 
   const handBack = async () => {
-    await call("setFlags", { manualDepth: false });
+    await call("setFlags", { manualLineup: false, manualPitching: false });
     bump();
   };
+  const yours = d.manualLineup && d.manualPitching ? "the depth chart" : d.manualLineup ? "the lineup" : "the pitching staff";
+  const his = d.manualLineup && d.manualPitching ? "" : d.manualLineup ? "; the manager sets the pitching staff" : "; the manager sets the lineup";
 
   const slotId = (slot: (typeof SLOTS)[number]) => (slot === "DH" ? depth.dh : depth.starters[slot]);
 
@@ -303,15 +313,17 @@ function Depth({ d }: { d: TeamView }) {
     <>
       {d.isUser ? (
         <div class="note">
-          {d.manualDepth ? (
+          {d.manualLineup || d.manualPitching ? (
             <>
-              You're setting the depth chart. Changes save immediately; the manager only fills holes when a player leaves the roster.{" "}
+              You're setting {yours}
+              {his}. Changes save immediately. While someone you placed is hurt or sent down, the manager fills in, and he gets his spot
+              back when he returns.{" "}
               <button type="button" class="btn small" onClick={handBack}>
                 Let the manager set it
               </button>
             </>
           ) : (
-            "The manager is setting the depth chart. Change any slot to take it over."
+            "The manager is setting the depth chart. Change the lineup or the pitching staff to take over that part."
           )}
         </div>
       ) : (

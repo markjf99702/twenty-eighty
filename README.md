@@ -226,8 +226,11 @@ the GM:
   injured list, promote or demote within the farm, release) is a click away; moves that
   aren't allowed say why and where to make room, and a call-up or a designation says how
   it turned out (where he plays, who claimed him).
-- **Depth chart**: set the lineup, rotation and bullpen order yourself, or leave it to
-  the manager. An assistant GM can handle injuries and call-ups until you turn him off.
+- **Depth chart**: set the lineup, rotation and bullpen order yourself, or leave it to the
+  manager. Change the lineup or the pitching staff and that part is yours while the other
+  stays his; while someone you placed is hurt or sent down, the manager fills in, and he
+  gets his spot back when he returns. An assistant GM can handle injuries and call-ups
+  until you turn him off.
 - **Player pages**: the scouting report as present/future 20-80 bars, pitch mix, defense
   by position, and stats by level.
 - **Stats**: sortable leaderboards for every level, with qualified/club/position filters

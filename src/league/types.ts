@@ -51,10 +51,17 @@ export interface Team {
   fortyMan: number[];
   /** MLB injured list. */
   injured: number[];
-  /** MLB depth chart, rebuilt by the manager AI after roster moves (unless the user sets it). */
+  /** MLB depth chart, rebuilt after roster moves: the manager's, or for the parts the user sets, from his plan. */
   depth: DepthChart;
-  /** The user has set this club's depth chart by hand; the AI only patches holes. */
-  manualDepth?: boolean;
+  /** The user sets this club's lineup (and its bench); the manager fills in for anyone he placed who's away. */
+  manualLineup?: boolean;
+  /** The user sets this club's rotation and bullpen order, the same way. */
+  manualPitching?: boolean;
+  /**
+   * The depth chart as the user set it, for the parts he sets: whoever he placed takes his spot whenever he's on the
+   * active roster, and players who are hurt or sent down keep theirs while the manager fills in.
+   */
+  depthPlan?: DepthChart;
   /** The user makes this club's roster moves; the AI stays out. */
   manualRoster?: boolean;
   affiliates: Record<MinorLevel, Affiliate>;

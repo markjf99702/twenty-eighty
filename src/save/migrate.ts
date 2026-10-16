@@ -2,7 +2,7 @@ import { generateLegends } from "../league/legends";
 import { foundingHall } from "../offseason/hall";
 import { generatePriors } from "../players/prior";
 import { Rng } from "../core/rng";
-import type { League } from "../league/types";
+import type { League, Team } from "../league/types";
 import { createFinance } from "../finance/finance";
 import { DEFAULT_SETTINGS } from "../league/settings";
 import { createOwner, hireGm } from "../finance/owner";
@@ -15,7 +15,8 @@ import { defaultScouting } from "../scouting/scouting";
  * universe's are. Version 2 predates scouting departments; version 3
  * predates finances and owners; version 4, trade offers; version 5, settings
  * and staff advice; version 6, moments, legends and the Hall of Fame (with
- * veterans' careers from before the first season).
+ * veterans' careers from before the first season); version 7, a hand-set
+ * depth chart in two parts, each kept as the user's plan.
  */
 export function migrateLeague(league: League, fromVersion: number): void {
   if (fromVersion < 2) {
@@ -68,5 +69,17 @@ export function migrateLeague(league: League, fromVersion: number): void {
     generatePriors(league.players, league.offseason ? league.year + 1 : league.year, new Rng(`${league.seed}:prior`));
     l.legends ??= generateLegends(league);
     l.hall ??= foundingHall(l.legends);
+  }
+  if (fromVersion < 8) {
+    // A hand-set depth chart was one piece, the manager's fill-ins included: it becomes the plan for both parts.
+    for (const t of league.teams) {
+      const old = t as Team & { manualDepth?: boolean };
+      if (old.manualDepth) {
+        t.manualLineup = true;
+        t.manualPitching = true;
+        t.depthPlan = structuredClone(t.depth);
+      }
+      delete old.manualDepth;
+    }
   }
 }

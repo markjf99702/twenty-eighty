@@ -193,22 +193,24 @@ export function playoffDepth(season: Season, team: Team, plan: PlayoffPlan | nul
   const mine = plan && user ? plan : null;
   const roster = new Set(playoffRoster(season, team, plan));
   const has = (id: number) => id >= 0 && roster.has(id);
-  let depth = team.depth;
   // The manager draws his October depth chart from the playoff roster, so a
-  // regular back from the injured list gets his place back. A chart the user
-  // set by hand stands, unless a regular is left off: then the manager redraws it.
-  const handSet = user && team.manualDepth && Object.values(depth.starters).every(has) && has(depth.dh);
-  if (!handSet) depth = autoDepthChart([...roster].map((id) => league.players[id]!));
-  const wanted = (mine?.rotation ?? depth.rotation.slice(0, 4)).filter((id) => has(id) && league.players[id]?.pitching);
-  const rotation = wanted.length ? wanted : depth.rotation.filter(has).slice(0, 4);
-  const inLineup = new Set([...Object.values(depth.starters), depth.dh]);
-  const bench = depth.bench.filter(has);
-  const bullpen = [...depth.bullpen.filter((id) => has(id) && !rotation.includes(id)), ...depth.rotation.filter((id) => has(id) && !rotation.includes(id))];
+  // regular back from the injured list gets his place back. A lineup the user
+  // set by hand stands, unless a regular is left off: then the manager redraws
+  // it. A pitching staff the user set keeps his order.
+  const auto = autoDepthChart([...roster].map((id) => league.players[id]!));
+  const lineupSet = user && team.manualLineup && Object.values(team.depth.starters).every(has) && has(team.depth.dh);
+  const lineup = lineupSet ? team.depth : auto;
+  const staff = user && team.manualPitching ? team.depth : auto;
+  const wanted = (mine?.rotation ?? staff.rotation.slice(0, 4)).filter((id) => has(id) && league.players[id]?.pitching);
+  const rotation = wanted.length ? wanted : staff.rotation.filter(has).slice(0, 4);
+  const inLineup = new Set([...Object.values(lineup.starters), lineup.dh]);
+  const bench = lineup.bench.filter(has);
+  const bullpen = [...staff.bullpen.filter((id) => has(id) && !rotation.includes(id)), ...staff.rotation.filter((id) => has(id) && !rotation.includes(id))];
   for (const id of roster) {
     if (inLineup.has(id) || bench.includes(id) || bullpen.includes(id) || rotation.includes(id)) continue;
     (isPitcher(league.players[id]!) ? bullpen : bench).push(id);
   }
-  return { starters: depth.starters, dh: depth.dh, bench, rotation, bullpen };
+  return { starters: lineup.starters, dh: lineup.dh, bench, rotation, bullpen };
 }
 
 /**

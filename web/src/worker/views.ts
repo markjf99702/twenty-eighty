@@ -636,7 +636,7 @@ function whereHePlays(league: League, team: Team, p: Player, verb: string): stri
   if (p.pitching) return `${name} ${verb} and joins the ${d.rotation.includes(p.id) ? "rotation" : "bullpen"}.`;
   const slot = d.dh === p.id ? "DH" : FIELD_POSITIONS.find((pos) => d.starters[pos] === p.id);
   if (slot) return `${name} ${verb} and starts ${SPOT[slot]}.`;
-  const who = team.manualDepth ? "your depth chart has him" : "the manager has him";
+  const who = team.manualLineup ? "your depth chart has him" : "the manager has him";
   const pos = p.position === "P" ? null : p.position;
   const regular = pos === null ? -1 : pos === "DH" ? d.dh : d.starters[pos];
   const instead = pos !== null && regular >= 0 ? ` (${playerName(league.players[regular]!)} starts ${SPOT[pos]})` : "";
@@ -747,7 +747,8 @@ export function teamView(season: Season, stats: StatsCache, teamId: number, ctx:
     payroll: payrollView(season, stats, team),
     isUser,
     manualRoster: Boolean(team.manualRoster),
-    manualDepth: Boolean(team.manualDepth),
+    manualLineup: Boolean(team.manualLineup),
+    manualPitching: Boolean(team.manualPitching),
     record: { w: rec.w, l: rec.l, rs: rec.rs, ra: rec.ra },
     counts: {
       active: team.rosters.MLB.length,

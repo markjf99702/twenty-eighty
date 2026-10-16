@@ -1,4 +1,4 @@
-import type { League, Team, TransactionType } from "../league/types";
+import type { DepthChart, League, Team, TransactionType } from "../league/types";
 import {
   FIELD_POSITIONS,
   type IlType,
@@ -88,18 +88,38 @@ export function canBeOptioned(p: Player): boolean {
   return p.options.usedThisYear || p.options.used < MAX_OPTION_YEARS;
 }
 
-/** Rebuild the MLB depth chart after a move (the user's club keeps its choices, holes are patched). */
+const LINEUP = [...FIELD_POSITIONS, "DH"] as const;
+type LineupSlot = (typeof LINEUP)[number];
+const slotOf = (d: DepthChart, slot: LineupSlot) => (slot === "DH" ? d.dh : d.starters[slot]);
+function setSlot(d: DepthChart, slot: LineupSlot, id: number): void {
+  if (slot === "DH") d.dh = id;
+  else d.starters[slot] = id;
+}
+const sameOrder = (a: number[], b: number[]) => a.length === b.length && a.every((x, i) => x === b[i]);
+
+/**
+ * Rebuild the MLB depth chart after a move. The manager draws every club's,
+ * except the parts of the user's that the user sets (the lineup, the pitching
+ * staff), which follow his plan: whoever he placed takes his spot whenever
+ * he's on the active roster; while he's hurt or sent down the manager fills
+ * in, and he gets the spot back when he returns.
+ */
 export function refreshDepth(league: League, team: Team): void {
   const roster = team.rosters.MLB.map((id) => league.players[id]!);
   const auto = autoDepthChart(roster);
-  if (league.userTeamId !== team.id || !team.manualDepth) {
+  const plan = league.userTeamId === team.id ? team.depthPlan : undefined;
+  if (!plan || (!team.manualLineup && !team.manualPitching)) {
     team.depth = auto;
     return;
   }
-  // Manual depth: keep the user's choices that are still valid (active, in
-  // their proper role, used once), fill lineup holes the way the manager
-  // would, and fill the rest from the manager's chart.
-  const d = team.depth;
+  // Players who have left the organization drop out of the plan.
+  const gone = (id: number) => id >= 0 && league.players[id]?.teamId !== team.id;
+  for (const slot of LINEUP) if (gone(slotOf(plan, slot))) setSlot(plan, slot, -1);
+  plan.rotation = plan.rotation.map((id) => (gone(id) ? -1 : id));
+  plan.bench = plan.bench.filter((id) => !gone(id));
+  plan.bullpen = plan.bullpen.filter((id) => !gone(id));
+
+  const d = structuredClone(auto);
   const hitters = new Set(roster.filter((p) => !isPitcher(p)).map((p) => p.id));
   const pitchers = new Set(roster.filter(isPitcher).map((p) => p.id));
   const used = new Set<number>();
@@ -114,41 +134,115 @@ export function refreshDepth(league: League, team: Team): void {
     }
     return out;
   };
-  const pick = (candidates: Iterable<number>) => take(candidates, hitters, 1)[0] ?? -1;
-  // Lock in every lineup choice that still stands before filling any hole.
-  const slots = [...FIELD_POSITIONS, "DH"] as const;
-  const get = (slot: (typeof slots)[number]) => (slot === "DH" ? d.dh : d.starters[slot]);
-  const set = (slot: (typeof slots)[number], id: number) => (slot === "DH" ? (d.dh = id) : (d.starters[slot] = id));
-  const holes = slots.filter((slot) => pick([get(slot)]) < 0);
-  if (holes.length) {
-    // Fill the holes together from the hitters who aren't starting: someone
-    // who plays the position if anyone does, then someone who can handle it,
-    // and among those whoever adds the most there (as the manager builds his
-    // own lineup). A hole in center goes to a center fielder, not to the
-    // first player free or to a catcher with a better bat.
-    const free = roster.filter((p) => hitters.has(p.id) && !used.has(p.id));
-    const fit = (p: Player, slot: (typeof slots)[number]) => (slot === "DH" || p.positions.includes(slot) ? 2 : canPlayPosition(p, slot) ? 1 : 0);
-    const n = Math.max(free.length, holes.length);
-    const value = Array.from({ length: n }, (_, i) =>
-      Array.from({ length: n }, (_, j) => {
+  if (team.manualLineup) {
+    // Lock in everyone the user placed who's here before filling any hole.
+    for (const slot of LINEUP) setSlot(d, slot, take([slotOf(plan, slot)], hitters, 1)[0] ?? -1);
+    const holes = LINEUP.filter((slot) => slotOf(d, slot) < 0);
+    if (holes.length) {
+      // Fill the holes together from the hitters who aren't starting: someone
+      // who plays the position if anyone does, then someone who can handle it,
+      // and among those whoever adds the most there (as the manager builds his
+      // own lineup). A hole in center goes to a center fielder, not to the
+      // first player free or to a catcher with a better bat. They're filled
+      // afresh after every move, so a call-up who plays the position takes over.
+      const free = roster.filter((p) => hitters.has(p.id) && !used.has(p.id));
+      const fit = (p: Player, slot: LineupSlot) => (slot === "DH" || p.positions.includes(slot) ? 2 : canPlayPosition(p, slot) ? 1 : 0);
+      const n = Math.max(free.length, holes.length);
+      const value = Array.from({ length: n }, (_, i) =>
+        Array.from({ length: n }, (_, j) => {
+          const p = free[i];
+          // Columns past the holes are the bench; a row past the free hitters is nobody.
+          if (j >= holes.length) return 0;
+          return p ? 1000 * fit(p, holes[j]!) + slotValue(p, holes[j]!) : -10_000;
+        }),
+      );
+      maxAssignment(value).forEach((j, i) => {
         const p = free[i];
-        // Columns past the holes are the bench; a row past the free hitters is nobody.
-        if (j >= holes.length) return 0;
-        return p ? 1000 * fit(p, holes[j]!) + slotValue(p, holes[j]!) : -10_000;
-      }),
-    );
-    for (const slot of holes) set(slot, -1);
-    maxAssignment(value).forEach((j, i) => {
-      const p = free[i];
-      if (!p || j >= holes.length) return;
-      set(holes[j]!, p.id);
-      used.add(p.id);
-    });
+        if (!p || j >= holes.length) return;
+        setSlot(d, holes[j]!, p.id);
+        used.add(p.id);
+      });
+    }
+    d.bench = take([...plan.bench, ...auto.bench, ...hitters], hitters);
   }
-  d.bench = take([...d.bench, ...auto.bench, ...hitters], hitters);
-  const size = Math.min(5, Math.max(auto.rotation.length, d.rotation.length));
-  d.rotation = take([...d.rotation, ...auto.rotation, ...auto.bullpen], pitchers, size);
-  d.bullpen = take([...d.bullpen, ...auto.bullpen, ...pitchers], pitchers);
+  if (team.manualPitching) {
+    // His starters keep their turns; a starter who's away has his turn taken by the manager's next choice.
+    const size = Math.min(5, Math.max(auto.rotation.length, plan.rotation.length));
+    const turns = Array.from({ length: size }, (_, i) => take([plan.rotation[i] ?? -1], pitchers, 1)[0] ?? -1);
+    d.rotation = turns.map((id) => (id >= 0 ? id : (take([...auto.rotation, ...auto.bullpen], pitchers, 1)[0] ?? -1))).filter((id) => id >= 0);
+    d.bullpen = take([...plan.bullpen, ...auto.bullpen, ...pitchers], pitchers);
+  }
+  team.depth = d;
+}
+
+/**
+ * The user's own depth chart, from the Depth chart tab. The part he changed
+ * (the lineup with its bench, or the pitching staff) becomes his plan, and the
+ * other stays the manager's. In a part that's already his, only the spots he
+ * changed take the new choice: a player who's hurt or sent down keeps his
+ * spot waiting for him, rather than losing it to whoever is filling in.
+ */
+export function handSetDepth(league: League, team: Team, next: DepthChart): void {
+  const live = team.depth;
+  const plan = structuredClone(team.depthPlan ?? live);
+  const away = (id: number) => league.players[id]?.teamId === team.id && !team.rosters.MLB.includes(id);
+  /** The new order, with anyone from the plan who's away back in his old place in it. */
+  const keepWaiting = (order: number[], planned: number[]) => {
+    const out = [...order];
+    planned.forEach((id, i) => {
+      if (away(id) && !out.includes(id)) out.splice(Math.min(i, out.length), 0, id);
+    });
+    return out;
+  };
+  if (LINEUP.some((slot) => slotOf(next, slot) !== slotOf(live, slot)) || !sameOrder(next.bench, live.bench)) {
+    if (team.manualLineup) {
+      for (const slot of LINEUP) if (slotOf(next, slot) !== slotOf(live, slot)) setSlot(plan, slot, slotOf(next, slot));
+      plan.bench = keepWaiting(next.bench, plan.bench);
+    } else {
+      plan.starters = { ...next.starters };
+      plan.dh = next.dh;
+      plan.bench = [...next.bench];
+    }
+    team.manualLineup = true;
+  }
+  if (!sameOrder(next.rotation, live.rotation) || !sameOrder(next.bullpen, live.bullpen)) {
+    if (team.manualPitching) {
+      next.rotation.forEach((id, i) => {
+        if (id !== live.rotation[i]) plan.rotation[i] = id;
+      });
+      plan.bullpen = keepWaiting(next.bullpen, plan.bullpen);
+    } else {
+      plan.rotation = [...next.rotation];
+      plan.bullpen = [...next.bullpen];
+    }
+    team.manualPitching = true;
+  }
+  team.depthPlan = plan;
+  refreshDepth(league, team);
+}
+
+/** Take over parts of the depth chart as they stand (the roster tab's switch), or hand them back to the manager. */
+export function setDepthOwners(league: League, team: Team, owners: { lineup?: boolean; pitching?: boolean }): void {
+  const plan = structuredClone(team.depthPlan ?? team.depth);
+  const now = team.depth;
+  if (owners.lineup !== undefined) {
+    if (owners.lineup && !team.manualLineup) {
+      plan.starters = { ...now.starters };
+      plan.dh = now.dh;
+      plan.bench = [...now.bench];
+    }
+    team.manualLineup = owners.lineup;
+  }
+  if (owners.pitching !== undefined) {
+    if (owners.pitching && !team.manualPitching) {
+      plan.rotation = [...now.rotation];
+      plan.bullpen = [...now.bullpen];
+    }
+    team.manualPitching = owners.pitching;
+  }
+  if (team.manualLineup || team.manualPitching) team.depthPlan = plan;
+  else delete team.depthPlan;
+  refreshDepth(league, team);
 }
 
 function removeFrom(list: number[], id: number): void {

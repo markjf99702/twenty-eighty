@@ -2,11 +2,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { generateLeague } from "../src/league/generate";
 import type { League, Team } from "../src/league/types";
 import { budgetRoom, payroll } from "../src/org/contracts";
-import { slotValue } from "../src/org/depth";
+import { autoDepthChart, slotValue } from "../src/org/depth";
+import { loadGame, type SaveGame, saveGame, serialize } from "../src/save/save";
 import {
   activateFromIl,
   callUp,
   designateForAssignment,
+  handSetDepth,
   optionPlayer,
   placeOnIl,
   positionLabel,
@@ -14,6 +16,7 @@ import {
   releasePlayer,
   rosterProblems,
   type RosterContext,
+  setDepthOwners,
 } from "../src/org/roster";
 import type { Tender } from "../src/offseason/types";
 import { playerValue } from "../src/org/value";
@@ -241,13 +244,13 @@ describe("roster rules", () => {
 
   it("patches a hand-set depth chart without playing anyone twice", () => {
     league.userTeamId = team.id;
-    team.manualDepth = true;
     // Move the manager's first baseman to DH, then lose the new first baseman.
-    const d = team.depth;
+    const d = structuredClone(team.depth);
     const first = d.starters["1B"];
     const newFirst = d.dh;
     d.dh = first;
     d.starters["1B"] = newFirst;
+    handSetDepth(league, team, d);
     expect(optionPlayer(ctx, team, player(newFirst)).ok || designateForAssignment(ctx, team, player(newFirst)).ok).toBe(true);
 
     const lineup = [...FIELD_POSITIONS.map((pos) => team.depth.starters[pos]), team.depth.dh];
@@ -270,17 +273,17 @@ describe("roster rules", () => {
     let checked = 0;
     for (const club of league.teams) {
       league.userTeamId = club.id;
-      club.manualDepth = true;
-      const d = club.depth;
+      const d = structuredClone(club.depth);
       const regular = d.starters.C;
       const backup = d.bench.find((id) => player(id).positions.includes("C"));
       if (backup === undefined) continue;
       d.starters.C = backup;
       d.bench = d.bench.map((id) => (id === backup ? regular : id));
-      const kept = { ...d.starters, DH: d.dh };
-      const free = d.bench.map(player);
+      handSetDepth(league, club, d);
+      const kept = { ...club.depth.starters, DH: club.depth.dh };
+      const free = club.depth.bench.map(player);
       const centerFielders = free.filter((p) => p.positions.includes("CF"));
-      const cf = player(d.starters.CF);
+      const cf = player(club.depth.starters.CF);
       injure(cf, 30);
       expect(placeOnIl(ctx, club, cf).ok).toBe(true);
 
@@ -295,5 +298,109 @@ describe("roster rules", () => {
       checked++;
     }
     expect(checked).toBeGreaterThan(15);
+  });
+
+  it("leaves the lineup to the manager when you change only the pitching staff", () => {
+    league.userTeamId = team.id;
+    const d = structuredClone(team.depth);
+    [d.bullpen[0], d.bullpen[1]] = [d.bullpen[1]!, d.bullpen[0]!];
+    handSetDepth(league, team, d);
+    expect(team.manualPitching).toBe(true);
+    expect(team.manualLineup).toBeFalsy();
+    // The catcher goes on the injured list and comes back: the manager runs the lineup as he would for any club, so
+    // the catcher has his job back, and your bullpen order stands throughout.
+    const c = player(team.depth.starters.C);
+    injure(c, 10);
+    expect(placeOnIl(ctx, team, c).ok).toBe(true);
+    const manager = autoDepthChart(team.rosters.MLB.map(player));
+    expect(team.depth.starters).toEqual(manager.starters);
+    expect(team.depth.dh).toBe(manager.dh);
+    c.injury = null;
+    ctx.day += 11;
+    expect(activateFromIl(ctx, team, c).ok).toBe(true);
+    expect(team.depth.starters.C).toBe(c.id);
+    expect(team.depth.bullpen.slice(0, 2)).toEqual(d.bullpen.slice(0, 2));
+  });
+
+  it("gives a regular you placed his spot back when he returns", () => {
+    league.userTeamId = team.id;
+    // Swap the first baseman and the DH, then lose the new first baseman for ten days.
+    const d = structuredClone(team.depth);
+    const [first, dh] = [d.starters["1B"], d.dh];
+    d.starters["1B"] = dh;
+    d.dh = first;
+    handSetDepth(league, team, d);
+    const regular = player(dh);
+    injure(regular, 10);
+    expect(placeOnIl(ctx, team, regular).ok).toBe(true);
+    const fill = team.depth.starters["1B"];
+    expect(fill).not.toBe(regular.id);
+    expect(team.depth.dh).toBe(first);
+    // Healthy and back: he plays first again, and his fill-in goes back to the bench.
+    regular.injury = null;
+    ctx.day += 11;
+    expect(activateFromIl(ctx, team, regular).ok).toBe(true);
+    expect(team.depth.starters["1B"]).toBe(regular.id);
+    expect(team.depth.dh).toBe(first);
+    expect(team.depth.bench).toContain(fill);
+  });
+
+  it("puts a call-up who plays the position in the spot of a regular who's out", () => {
+    const catches = (p: Player) => p.position === "C" || p.positions.includes("C");
+    let checked = 0;
+    for (const club of league.teams) {
+      league.userTeamId = club.id;
+      const d = structuredClone(club.depth);
+      const backups = d.bench.filter((id) => catches(player(id)));
+      const callee = club.rosters.AAA.map(player).find((p) => catches(p) && p.onFortyMan && !p.injury);
+      if (backups.length !== 1 || !callee) continue;
+      // Your choice: the backup catcher is the DH. Then the catcher goes on the injured list, and nobody free catches.
+      const backup = backups[0]!;
+      d.bench = d.bench.map((id) => (id === backup ? d.dh : id));
+      d.dh = backup;
+      handSetDepth(league, club, d);
+      const c = player(club.depth.starters.C);
+      injure(c, 30);
+      expect(placeOnIl(ctx, club, c).ok).toBe(true);
+      expect(club.depth.dh).toBe(backup);
+      expect(catches(player(club.depth.starters.C))).toBe(false);
+      // The catcher called up to replace him catches, and your DH stays.
+      expect(callUp(ctx, club, callee, true).ok).toBe(true);
+      expect(club.depth.starters.C).toBe(callee.id);
+      expect(club.depth.dh).toBe(backup);
+      checked++;
+    }
+    expect(checked).toBeGreaterThan(2);
+  });
+
+  it("hands the depth chart back to the manager, or takes it over as it stands", () => {
+    league.userTeamId = team.id;
+    const manager = structuredClone(team.depth);
+    setDepthOwners(league, team, { lineup: true, pitching: true });
+    expect(team.depthPlan).toEqual(manager);
+    expect(team.depth).toEqual(manager);
+    const d = structuredClone(team.depth);
+    [d.rotation[0], d.rotation[1]] = [d.rotation[1]!, d.rotation[0]!];
+    handSetDepth(league, team, d);
+    expect(team.depth.rotation.slice(0, 2)).toEqual(d.rotation.slice(0, 2));
+    setDepthOwners(league, team, { lineup: false, pitching: false });
+    expect(team.depthPlan).toBeUndefined();
+    expect(team.depth).toEqual(manager);
+  });
+
+  it("reads an older save's hand-set depth chart as the plan for both parts", () => {
+    league.userTeamId = team.id;
+    const save = JSON.parse(serialize(saveGame(league, null))) as SaveGame;
+    (save.league.teams[team.id] as Team & { manualDepth?: boolean }).manualDepth = true;
+    save.version = 7;
+    const back = loadGame(save).league.teams[team.id]!;
+    expect(back.manualLineup).toBe(true);
+    expect(back.manualPitching).toBe(true);
+    expect(back.depthPlan).toEqual(back.depth);
+    expect("manualDepth" in back).toBe(false);
+    // And a club whose chart was the manager's stays his.
+    const other = loadGame(save).league.teams[team.id === 0 ? 1 : 0]!;
+    expect(other.manualLineup).toBeFalsy();
+    expect(other.depthPlan).toBeUndefined();
   });
 });

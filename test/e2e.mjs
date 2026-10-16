@@ -112,11 +112,12 @@ assert.match(asked, /Designate .+ for assignment\?/, 'designating a player did n
 await page.locator('tr.expand button', { hasText: 'Not yet' }).click();
 await page.waitForSelector('tr.expand .actions');
 await fits('the roster with a player\'s moves open');
-// One change to the depth chart makes it yours, and one tap hands it back to the manager.
+// A change to the bullpen makes the pitching staff yours and leaves the lineup to the manager, and one tap hands it back.
 await page.goto(base + mine + '-depth');
 await page.locator('.depth button[aria-label="Move down"]').first().click();
 const handBack = page.locator('.note button', { hasText: 'Let the manager set it' });
 await handBack.waitFor({ timeout: 10000 });
+assert.match(await page.locator('.note', { has: page.locator('button', { hasText: 'Let the manager set it' }) }).textContent(), /You're setting the pitching staff; the manager sets the lineup\./, 'a bullpen change took over the whole depth chart');
 await fits('the depth chart');
 await handBack.click();
 await page.locator('.note', { hasText: 'The manager is setting the depth chart' }).waitFor({ timeout: 10000 });

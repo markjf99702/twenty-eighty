@@ -347,7 +347,9 @@ export function acceptJob(league: League, teamId: number): GmState {
   if (!gm || !gm.fired || !gm.offers.includes(teamId)) throw new Error("That club hasn't offered you a job.");
   const old = league.teams[gm.teamId]!;
   old.manualRoster = false;
-  old.manualDepth = false;
+  old.manualLineup = false;
+  old.manualPitching = false;
+  delete old.depthPlan;
   old.finance.autoPrice = true;
   // Your scouts' looks stay with your old club.
   league.scouting.looks = {};

@@ -19,13 +19,14 @@ import {
   assignMinors,
   callUp,
   designateForAssignment,
+  handSetDepth,
   optionPlayer,
   placeOnIl,
-  refreshDepth,
   releasePlayer,
   type RosterContext,
   type RosterResult,
   rosterProblems,
+  setDepthOwners,
 } from "../../../src/org/roster";
 import { payroll } from "../../../src/org/contracts";
 import { extensionOptions, signExtension } from "../../../src/org/extensions";
@@ -608,21 +609,16 @@ const handlers: Handlers = {
     const team = userTeam();
     const problem = validDepth(team, s.league, depth);
     if (problem) return { ok: false, reason: problem };
-    team.depth = structuredClone(depth);
-    team.manualDepth = true;
-    refreshDepth(s.league, team);
+    handSetDepth(s.league, team, structuredClone(depth));
     persistSoon();
     return { ok: true };
   },
 
-  setFlags({ manualRoster, manualDepth }) {
+  setFlags({ manualRoster, manualLineup, manualPitching }) {
     const s = requireSeason();
     const team = userTeam();
     if (manualRoster !== undefined) team.manualRoster = manualRoster;
-    if (manualDepth !== undefined) {
-      team.manualDepth = manualDepth;
-      refreshDepth(s.league, team);
-    }
+    if (manualLineup !== undefined || manualPitching !== undefined) setDepthOwners(s.league, team, { lineup: manualLineup, pitching: manualPitching });
     persistSoon();
     return { ok: true };
   },
