@@ -103,6 +103,8 @@ export interface Bracket {
 
 export const PLAYOFF_ROSTER = 26;
 export const PLAYOFF_PITCHERS = 13;
+/** A manager's own pick carries at most this many position players, so 12 or 13 pitchers. */
+const MANAGER_HITTERS = 14;
 
 /** Whether the higher seed is home in each game of a best-of-N. */
 const HOME_PATTERN: Record<number, boolean[]> = {
@@ -220,8 +222,8 @@ export function playoffCandidates(league: League, team: Team): Player[] {
 
 /**
  * The playoff roster a club would carry: its healthy active roster and anyone
- * healthy again on the injured list, trimmed to 26 (at most 13 pitchers) or
- * filled from the 40-man, best first by its own read.
+ * healthy again on the injured list, trimmed to 26 (12 or 13 pitchers, as
+ * October staffs run) or filled from the 40-man, best first by its own read.
  */
 export function defaultPlayoffRoster(season: Season, team: Team): number[] {
   const league = season.league;
@@ -245,7 +247,7 @@ export function defaultPlayoffRoster(season: Season, team: Team): number[] {
     if (out.length >= PLAYOFF_ROSTER) break;
     if (out.includes(p)) continue;
     if (isPitcher(p) && pitchers() >= PLAYOFF_PITCHERS) continue;
-    if (!isPitcher(p) && out.length - pitchers() >= PLAYOFF_ROSTER - 11) continue;
+    if (!isPitcher(p) && out.length - pitchers() >= MANAGER_HITTERS) continue;
     out.push(p);
   }
   return out.map((p) => p.id);

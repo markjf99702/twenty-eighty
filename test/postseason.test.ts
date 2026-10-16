@@ -93,6 +93,16 @@ describe("every club in October", () => {
       expect([...carried].filter((x) => league.players[x]!.pitching).length).toBeLessThanOrEqual(13);
     }
   });
+
+  it("carries 12 or 13 pitchers when its manager picks the roster, as October staffs do", () => {
+    for (const id of bracket.seeds.flat()) {
+      const picked = defaultPlayoffRoster(season, season.team(id));
+      const arms = picked.filter((x) => league.players[x]!.pitching).length;
+      expect(picked).toHaveLength(26);
+      expect(arms).toBeGreaterThanOrEqual(12);
+      expect(arms).toBeLessThanOrEqual(13);
+    }
+  });
 });
 
 describe("injuries in October", () => {
