@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { generateLeague } from "../src/league/generate";
 import { overallGrade, playerValue } from "../src/org/value";
-import { draftClass } from "../src/offseason/draft";
+import { draftClass, signAmateur } from "../src/offseason/draft";
 import { Rng } from "../src/core/rng";
 import { analyticsRead, belief } from "../src/scouting/analytics";
 import { perceive, takeLook, uncertainty, valueShift } from "../src/scouting/scouting";
@@ -46,6 +46,35 @@ describe("scouting reports", () => {
     expect(takeLook(league, 0, other).ok).toBe(true);
     expect(uncertainty(league, 0, other)).toBeLessThan(before);
     expect(takeLook(league, 0, own).ok).toBe(false);
+  });
+
+  it("read a signed amateur as on the board until his first season", () => {
+    const l = generateLeague({ seed: "signing-read" });
+    const club = l.teams[5]!;
+    const kids = draftClass(new Rng("signing-read"), 12);
+    const boards = kids.map((kid) => ({
+      kid,
+      mine: perceive(l, club.id, kid),
+      theirs: perceive(l, 9, kid),
+      sigma: uncertainty(l, club.id, kid),
+      theirSigma: uncertainty(l, 9, kid),
+    }));
+    for (const b of boards) {
+      signAmateur(l, club, b.kid);
+      expect(b.kid.id).toBeGreaterThanOrEqual(0);
+      // The board's read and the first look at his page agree, for his club and everyone else.
+      const now = perceive(l, club.id, b.kid);
+      expect(now.hitting).toEqual(b.mine.hitting);
+      expect(now.pitching).toEqual(b.mine.pitching);
+      expect(perceive(l, 9, b.kid).hitting).toEqual(b.theirs.hitting);
+      expect(uncertainty(l, club.id, b.kid)).toBe(b.sigma);
+    }
+    // His first season: his club sees him every day now, and others see a minor leaguer.
+    l.year += 1;
+    for (const b of boards) {
+      expect(uncertainty(l, club.id, b.kid)).toBeLessThan(b.sigma * 0.5);
+      expect(uncertainty(l, 9, b.kid)).toBeLessThan(b.theirSigma);
+    }
   });
 
   it("don't flatter the top of a draft board", () => {

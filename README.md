@@ -465,7 +465,9 @@ through its own scouts: the true grade plus an error. That error depends on:
   miss of ±7 grade points on a tool) to "elite" ($13M, ±2.9);
 - **familiarity**: your own organization is read best (less than half the miss), then
   other clubs' big leaguers, their upper and lower minors, college draft prospects,
-  and, hardest of all, high schoolers and 17-year-old international amateurs;
+  and, hardest of all, high schoolers and 17-year-old international amateurs. A player
+  signed out of the draft or the international pool is read as he was on the board until
+  his first season, so his page agrees with the board when he signs;
 - **the tool**: speed and arm strength are easy to clock, the hit tool and command are
   the hardest reads, and projecting the future is harder than grading the present;
 - **looks**: send a scout from a player's page, the draft board or the international

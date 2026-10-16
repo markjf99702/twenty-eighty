@@ -89,6 +89,7 @@ export function Scouting({ status }: { status: Status }) {
               </tbody>
             </table>
           </div>
+          <div class="small dim">A player you draft or sign as an amateur is still read as one until his first season with you.</div>
         </Section>
 
         <Section title="Analytics department" aside={`${v.analytics.label}, ${$(v.analytics.cost)} a year`}>

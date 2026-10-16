@@ -15,9 +15,10 @@ import type { ScoutingState } from "./types";
  *
  * Every club sees each player through its own scouts: the true grade plus an
  * error. The error's size depends on the club's scouting department, how well
- * it knows the player (its own organization best, amateurs worst), the tool
- * (speed and arm strength are easy to measure; the hit tool and command are
- * not), and how many times the club has sent a scout to see him. The error
+ * it knows the player (its own organization best, amateurs worst, and a player
+ * signed out of the amateur ranks is still one until his first season), the
+ * tool (speed and arm strength are easy to measure; the hit tool and command
+ * are not), and how many times the club has sent a scout to see him. The error
  * itself comes from a stable hash of (club, player, tool), so a report doesn't
  * flicker from day to day; part of it is redrawn each year. Nothing here is
  * saved except the department levels and the user's looks.
@@ -105,6 +106,9 @@ export const staffCost = (league: League, team: Team) =>
 // ---------------------------------------------------------------------------
 // Errors
 
+/** Amateurs' pool ids repeat every year, so their keys carry the year: pool id x this, plus the year. */
+const POOL_YEARS = 7919;
+
 /**
  * The identity a player's reports hang on. Amateurs in a draft or signing
  * pool have temporary ids that repeat every year, so theirs includes the
@@ -112,15 +116,28 @@ export const staffCost = (league: League, team: Team) =>
  */
 export function scoutKey(league: League, p: Player): number {
   if (p.scoutKey !== undefined) return p.scoutKey;
-  return p.id < 0 ? p.id * 7919 + league.year : p.id;
+  return p.id < 0 ? p.id * POOL_YEARS + league.year : p.id;
 }
+
+/**
+ * Signed out of this winter's draft or international pool (his key carries
+ * the pool's year). Nobody has seen him play pro ball yet, so clubs read him
+ * as they did on their boards until his first season starts.
+ */
+function signedThisWinter(league: League, p: Player): boolean {
+  return p.scoutKey !== undefined && ((p.scoutKey % POOL_YEARS) + POOL_YEARS) % POOL_YEARS === league.year % POOL_YEARS;
+}
+
+/** Known only as an amateur: in a pool, signed this winter, or never yet in the league. */
+const knownAsAmateur = (league: League, p: Player) =>
+  p.id < 0 || signedThisWinter(league, p) || (p.teamId === null && p.service === 0 && p.career.length === 0);
 
 /** Who's looking: a club (its id), or null for a neutral, league-average read. */
 export type Viewer = number | null;
 
 function familiarity(league: League, viewer: Viewer, p: Player): number {
   let f: number;
-  if (p.id < 0 || (p.teamId === null && p.service === 0 && p.career.length === 0)) {
+  if (knownAsAmateur(league, p)) {
     f = p.age >= 21 ? FAMILIARITY.college : FAMILIARITY.amateur;
   } else if (p.teamId === null) {
     f = p.service > 0 ? FAMILIARITY.freeAgentVeteran : FAMILIARITY.freeAgent;
@@ -153,9 +170,9 @@ export function uncertainty(league: League, viewer: Viewer, p: Player): number {
  */
 const CAUTION = 1.7;
 
-/** The players a report is weighed against: unsigned amateurs by age, everyone else by level. */
-function priorGroup(p: Player): PriorGroup {
-  if (p.id < 0 || (p.teamId === null && p.service === 0 && p.career.length === 0)) return p.age >= 21 ? "college" : "young";
+/** The players a report is weighed against: amateurs by age, everyone else by level. */
+function priorGroup(league: League, p: Player): PriorGroup {
+  if (knownAsAmateur(league, p)) return p.age >= 21 ? "college" : "young";
   if (p.teamId === null) return p.service > 0 ? "MLB" : "AAA";
   return p.level;
 }
@@ -177,7 +194,7 @@ function toolError(league: League, viewer: Viewer, p: Player, key: ScoutTool, sl
   const reach = clamp((27 - p.age) / 8, 0, 1);
   const seenNow = truth.present + s * z;
   const seenPeak = truth.future + s * z + s * 0.8 * reach * hashNormal(seed, who, pid, keyId, 23);
-  const [usualNow, usualPeak] = PRIOR_MEANS[priorGroup(p)][key];
+  const [usualNow, usualPeak] = PRIOR_MEANS[priorGroup(league, p)][key];
   const spread = TOOL_SPREAD[key] ** 2;
   const estimate = (seen: number, usual: number, noise: number) => usual + (spread / (spread + (CAUTION * noise) ** 2)) * (seen - usual);
   return {
@@ -283,9 +300,12 @@ export function takeLook(league: League, day: number, p: Player): { ok: boolean;
   return { ok: true };
 }
 
-/** When an amateur signs, his report (and the user's looks at him) follow him to his real id. */
+/**
+ * When an amateur signs, his report (and the user's looks at him) follow him to his real id, and it reads the same
+ * until his first season (signedThisWinter).
+ */
 export function carryReport(league: League, p: Player, poolId: number): void {
-  p.scoutKey = poolId * 7919 + league.year;
+  p.scoutKey = poolId * POOL_YEARS + league.year;
   const looks = league.scouting.looks[poolId];
   if (looks) {
     league.scouting.looks[p.id] = looks;
