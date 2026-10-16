@@ -15,7 +15,7 @@ import { maxAssignment } from "../core/assignment";
 import { canPlayPosition } from "../players/defense";
 import { injuryName } from "../players/injuries";
 import { autoDepthChart, slotValue } from "./depth";
-import { budgetRoom, ensureMajorContract, followTender, MIN_SALARY, outrightContract } from "./contracts";
+import { budgetRoom, ensureMajorContract, followTender, MIN_SALARY, outrightContract, tenderWindow } from "./contracts";
 import { peakValue, playerValue } from "./value";
 
 /**
@@ -407,9 +407,13 @@ export function releasePlayer(ctx: RosterContext, team: Team, p: Player): Roster
   removeFrom(team.fortyMan, p.id);
   removeFrom(team.injured, p.id);
   const wasMlb = p.level === "MLB";
-  // The club still owes whatever is guaranteed.
-  const c = p.contract;
-  if (c && c.type === "guaranteed" && c.years > 0) team.deadMoney.push({ playerId: p.id, amount: c.salary, years: c.years });
+  // The club still owes what's guaranteed, a year at a time, and the rest of an arbitration salary, as it would if he
+  // were outrighted. Before the tender deadline a veteran whose deal is up, or an arbitration case not yet tendered,
+  // is owed nothing: releasing him is a non-tender.
+  const w = tenderWindow(ctx.league);
+  const settled = w !== null && (w.expiring.includes(p.id) || w.tenders.some((t) => t.playerId === p.id));
+  const c = settled ? null : p.contract;
+  if (c && (c.type === "guaranteed" || c.type === "arb") && c.years > 0) team.deadMoney.push({ playerId: p.id, amount: c.salary, years: c.years });
   p.teamId = null;
   p.onFortyMan = false;
   p.il = null;

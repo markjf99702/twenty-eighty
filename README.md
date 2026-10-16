@@ -409,8 +409,9 @@ Every winter the whole universe moves forward a year:
   when they decide whom to tender. A win costs about $8M on the
   open market, and projected WAR comes from the grades through coefficients measured
   from the engine. Each club's budget is set by its owner from what the club takes in
-  (see Finances and owners below); released players' guaranteed money stays on the
-  books as dead money.
+  (see Finances and owners below); a released player's guaranteed money, or the rest
+  of his arbitration salary, stays on the books as dead money (a non-tender owes
+  nothing).
 - **Extensions**: any time, a club can buy out a player's arbitration years (and some
   of his free-agent years) with a guaranteed deal of two to eight years, once it
   covers at least one season past the pre-arbitration scale. He asks, season by

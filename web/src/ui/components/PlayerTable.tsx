@@ -35,9 +35,14 @@ function askFirst(a: RosterActionOption, p: PlayerSummary): string {
     const pay = owed ? `, and his ${dollars(c.salary)}${c.type === "guaranteed" ? ` a year through ${c.through}` : " salary"} stays on your payroll` : "";
     return `Designate ${p.name} for assignment? Other clubs get a shot at him on waivers; if nobody claims him, he stays in your system at AAA, off the 40-man${pay}.`;
   }
-  return c && c.type === "guaranteed" && c.years > 0
-    ? `Release ${p.name}? He leaves the organization, but you still owe him ${dollars(c.salary)} a year through ${c.through}, on your payroll as dead money.`
-    : `Release ${p.name}? He leaves the organization, and you owe him nothing more.`;
+  // Before the tender deadline (a pending contract), a case or a veteran whose deal is up is owed nothing.
+  if (c && !c.pending && c.type === "guaranteed" && c.years > 0) {
+    return `Release ${p.name}? He leaves the organization, but you still owe him ${dollars(c.salary)} a year through ${c.through}, on your payroll as dead money.`;
+  }
+  if (c && !c.pending && c.type === "arb") {
+    return `Release ${p.name}? He leaves the organization, but you still owe him the rest of his ${dollars(c.salary)} arbitration salary, on your payroll as dead money.`;
+  }
+  return `Release ${p.name}? He leaves the organization, and you owe him nothing more.`;
 }
 
 export function RosterMoves({ p, onDone }: { p: PlayerSummary; onDone?: () => void }) {

@@ -11,9 +11,11 @@ import {
   placeOnIl,
   positionLabel,
   refreshDepth,
+  releasePlayer,
   rosterProblems,
   type RosterContext,
 } from "../src/org/roster";
+import type { Tender } from "../src/offseason/types";
 import { playerValue } from "../src/org/value";
 import { FIELD_POSITIONS, type Player, playerName } from "../src/players/types";
 import { staffCost } from "../src/scouting/scouting";
@@ -130,6 +132,40 @@ describe("roster rules", () => {
     expect(callUp(ctx, team, arb).ok).toBe(true);
     expect(arb.contract).toMatchObject({ type: "arb", salary });
     expect(payroll(league, team)).toBe(before);
+  });
+
+  it("owes the rest of an arbitration salary on a release, as on an outright", () => {
+    const arb = team.rosters.MLB.map(player)
+      .filter((p) => p.contract?.type === "arb")
+      .sort((a, b) => b.contract!.salary - a.contract!.salary)[0]!;
+    const salary = arb.contract!.salary;
+    const before = payroll(league, team);
+    expect(releasePlayer(ctx, team, arb).ok).toBe(true);
+    expect(arb.teamId).toBeNull();
+    expect(team.deadMoney).toContainEqual({ playerId: arb.id, amount: salary, years: 1 });
+    // Released or outrighted, his salary stays on the payroll.
+    expect(payroll(league, team)).toBe(before);
+  });
+
+  it("owes nothing on a release before the tender deadline for a case or a veteran whose deal is up", () => {
+    const [pending, leaving] = team.rosters.MLB.map(player).filter((p) => !p.pitching);
+    pending!.contract = { type: "arb", salary: 3.2, years: 1 };
+    leaving!.contract = { type: "guaranteed", salary: 12, years: 1 };
+    const tender: Tender = { playerId: pending!.id, teamId: team.id, salary: 5.4, tender: true };
+    league.offseason = {
+      year: league.year,
+      phase: "tenders",
+      development: { risers: [], fallers: [], retirements: [] },
+      shift: {},
+      tenders: [tender],
+      expiring: [leaving!.id],
+      draft: null,
+      freeAgency: null,
+      international: null,
+    };
+    expect(releasePlayer(ctx, team, pending!).ok).toBe(true);
+    expect(releasePlayer(ctx, team, leaving!).ok).toBe(true);
+    expect(team.deadMoney).toEqual([]);
   });
 
   it("turns a pre-arbitration deal into a minor league one on an outright", () => {
