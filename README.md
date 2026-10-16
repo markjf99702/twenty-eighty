@@ -236,14 +236,15 @@ the GM:
 - **October, game by game**: twelve clubs, best-of-3 Wild Card Series, then best-of-5,
   best-of-7 and the World Series. Play your club's next game, finish a round, or run to
   the end. Every club carries a 26-man playoff roster from its 40-man (at most 13
-  pitchers, and a manager's own pick has 12 or 13): you set yours and the rotation order,
-  and the other managers pick theirs day by day. Each series starts from the top with
-  whoever is rested, and the other starters work in relief. Injuries keep healing through
-  October, and a player on the injured list can make the playoff roster: he plays once
-  he's healthy. The October page shows your next game with both probable starters, your
-  series game by game with a line on each (walk-offs, comebacks, shutouts, a starter's
-  gem, a two-homer night) and a box score, the bracket as it fills in, and MVPs for the
-  League Championship Series and the World Series.
+  pitchers, and a manager's own pick has 12 or 13). The managers pick their rosters and
+  rotations day by day, as players heal, and yours does too until you set your own roster
+  and rotation order. Each series starts from the top with whoever is rested, and the
+  other starters work in relief. Injuries keep healing through October, and a player on
+  the injured list can make the playoff roster: he plays once he's healthy. The October
+  page shows your next game with both probable starters, your series game by game with a
+  line on each (walk-offs, comebacks, shutouts, a starter's gem, a two-homer night) and a
+  box score, the bracket as it fills in, and MVPs for the League Championship Series and
+  the World Series.
 - **The offseason**, a phase at a time: the season in review (awards, who developed by
   your scouts' read, who retired), the tender deadline for your arbitration cases (each
   with the stat line he takes into the hearing, and what his saves added to the award),

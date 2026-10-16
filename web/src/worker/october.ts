@@ -8,8 +8,6 @@ import { playerName } from "../../../src/players/types";
 import {
   type Bracket,
   currentRound,
-  defaultPlayoffRoster,
-  defaultPlayoffRotation,
   type LiveSeries,
   type PostseasonResult,
   type Round,
@@ -17,9 +15,11 @@ import {
   PLAYOFF_PITCHERS,
   PLAYOFF_ROSTER,
   playoffCandidates,
+  playoffDepth,
   playoffRoster,
   probableStarter,
   seriesOf,
+  startPostseason,
   stillAlive,
 } from "../../../src/season/postseason";
 import type { Season } from "../../../src/season/season";
@@ -138,7 +138,10 @@ export function postseasonView(season: Season, boxes: Map<string, BoxScoreView>)
       };
     }
     const plan = b.plan;
-    const roster = lg >= 0 ? playoffRoster(season, season.team(user), plan) : [];
+    const team = season.team(user);
+    const roster = lg >= 0 ? playoffRoster(season, team, plan) : [];
+    // The rotation as it stands: the user's, or the manager's pick of the day.
+    const rotation = lg >= 0 ? playoffDepth(season, team, plan).rotation : [];
     mine = {
       seed: lg >= 0 ? b.seeds[lg]!.indexOf(user) + 1 : null,
       alive,
@@ -147,7 +150,8 @@ export function postseasonView(season: Season, boxes: Map<string, BoxScoreView>)
       plan: {
         roster: roster.length,
         pitchers: roster.filter((id) => league.players[id]!.pitching).length,
-        rotation: (plan.rotation ?? []).map((id) => ({ id, name: playerName(league.players[id]!) })),
+        rotation: rotation.map((id) => ({ id, name: playerName(league.players[id]!) })),
+        byManager: plan.roster === null,
       },
     };
   }
@@ -175,12 +179,22 @@ export function octoberStatus(season: Season): Status["october"] {
   return { started: true, alive, next: !alive ? null : s && s.next !== null ? `Play Game ${s.games.length + 1}` : "Play to your next series" };
 }
 
+/**
+ * October opens (once): the bracket is seeded. Every club, the user's too until he sets a plan, carries the playoff
+ * roster and rotation its manager picks day by day, so a player who heals is back on it.
+ */
+export function openOctober(season: Season): void {
+  if (!season.done) throw new Error("The regular season isn't over yet.");
+  if (!season.postseason && !season.bracket) startPostseason(season);
+}
+
 export function playoffPlanView(season: Season, stats: StatsCache, team: Team): PlayoffPlanView | null {
   const b = season.bracket;
   if (!b || !b.seeds.flat().includes(team.id)) return null;
   const league = season.league;
-  const roster = b.plan.roster ?? defaultPlayoffRoster(season, team);
-  const rotation = b.plan.rotation ?? defaultPlayoffRotation(season, team, roster);
+  // The plan as it stands, which is the manager's pick of the day until the user sets his own.
+  const roster = playoffRoster(season, team, b.plan);
+  const rotation = b.plan.rotation ?? playoffDepth(season, team, b.plan).rotation;
   // The 40-man, with anyone on the short injured lists (healthy again, or on his way back).
   const pool = playoffCandidates(league, team);
   return {

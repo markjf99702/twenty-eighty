@@ -289,6 +289,7 @@ function YourOctober({ d, status }: { d: PostseasonView; status: Status }) {
           <span>
             Playoff roster: <b>{u.plan.roster}</b> players, {u.plan.pitchers} pitchers.
             {u.plan.rotation.length > 0 && <> Rotation: {u.plan.rotation.map((r) => r.name).join(", ")}.</>}
+            {u.plan.byManager && <> Your manager picks the playoff roster and rotation until you set them.</>}
           </span>
           {!editing && (
             <button type="button" class="btn small" onClick={() => setEditing(true)}>

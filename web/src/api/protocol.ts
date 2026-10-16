@@ -533,7 +533,8 @@ export interface PostseasonView {
     alive: boolean;
     series: SeriesView[];
     next: { n: number; round: string; date: string; home: boolean; opponent: string; starter: StarterView | null; theirStarter: StarterView | null } | null;
-    plan: { roster: number; pitchers: number; rotation: { id: number; name: string }[] };
+    /** The playoff roster and rotation as they stand; `byManager` until the user sets his own, the manager's pick of the day. */
+    plan: { roster: number; pitchers: number; rotation: { id: number; name: string }[]; byManager: boolean };
   } | null;
 }
 

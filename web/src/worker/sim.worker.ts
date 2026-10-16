@@ -48,15 +48,8 @@ import { advanceOffseason, beginOffseason, offerClock, WINTER_DAYS, winterContex
 import { FIELD_POSITIONS, MINOR_LEVELS, type Level, playerName } from "../../../src/players/types";
 import { allStarIds } from "../../../src/season/allstar";
 import { deserialize, loadGame, saveGame, serialize } from "../../../src/save/save";
-import {
-  defaultPlayoffRoster,
-  defaultPlayoffRotation,
-  planProblem,
-  playPostseason,
-  startPostseason,
-  stillAlive,
-} from "../../../src/season/postseason";
-import { playoffPlanView, postseasonView } from "./october";
+import { planProblem, playPostseason, stillAlive } from "../../../src/season/postseason";
+import { openOctober, playoffPlanView, postseasonView } from "./october";
 import { allStarLine, allStarView } from "./allstar";
 import { hallView, momentViews, recordsView } from "./records";
 import { Season } from "../../../src/season/season";
@@ -492,18 +485,7 @@ const handlers: Handlers = {
   },
 
   async playoffs() {
-    const s = requireSeason();
-    if (!s.done) throw new Error("The regular season isn't over yet.");
-    if (!s.postseason && !s.bracket) {
-      const b = startPostseason(s);
-      // The user's club starts October with the playoff roster its manager would pick.
-      const user = s.league.userTeamId;
-      if (user !== null && b.seeds.flat().includes(user)) {
-        const team = s.team(user);
-        const roster = defaultPlayoffRoster(s, team);
-        b.plan = { roster, rotation: defaultPlayoffRotation(s, team, roster) };
-      }
-    }
+    openOctober(requireSeason());
     await persist();
     return currentStatus();
   },

@@ -3,7 +3,6 @@ import { bookPostseason } from "../finance/finance";
 import type { DepthChart, League, Team } from "../league/types";
 import { orgPlayers } from "../org/contracts";
 import { autoDepthChart } from "../org/depth";
-import { canStart } from "../org/value";
 import type { Player } from "../players/types";
 import { believedWar } from "../scouting/analytics";
 import type { GameResult } from "../sim/game";
@@ -251,20 +250,6 @@ export function defaultPlayoffRoster(season: Season, team: Team): number[] {
     out.push(p);
   }
   return out.map((p) => p.id);
-}
-
-/** Starters a club would line up for October, best first by its own read. */
-export function defaultPlayoffRotation(season: Season, team: Team, roster: number[]): number[] {
-  const league = season.league;
-  const on = new Set(roster);
-  const war = (p: Player) => believedWar(season, team.id, p);
-  const depth = team.depth.rotation.filter((id) => on.has(id));
-  const others = roster.map((id) => league.players[id]!).filter((p) => p.pitching && canStart(p) && !depth.includes(p.id));
-  return [...depth.map((id) => league.players[id]!), ...others]
-    .filter((p) => !season.isOut(p.id))
-    .sort((a, b) => war(b) - war(a))
-    .slice(0, 4)
-    .map((p) => p.id);
 }
 
 /** What's wrong with a playoff plan, if anything. */

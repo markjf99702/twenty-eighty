@@ -6,9 +6,9 @@ import { playerValue } from "../src/org/value";
 import type { Player } from "../src/players/types";
 import {
   defaultPlayoffRoster,
-  defaultPlayoffRotation,
   planProblem,
   playoffDepth,
+  playoffRoster,
   playoffSeeds,
   playPostseason,
   seriesOf,
@@ -18,7 +18,7 @@ import {
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
 import { Season } from "../src/season/season";
 import type { GameResult } from "../src/sim/game";
-import { playoffPlanView, postseasonView } from "../web/src/worker/october";
+import { openOctober, playoffPlanView, postseasonView } from "../web/src/worker/october";
 import { StatsCache } from "../web/src/worker/views";
 
 const league = generateLeague({ seed: "october" });
@@ -49,10 +49,13 @@ const ace = topSeed.depth.rotation.map((id) => league.players[id]!).find((p) => 
 hurt(ace, 8);
 placeOnIl(season.rosterContext(), topSeed, ace);
 
+// The league as October is about to open, to open it again without a plan of the user's.
+const beforeOctober = serialize(saveGame(league, season));
 const bracket = startPostseason(season);
 hireGm(league, USER);
 const roster = defaultPlayoffRoster(season, team);
-const rotation = defaultPlayoffRotation(season, team, roster);
+// The rotation the manager would line up from that roster, which the plan editor starts from.
+const rotation = playoffDepth(season, team, { roster, rotation: null }).rotation;
 bracket.plan = { roster, rotation };
 
 const seen: GameResult[] = [];
@@ -124,6 +127,37 @@ describe("injuries in October", () => {
     // And he has his place in the lineup again.
     const depth = playoffDepth(season, team, { roster, rotation: null });
     expect([...Object.values(depth.starters), depth.dh]).toContain(onIl.id);
+  });
+});
+
+describe("your club in October before you set a plan", () => {
+  it("carries its manager's pick, day by day, so a player who heals is on it", () => {
+    const copy = loadGame(deserialize(beforeOctober));
+    const s = copy.season!;
+    hireGm(copy.league, USER);
+    const club = s.team(USER);
+    // Hurt in the last game for five days: out when the Wild Card Series starts, healthy before the Division Series.
+    const regular = club.rosters.MLB.map((id) => copy.league.players[id]!)
+      .filter((p) => !p.pitching && !s.isOut(p.id))
+      .sort((a, b) => playerValue(b) - playerValue(a))[0]!;
+    regular.injury = { name: "Hamstring strain", days: 5, daysLeft: 5, startDay: LAST };
+    s.injured.add(regular.id);
+    openOctober(s);
+    expect(s.bracket!.plan).toEqual({ roster: null, rotation: null });
+    expect(playoffRoster(s, club)).not.toContain(regular.id);
+    const before = postseasonView(s, new Map())!.user!.plan;
+    expect(before.byManager).toBe(true);
+    expect(before.roster).toBe(26);
+    expect(before.rotation.length).toBeGreaterThanOrEqual(3);
+    // The bye.
+    playPostseason(s, "game", USER);
+    expect(s.isOut(regular.id)).toBe(false);
+    expect(playoffRoster(s, club)).toContain(regular.id);
+    const depth = playoffDepth(s, club, s.bracket!.plan);
+    expect([...Object.values(depth.starters), depth.dh]).toContain(regular.id);
+    // A plan of the user's stands from then on.
+    s.bracket!.plan = { roster: playoffRoster(s, club), rotation: null };
+    expect(postseasonView(s, new Map())!.user!.plan.byManager).toBe(false);
   });
 });
 
