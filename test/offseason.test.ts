@@ -5,7 +5,7 @@ import { rosterProblems } from "../src/org/roster";
 import { evaluateTrade, executeTrade, surplusValue, tradeValue } from "../src/org/trades";
 import { extensionOptions } from "../src/org/extensions";
 import { Rng } from "../src/core/rng";
-import { boardValue, draftClass, onTheClock } from "../src/offseason/draft";
+import { boardValue, draftClass, onTheClock, picksLeft } from "../src/offseason/draft";
 import { overallGrade, playerValue } from "../src/org/value";
 import { bonusAsk, prospect } from "../src/offseason/international";
 import { perceive } from "../src/scouting/scouting";
@@ -98,6 +98,16 @@ describe("the offseason", () => {
     expect(onTheClock(d)!.teamId).toBe(d.order[0]);
     expect(season.records[d.order[0]!]!.w).toBeLessThanOrEqual(worst.w + 1);
     for (const id of state.expiring) expect(league.freeAgents).toContain(id);
+  });
+
+  it("counts each club's picks still to come, and none once the draft is over", () => {
+    const d = league.offseason!.draft!;
+    const first = d.order[0]!;
+    // Ten rounds, the first club on the clock at the top of each.
+    expect(picksLeft(d, first)).toEqual(Array.from({ length: d.rounds }, (_, r) => r * d.order.length + 1));
+    const total = d.order.length * d.rounds;
+    const over = { ...d, picks: Array.from({ length: total }, (_, i) => ({ round: 1, pick: i + 1, teamId: first, playerId: 0, bonus: 0 })) };
+    expect(picksLeft(over, first)).toEqual([]);
   });
 
   it("sends a case traded before the deadline to arbitration with his new club", () => {

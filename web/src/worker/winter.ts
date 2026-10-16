@@ -8,7 +8,7 @@ import { askingPrice, onTheBlock } from "../../../src/org/market";
 import { offerLive } from "../../../src/org/offers";
 import { evaluateTrade, tradeValue } from "../../../src/org/trades";
 import { offerClock } from "../../../src/offseason/offseason";
-import { boardValue, onTheClock } from "../../../src/offseason/draft";
+import { boardValue, onTheClock, picksLeft } from "../../../src/offseason/draft";
 import { acceptBar, offerScore } from "../../../src/offseason/freeAgency";
 import { MAX_INTERNATIONAL_SIGNINGS } from "../../../src/offseason/international";
 import type { FreeAgencyState, FreeAgentAsk } from "../../../src/offseason/types";
@@ -128,9 +128,7 @@ export function offseasonView(season: Season, stats: StatsCache): OffseasonView 
   if (w.phase === "draft" && w.draft) {
     const d = w.draft;
     const clock = onTheClock(d);
-    const total = d.order.length * d.rounds;
-    const myPicks: number[] = [];
-    for (let n = d.picks.length; n < total; n++) if (d.order[n % d.order.length] === user) myPicks.push(n + 1);
+    const myPicks = user === null ? [] : picksLeft(d, user);
     // Your board: the class as your scouts see it.
     const seen = (p: Player) => boardValue(p) + valueShift(league, user, p, true);
     const board = [...d.pool]

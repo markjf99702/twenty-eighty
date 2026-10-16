@@ -248,9 +248,10 @@ the GM:
 - **The offseason**, a phase at a time: the season in review (awards, who developed by
   your scouts' read, who retired), the tender deadline for your arbitration cases (each
   with the stat line he takes into the hearing, and what his saves added to the award),
-  the draft (pick when you're on the clock), eight weeks of free agency (make offers;
-  players take the best one that clears their price), international signings against
-  your bonus pool, and spring training. Then the next season starts.
+  the draft (pick when you're on the clock; finishing it lets your scouting director make
+  the picks you haven't, and asks first), eight weeks of free agency (make offers; players
+  take the best one that clears their price), international signings against your bonus
+  pool, and spring training. Then the next season starts.
 - **Trades** at any time before the July 31 deadline or in the winter: pick players from
   both sides and the other club tells you whether it would say yes (and roughly how much
   more it wants if not). Until the tender deadline, trades (and the payroll) go by next

@@ -3,6 +3,7 @@ import { bump, call } from "../api/client";
 import type { Status, StopNote, StopRules } from "../api/protocol";
 import { notify, Toasts } from "./components/Common";
 import { DriveCloud, NewerCopy } from "./components/Drive";
+import { WinterNext } from "./components/WinterNext";
 import { drive } from "./drive";
 import { syncLeague } from "./sync";
 import { href, type Route, useRoute } from "./router";
@@ -543,9 +544,7 @@ function Board({
                   Find a new job
                 </a>
               ) : (
-                <button type="button" class="btn primary" onClick={() => onWinter?.("advance")}>
-                  {game.winter.action}
-                </button>
+                <WinterNext status={game} onAdvance={() => onWinter?.("advance")} />
               )}
             </>
           ) : null}

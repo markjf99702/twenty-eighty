@@ -222,6 +222,19 @@ const pick = await page.evaluate(() => {
 });
 assert.ok(pick && pick.left >= pick.wrapLeft && pick.right <= pick.wrapRight, `the Draft button is off the edge of the board (${JSON.stringify(pick)})`);
 await fits('the draft board');
+// With picks still to make, Finish the draft asks before the scouting director makes them, on the scoreboard and at
+// the foot of the page.
+await board('Finish the draft').click();
+const askDraft = page.locator('.board .winter-confirm');
+await askDraft.waitFor({ timeout: 10000 });
+assert.match(await askDraft.textContent(), /Let your scouting director make your (\d+ remaining picks|last pick)\?/, 'Finish the draft did not ask first');
+await fits('the draft question on the scoreboard');
+await askDraft.locator('button', { hasText: 'Not yet' }).click();
+await askDraft.waitFor({ state: 'detached', timeout: 10000 });
+await page.locator('.winter-next .btn.primary', { hasText: 'Finish the draft' }).click();
+await page.locator('.winter-next .winter-confirm', { hasText: 'Let your scouting director make' }).waitFor({ timeout: 10000 });
+await page.locator('.winter-next .winter-confirm button', { hasText: 'Not yet' }).click();
+await onTheClock.waitFor({ timeout: 10000 });
 
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();

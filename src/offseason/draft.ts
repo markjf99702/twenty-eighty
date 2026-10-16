@@ -78,6 +78,14 @@ export function onTheClock(d: DraftState): { round: number; pick: number; teamId
   return { round: Math.floor(n / d.order.length) + 1, pick: n + 1, teamId: d.order[n % d.order.length]! };
 }
 
+/** The overall numbers of a club's picks still to come, the one on the clock included (none once the draft is over). */
+export function picksLeft(d: DraftState, teamId: number): number[] {
+  if (!onTheClock(d)) return [];
+  const out: number[] = [];
+  for (let n = d.picks.length; n < d.order.length * d.rounds; n++) if (d.order[n % d.order.length] === teamId) out.push(n + 1);
+  return out;
+}
+
 const boardCache = new WeakMap<Player, number>();
 /** The draft board: projected peak value, with a nudge toward players closer to the majors. */
 export function boardValue(p: Player): number {

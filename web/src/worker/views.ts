@@ -5,7 +5,7 @@ import { MAX_OPTION_YEARS, MINOR_LEVELS, PITCH_NAMES, playerName, SERVICE_DAYS_P
 import type { FieldPosition, Level, MinorLevel, Player } from "../../../src/players/types";
 import { FIELD_POSITIONS, LEVELS } from "../../../src/players/types";
 import type { League, Team, Transaction } from "../../../src/league/types";
-import { onTheClock as draftClock } from "../../../src/offseason/draft";
+import { onTheClock as draftClock, picksLeft } from "../../../src/offseason/draft";
 import { careerBatting, careerPitching } from "../../../src/offseason/history";
 import { teamName } from "../../../src/league/types";
 import { defenseGrade } from "../../../src/players/defense";
@@ -233,7 +233,9 @@ function winterStatus(league: League, season: Season): Partial<Status> {
       label: w.phase === "freeAgency" && fa ? `${label}, week ${Math.min(fa.week + 1, fa.weeks)} of ${fa.weeks}` : label,
       action: w.phase === "spring" ? `Start the ${league.year + 1} season` : action,
       ...(fa ? { week: fa.week, weeks: fa.weeks } : {}),
-      ...(w.phase === "draft" ? { userOnClock: clock?.teamId === league.userTeamId } : {}),
+      ...(w.phase === "draft" && w.draft
+        ? { userOnClock: clock?.teamId === league.userTeamId, picksLeft: league.userTeamId === null ? 0 : picksLeft(w.draft, league.userTeamId).length }
+        : {}),
     },
   };
 }

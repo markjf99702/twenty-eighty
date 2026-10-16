@@ -6,6 +6,7 @@ import type { DevRow, OffseasonPhase, OffseasonView, PlayerSummary, Status } fro
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { Grade, GradeChips } from "../components/Grade";
 import { type Column, Table } from "../components/Table";
+import { WinterNext } from "../components/WinterNext";
 import { finishText, fixed, GLOSSARY, LEVEL_NAMES } from "../format";
 import { href, playerHref } from "../router";
 import { ConfidenceMeter, GoalList, JobOffers } from "./Owner";
@@ -115,9 +116,7 @@ export function Winter({ status, onWinter, onStatus }: { status: Status; onWinte
 
       <div class="start-bar winter-next">
         <span class="dim">{NEXT[v.phase]}</span>
-        <button type="button" class="btn primary" disabled={status.owner?.fired} onClick={() => onWinter("advance")}>
-          {status.winter?.action}
-        </button>
+        <WinterNext status={status} disabled={status.owner?.fired} onAdvance={() => onWinter("advance")} />
       </div>
     </>
   );

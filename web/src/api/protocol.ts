@@ -50,7 +50,16 @@ export interface Status {
   /** October: whether it's started, whether the user's club is still in it, and its next game ("Game 3"). */
   october?: { started: boolean; alive: boolean; next: string | null };
   /** Where the winter stands, during the offseason. */
-  winter?: { phase: OffseasonPhase; label: string; action: string; week?: number; weeks?: number; userOnClock?: boolean };
+  winter?: {
+    phase: OffseasonPhase;
+    label: string;
+    action: string;
+    week?: number;
+    weeks?: number;
+    userOnClock?: boolean;
+    /** At the draft: how many of the user's picks are still to come (the scouting director makes them if he finishes it). */
+    picksLeft?: number;
+  };
   /** Whether the user can trade right now (no trades after the deadline until the season ends). */
   canTrade?: boolean;
   tradeNote?: string;
