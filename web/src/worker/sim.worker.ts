@@ -75,6 +75,7 @@ import {
   dashboardView,
   dateLabel,
   deskFraction,
+  FIRED_NOTE,
   extensionCandidatesView,
   extensionView,
   gameItems,
@@ -198,6 +199,10 @@ function userTeam(): Team {
   if (id === null) throw new Error("You don't manage a club.");
   return s.team(id);
 }
+
+/** Fired, and no new job taken yet: the old club's moves, money and trades aren't yours to make. */
+const fired = () => Boolean(requireSeason().league.gm?.fired);
+const firedRefusal = () => ({ ok: false as const, reason: FIRED_NOTE });
 
 function attach(s: Season): void {
   boxes.clear();
@@ -594,6 +599,7 @@ const handlers: Handlers = {
   },
 
   rosterAction(req) {
+    if (fired()) return firedRefusal();
     const league = requireSeason().league;
     const before = league.transactions.length;
     const result = applyRosterAction(req);
@@ -605,6 +611,7 @@ const handlers: Handlers = {
   },
 
   setDepth({ depth }) {
+    if (fired()) return firedRefusal();
     const s = requireSeason();
     const team = userTeam();
     const problem = validDepth(team, s.league, depth);
@@ -615,6 +622,7 @@ const handlers: Handlers = {
   },
 
   setFlags({ manualRoster, manualLineup, manualPitching }) {
+    if (fired()) return firedRefusal();
     const s = requireSeason();
     const team = userTeam();
     if (manualRoster !== undefined) team.manualRoster = manualRoster;
@@ -671,6 +679,7 @@ const handlers: Handlers = {
   },
 
   setTender({ playerId, tender }) {
+    if (fired()) return firedRefusal();
     const w = winter();
     const t = w.tenders.find((x) => x.playerId === playerId && x.teamId === userTeam().id);
     if (!t) return { ok: false, reason: "He isn't one of your arbitration cases." };
@@ -744,6 +753,7 @@ const handlers: Handlers = {
       activeLimit: activeLimit(c),
       advice: execute ? null : tradeAdviceView(s, give, get, fraction),
     };
+    if (execute && fired()) return { ...view, ...firedRefusal() };
     const problem = roomMoveProblem(c, mine, give, moves);
     if (problem) return { ...view, ok: false, over: undefined, reason: problem };
     if (!st.canTrade) return { ...view, ok: false, reason: st.tradeNote };
@@ -780,7 +790,7 @@ const handlers: Handlers = {
     const team = userTeam();
     const p = s.league.players[playerId];
     if (!p || p.teamId !== team.id) return { ok: false, reason: "He isn't in your organization." };
-    if (s.league.gm?.fired) return { ok: false, reason: "You don't run the club anymore." };
+    if (fired()) return firedRefusal();
     const fraction = s.league.offseason ? 1 : Math.max(0, 1 - s.day / s.totalDays);
     const offer = extensionOptions(s.league, p, fraction);
     if (!offer.ok) return offer;
@@ -797,6 +807,7 @@ const handlers: Handlers = {
   },
 
   answerOffer({ id, accept }) {
+    if (accept && fired()) return firedRefusal();
     const s = requireSeason();
     const st = currentStatus();
     if (accept && !st.canTrade) return { ok: false, reason: st.tradeNote };
@@ -834,6 +845,7 @@ const handlers: Handlers = {
   },
 
   setDepartments({ scouting, analytics }) {
+    if (fired()) return firedRefusal();
     const s = requireSeason();
     const team = userTeam();
     if (!s.league.offseason && s.day > 0) return { ok: false, reason: "Department budgets are set in the offseason and on Opening Day, before the first game." };
@@ -855,6 +867,7 @@ const handlers: Handlers = {
   },
 
   setTicketPrice({ price }) {
+    if (fired()) return firedRefusal();
     const team = userTeam();
     const f = team.finance;
     if (price === "auto") {

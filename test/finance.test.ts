@@ -22,7 +22,7 @@ import { staffCost } from "../src/scouting/scouting";
 import { playoffSeeds, runPostseason } from "../src/season/postseason";
 import { Season } from "../src/season/season";
 import { ownerView } from "../web/src/worker/business";
-import { readOf, status } from "../web/src/worker/views";
+import { FIRED_NOTE, readOf, StatsCache, status, teamView } from "../web/src/worker/views";
 
 const USER = 5;
 const league = generateLeague({ seed: "finance-test" });
@@ -229,8 +229,18 @@ describe("the owner", () => {
     expect(l.gm!.offers).toHaveLength(3);
     expect(l.gm!.offers).not.toContain(3);
     expect(status(l, s, true).owner!.seasons).toBe(3);
+    // Until he takes a job, the club that let him go isn't his to run: no trades, and its roster has no moves for him.
+    expect(status(l, s, true)).toMatchObject({ canTrade: false, tradeNote: FIRED_NOTE });
+    const cache = new StatsCache(() => s);
+    const old = teamView(s, cache, 3, s.rosterContext());
+    expect(old).toMatchObject({ isUser: true, manage: false });
+    expect(old.active.some((p) => p.actions)).toBe(false);
     const next = l.gm!.offers[0]!;
     acceptJob(l, next);
+    expect(status(l, s, true).tradeNote).toBe("Trading reopens when the offseason begins.");
+    const mine = teamView(s, cache, next, s.rosterContext());
+    expect(mine).toMatchObject({ isUser: true, manage: true });
+    expect(mine.active.every((p) => p.actions && p.actions.length > 0)).toBe(true);
     expect(l.userTeamId).toBe(next);
     expect(l.gm!.fired).toBe(false);
     expect(l.gm!.teamId).toBe(next);

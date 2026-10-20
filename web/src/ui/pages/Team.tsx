@@ -190,21 +190,21 @@ function Roster({ d, year }: { d: TeamView; year: number }) {
         <ViewSwitch view={view} onChange={setView} year={year} last={d.hasLastSeason} />
       </div>
       {view !== "scouting" && <StatsKey recent={view === "recent"} />}
-      {d.isUser && d.problems.length > 0 && (
+      {d.manage && d.problems.length > 0 && (
         <div class="note alert">
           <b>Roster problems:</b> {d.problems.join(" ")}
         </div>
       )}
-      {d.isUser && <Flags d={d} />}
+      {d.manage && <Flags d={d} />}
       <Section title="Position players" aside={`${hitters.length}`}>
-        <PlayerTable key={`h-${view}`} rows={hitters} pitchers={false} manage={d.isUser} view={view} sortKey={statSort} tradeFrom={d.isUser ? undefined : d.team.id} />
+        <PlayerTable key={`h-${view}`} rows={hitters} pitchers={false} manage={d.manage} view={view} sortKey={statSort} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
       <Section title="Pitchers" aside={`${pitchers.length}`}>
-        <PlayerTable key={`p-${view}`} rows={pitchers} pitchers manage={d.isUser} view={view} sortKey={statSort} tradeFrom={d.isUser ? undefined : d.team.id} />
+        <PlayerTable key={`p-${view}`} rows={pitchers} pitchers manage={d.manage} view={view} sortKey={statSort} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
       <Section title="Injured list" aside={`${d.injured.length}`}>
-        {d.injured.some((p) => !p.pitcher) && <PlayerTable rows={d.injured.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} view={view} />}
-        {d.injured.some((p) => p.pitcher) && <PlayerTable rows={d.injured.filter((p) => p.pitcher)} pitchers manage={d.isUser} view={view} />}
+        {d.injured.some((p) => !p.pitcher) && <PlayerTable rows={d.injured.filter((p) => !p.pitcher)} pitchers={false} manage={d.manage} view={view} />}
+        {d.injured.some((p) => p.pitcher) && <PlayerTable rows={d.injured.filter((p) => p.pitcher)} pitchers manage={d.manage} view={view} />}
         {d.injured.length === 0 && <div class="empty">Nobody on the injured list.</div>}
       </Section>
     </>
@@ -230,10 +230,10 @@ function Farm({ d, year }: { d: TeamView; year: number }) {
       </div>
       {view !== "scouting" && <StatsKey minors recent={view === "recent"} />}
       <Section title="Position players">
-        <PlayerTable key={`h-${view}-${level}`} rows={rows.filter((p) => !p.pitcher)} pitchers={false} manage={d.isUser} sortKey={sort} view={view} tradeFrom={d.isUser ? undefined : d.team.id} />
+        <PlayerTable key={`h-${view}-${level}`} rows={rows.filter((p) => !p.pitcher)} pitchers={false} manage={d.manage} sortKey={sort} view={view} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
       <Section title="Pitchers">
-        <PlayerTable key={`p-${view}-${level}`} rows={rows.filter((p) => p.pitcher)} pitchers manage={d.isUser} sortKey={sort} view={view} tradeFrom={d.isUser ? undefined : d.team.id} />
+        <PlayerTable key={`p-${view}-${level}`} rows={rows.filter((p) => p.pitcher)} pitchers manage={d.manage} sortKey={sort} view={view} tradeFrom={d.isUser ? undefined : d.team.id} />
       </Section>
     </>
   );
@@ -270,7 +270,7 @@ function Depth({ d }: { d: TeamView }) {
   const hitters = d.active.filter((p) => !p.pitcher).sort((a, b) => a.name.localeCompare(b.name));
   const pitchers = d.active.filter((p) => p.pitcher).sort((a, b) => a.name.localeCompare(b.name));
   const depth = d.depth;
-  const edit = d.isUser;
+  const edit = d.manage;
 
   const save = async (next: DepthChart) => {
     const res = await call("setDepth", { depth: next });
@@ -327,7 +327,7 @@ function Depth({ d }: { d: TeamView }) {
 
   return (
     <>
-      {d.isUser ? (
+      {d.manage ? (
         <div class="note">
           {d.manualLineup || d.manualPitching ? (
             <>
@@ -508,7 +508,7 @@ function Payroll({ d }: { d: TeamView }) {
       <Section title="Contracts" aside={`${p.contracts.length} big-league deals`}>
         <Table columns={columns} rows={p.contracts} rowKey={(r) => r.id} sortKey="salary" />
       </Section>
-      {d.isUser && <Extensions />}
+      {d.manage && <Extensions />}
     </>
   );
 }

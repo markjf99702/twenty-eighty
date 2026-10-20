@@ -304,6 +304,8 @@ export interface TeamView {
   team: TeamRef & { park: string; altitude: number; market: number; affiliates: Record<MinorLevel, string> };
   payroll: PayrollView;
   isUser: boolean;
+  /** Whether you run the club now: your club, unless it has let you go and you haven't taken another job. */
+  manage: boolean;
   manualRoster: boolean;
   /** The parts of the depth chart the user sets: the lineup (with its bench) and the pitching staff. */
   manualLineup: boolean;
@@ -1039,7 +1041,7 @@ export interface Api {
   /** `message`: what the move did, when there's more to it than its name (who claimed a designated player, where a call-up plays). */
   rosterAction: { req: RosterAction; res: { ok: boolean; reason?: string; message?: string } };
   setDepth: { req: { depth: DepthChart }; res: { ok: boolean; reason?: string } };
-  setFlags: { req: { manualRoster?: boolean; manualLineup?: boolean; manualPitching?: boolean }; res: { ok: boolean } };
+  setFlags: { req: { manualRoster?: boolean; manualLineup?: boolean; manualPitching?: boolean }; res: { ok: boolean; reason?: string } };
   postseason: { req: void; res: PostseasonView | null };
   beginOffseason: { req: void; res: Status };
   advance: { req: void; res: Status };

@@ -162,7 +162,7 @@ export function PlayerPage({ playerId, status }: { playerId: number; status: Sta
             )}
           </Section>
 
-          {v.team && status.userTeamId === v.team.id && <ExtensionPanel playerId={playerId} name={p.name} />}
+          {v.team && status.userTeamId === v.team.id && !status.owner?.fired && <ExtensionPanel playerId={playerId} name={p.name} />}
 
           <Section title="Status">
             <div class="facts">

@@ -214,21 +214,30 @@ export function whenLabel(league: League, season: Season): string {
   return `Winter ${league.year}-${String((league.year + 1) % 100).padStart(2, "0")}${w ? `: ${w.label.toLowerCase()}` : ""}`;
 }
 
+/** What the club that let you go says while you're between jobs. */
+export const FIRED_NOTE = "You don't run the club anymore: pick one of the clubs that called.";
+
 function winterStatus(league: League, season: Season): Partial<Status> {
   const phase = phaseOf(season);
   const w = league.offseason;
-  const canTrade = phase === "offseason" || (phase === "regular" && season.day <= TRADE_DEADLINE_DAY);
-  const tradeNote = canTrade
-    ? undefined
-    : phase === "regular"
-      ? "The trade deadline has passed. Trading reopens in the offseason."
-      : "Trading reopens when the offseason begins.";
+  const open = phase === "offseason" || (phase === "regular" && season.day <= TRADE_DEADLINE_DAY);
+  // A fired GM trades for nobody until he takes one of the jobs offered.
+  const fired = Boolean(league.gm?.fired);
+  const canTrade = open && !fired;
+  const tradeNote = fired
+    ? FIRED_NOTE
+    : open
+      ? undefined
+      : phase === "regular"
+        ? "The trade deadline has passed. Trading reopens in the offseason."
+        : "Trading reopens when the offseason begins.";
   if (!w) return { canTrade, tradeNote };
   const [label, action] = WINTER_LABELS[w.phase]!;
   const fa = w.freeAgency;
   const clock = w.draft ? draftClock(w.draft) : null;
   return {
     canTrade,
+    ...(tradeNote ? { tradeNote } : {}),
     winter: {
       phase: w.phase,
       label: w.phase === "freeAgency" && fa ? `${label}, week ${Math.min(fa.week + 1, fa.weeks)} of ${fa.weeks}` : label,
@@ -732,8 +741,10 @@ export function teamView(season: Season, stats: StatsCache, teamId: number, ctx:
   const league = season.league;
   const team = season.team(teamId);
   const isUser = league.userTeamId === teamId;
+  // Your club, unless it has let you go and you haven't taken another job yet.
+  const manage = isUser && !league.gm?.fired;
   const P = (id: number) => league.players[id]!;
-  const summarize = (id: number) => playerSummary(P(id), season, stats, isUser ? rosterActions(P(id), team, ctx) : undefined);
+  const summarize = (id: number) => playerSummary(P(id), season, stats, manage ? rosterActions(P(id), team, ctx) : undefined);
   const rec = season.records[teamId]!;
   const minors = {} as Record<MinorLevel, PlayerSummary[]>;
   for (const level of MINOR_LEVELS) minors[level] = team.rosters[level].map(summarize);
@@ -747,6 +758,7 @@ export function teamView(season: Season, stats: StatsCache, teamId: number, ctx:
     },
     payroll: payrollView(season, stats, team),
     isUser,
+    manage,
     manualRoster: Boolean(team.manualRoster),
     manualLineup: Boolean(team.manualLineup),
     manualPitching: Boolean(team.manualPitching),
@@ -844,7 +856,7 @@ export function playerView(season: Season, stats: StatsCache, playerId: number, 
   const arsenal = q.pitching?.pitches ?? [];
   const thrown = arsenal.reduce((s, x) => s + x.usage, 0) || 1;
   return {
-    summary: playerSummary(p, season, stats, isUser ? rosterActions(p, team!, ctx) : undefined),
+    summary: playerSummary(p, season, stats, isUser && !league.gm?.fired ? rosterActions(p, team!, ctx) : undefined),
     team: team ? teamRef(team) : null,
     born: `${league.year - p.age}`,
     tools,
