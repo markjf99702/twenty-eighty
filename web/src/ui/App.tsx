@@ -100,6 +100,7 @@ export function App() {
   const [stops, setStops] = useState<StopRules>(storedStops);
   const stopsRef = useRef(stops);
   const [stopNote, setStopNote] = useState<StopNote | null>(null);
+  const stopNoteRef = useRef<HTMLDivElement>(null);
   const statusRef = useRef(status);
   statusRef.current = status;
   const simRef = useRef(sim);
@@ -165,6 +166,27 @@ export function App() {
     }
     void call("setPace", { msPerDay: paceMs(p) });
   };
+
+  // When a stop ends a sim, its note is where you'll see it, though you may have scrolled far down to watch the sim.
+  useEffect(() => {
+    const note = stopNoteRef.current;
+    const board = document.querySelector<HTMLElement>(".board");
+    if (!stopNote || !note || !board) return;
+    // The scoreboard stays pinned on a wide screen; on a phone it scrolls away again once the sim is over.
+    const pinned = getComputedStyle(board).position === "sticky";
+    const top = pinned ? board.getBoundingClientRect().bottom : 0;
+    const box = note.getBoundingClientRect();
+    if (box.top >= top && box.bottom <= innerHeight) return;
+    const behavior = matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth";
+    if (pinned) {
+      // Just under the scoreboard, which takes two lines on a narrow laptop.
+      note.style.scrollMarginTop = `${Math.ceil(top) + 12}px`;
+      note.scrollIntoView({ block: "nearest", behavior });
+    } else {
+      // On a phone, back to the top: the note, and the Sim buttons to carry on with.
+      window.scrollTo({ top: 0, behavior });
+    }
+  }, [stopNote]);
 
   // Esc stops a running sim.
   useEffect(() => {
@@ -319,7 +341,7 @@ export function App() {
       <main>
         <NewerCopy status={status} onStatus={setStatus} />
         {stopNote && (
-          <div class={`stop-note ${stopNote.kind}`} role="status">
+          <div class={`stop-note ${stopNote.kind}`} role="status" ref={stopNoteRef}>
             <span class="k">Stopped</span>
             <span class="t">{stopNote.text}</span>
             {stopNote.href && (

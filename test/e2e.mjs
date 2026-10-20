@@ -159,6 +159,28 @@ await page.waitForSelector('.board', { timeout: 20000 });
 assert.ok(await page.title(), 'the page did not load offline');
 await ctx.setOffline(false);
 
+// A stop is in view when the sim stops, though you scrolled down to read while it ran (on a phone the scoreboard
+// scrolls away once the sim is over). Scrolled first, so a stop on the first day finds the page scrolled too.
+await page.evaluate(() => localStorage.setItem('twenty-eighty.stops', JSON.stringify({ streak: 2, injury: false, offer: 'off', deadline: false, staff: false, allStar: false, moments: false })));
+await page.goto(base + '#home');
+await page.reload();
+await page.waitForSelector('.club-hero');
+await page.evaluate(() => {
+  window.scrollTo(0, document.documentElement.scrollHeight);
+  [...document.querySelectorAll('.board .btn')].find((b) => b.textContent.trim() === 'Month').click();
+});
+await page.locator('.board .progress').waitFor({ timeout: 3000 }).catch(() => {});
+await idle();
+if (await page.locator('.stop-note').count()) {
+  const seen = await page
+    .waitForFunction(() => { const r = document.querySelector('.stop-note').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }, null, { timeout: 5000 })
+    .then(() => true, () => false);
+  assert.ok(seen, `the sim stopped ("${await page.locator('.stop-note').textContent()}") with the note out of sight`);
+}
+await page.evaluate(() => localStorage.removeItem('twenty-eighty.stops'));
+await page.reload();
+await page.waitForSelector('.board-cells');
+
 // The trade desk once there's something on it: an offer's players by their full names, and the block's Fit and
 // Trade for in view (Trade for is under the name, since the table scrolls sideways on a phone).
 let offerSeen = false;
