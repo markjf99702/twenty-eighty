@@ -976,16 +976,12 @@ export class GameSim {
     if (hurt) {
       this.injure(s.id);
       pull = true;
-    } else if (s.pitches >= s.limit) pull = true;
-    else if (field.setup.exhibition) {
-      if (inningStart && s.outs >= (s.starter ? 6 : 3)) pull = true;
+    } else if (field.setup.exhibition) {
+      if (s.pitches >= s.limit || (inningStart && s.outs >= (s.starter ? 6 : 3))) pull = true;
     } else if (s.starter) {
-      if (s.runs >= 6 && s.pitches >= 40) pull = true;
-      else if (s.runs >= 5 && this.inning <= 5 && s.pitches >= 60) pull = true;
-      else if (inningStart && s.pitches >= s.limit - 7) pull = true;
-      else if (!inningStart && runners >= 2 && this.inning >= 5 && s.pitches >= s.limit - 12) pull = true;
-      else if (inningStart && this.inning >= 7 && s.battersFaced >= 27 && Math.abs(lead) <= 2) pull = true;
-    } else {
+      pull = starterComesOut(s, this.inning, inningStart, runners, lead, this.battingSide.hits);
+    } else if (s.pitches >= s.limit) pull = true;
+    else {
       const longMan = field.setup.bullpen.indexOf(s.id) >= field.setup.bullpen.length - 2;
       const blowout = lead >= 5 || lead <= -4;
       if (inningStart && s.outs >= 3 && !(longMan && blowout && s.pitches < s.limit - 10)) pull = true;
@@ -1285,6 +1281,31 @@ function errorRate(type: BattedBallType, skill: number): number {
 /** Heart pitches are in the zone, shadow pitches straddle it (count half), chase/waste are out. */
 function zoneShare(region: Region): number {
   return region === "heart" ? 1 : region === "shadow" ? 0.5 : 0;
+}
+
+/** A starter's outing so far, as his manager sees it. */
+export interface StarterOuting {
+  pitches: number;
+  /** His pitch limit today. */
+  limit: number;
+  runs: number;
+  battersFaced: number;
+}
+
+/**
+ * Whether a manager takes his starter out before the next batter (an injury and an exhibition aside), with `lead`
+ * his club's and `hitsAllowed` the other side's hits all game: at his limit, when he's hit hard, near the limit at
+ * the top of an inning or with two on late, or the fourth time through a close game's order. From the 6th inning
+ * on, a starter with a no-hitter going stays in until he's well past his limit, and finishes any inning he starts.
+ */
+export function starterComesOut(s: StarterOuting, inning: number, inningStart: boolean, runners: number, lead: number, hitsAllowed: number): boolean {
+  const F = ENGINE.fatigue;
+  if (hitsAllowed === 0 && inning >= 6) return inningStart && s.pitches >= Math.min(s.limit + F.noHitExtra, F.noHitCap);
+  if (s.pitches >= s.limit) return true;
+  if (s.runs >= 6 && s.pitches >= 40) return true;
+  if (s.runs >= 5 && inning <= 5 && s.pitches >= 60) return true;
+  if (inningStart) return s.pitches >= s.limit - 7 || (inning >= 7 && s.battersFaced >= 27 && Math.abs(lead) <= 2);
+  return runners >= 2 && inning >= 5 && s.pitches >= s.limit - 12;
 }
 
 export function simulateGame(env: SimEnv, away: TeamGameSetup, home: TeamGameSetup, rng: Rng, day = 0): GameResult {

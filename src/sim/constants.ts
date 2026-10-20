@@ -169,6 +169,13 @@ export const ENGINE = {
     limitJitter: 5,
     /** Cap on the fatigue penalty (z). */
     max: 1.5,
+    /**
+     * From the 6th inning on, a starter with a no-hitter going stays in until he's this many pitches past his
+     * limit (about where tiring reaches its cap)...
+     */
+    noHitExtra: 25,
+    /** ...but no further than this, and he finishes any inning he starts. */
+    noHitCap: 135,
   },
 
   /**

@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Rng } from "../src/core/rng";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
-import { simulateGame, type GameResult } from "../src/sim/game";
+import { simulateGame, starterComesOut, type GameResult } from "../src/sim/game";
 
 const league = generateLeague({ seed: "test-games" });
 const season = new Season(league);
@@ -81,5 +81,48 @@ describe("a simulated game", () => {
         }
       }
     }
+  });
+});
+
+describe("a starter with a no-hitter going", () => {
+  // Through eight innings at 105 pitches, five past his limit.
+  const outing = { pitches: 105, limit: 100, runs: 0, battersFaced: 25 };
+
+  it("starts the 9th, where two hits allowed would have ended his night", () => {
+    expect(starterComesOut(outing, 9, true, 0, 1, 0)).toBe(false);
+    expect(starterComesOut(outing, 9, true, 0, 1, 2)).toBe(true);
+  });
+
+  it("finishes an inning he starts, and comes out once he's well past his limit", () => {
+    expect(starterComesOut({ ...outing, pitches: 138 }, 9, false, 2, 1, 0)).toBe(false);
+    expect(starterComesOut({ ...outing, pitches: 125 }, 9, true, 0, 1, 0)).toBe(true);
+    expect(starterComesOut({ ...outing, pitches: 135, limit: 118 }, 9, true, 0, 1, 0)).toBe(true);
+    // Before the 6th the usual hooks apply.
+    expect(starterComesOut(outing, 5, true, 0, 1, 0)).toBe(true);
+  });
+
+  it("finishes most no-hitters himself", () => {
+    const l = generateLeague({ seed: "no-hit-bids" });
+    const s = new Season(l);
+    // The weakest lineup there could be: the other side's starter is often hitless deep into the game.
+    const weak = l.teams[1]!;
+    for (const id of weak.rosters.MLB) {
+      const p = l.players[id]!;
+      if (!p.pitching) for (const tool of ["hit", "power", "eye", "speed"] as const) p.hitting[tool].present = 20;
+    }
+    const rng = new Rng("no-hit bids");
+    let solo = 0;
+    let combined = 0;
+    for (let i = 0; i < 1000; i++) {
+      const home = l.teams[2 + (i % 28)]!;
+      const r = simulateGame(s.env, s.gameSetup(weak, rng, i), s.gameSetup(home, rng, i), rng);
+      if (r.hits[0] === 0) {
+        if (r.pitchersUsed[1].length === 1) solo++;
+        else combined++;
+      }
+    }
+    // Managers used to go to the bullpen at the usual pitch counts, and 23 of these 31 no-hitters were combined.
+    expect(solo + combined).toBeGreaterThanOrEqual(10);
+    expect(solo).toBeGreaterThan(2 * combined);
   });
 });
