@@ -119,8 +119,12 @@ await fits('the roster');
 // A new league has no season before this one, so the tables offer this season's stats and not last season's.
 const statViews = await page.locator('.seg[aria-label="Show"] button').allTextContents();
 assert.deepEqual(statViews.filter((t) => / stats$/.test(t)).length, 1, `the roster offers ${statViews.join(', ')}`);
-// A player's roster moves open on screen (the table scrolls sideways to reach them), and designating him asks first.
-await page.locator('.tbl tbody tr').first().locator('button', { hasText: 'Moves' }).click();
+// A player's Moves button is on screen without scrolling the table (on a phone it's under his name; a wide screen has
+// it in the last column), his roster moves open on screen, and designating him asks first.
+const movesButton = page.locator('.tbl tbody tr').first().locator('button:visible', { hasText: 'Moves' });
+const movesAt = await movesButton.boundingBox();
+assert.ok(movesAt && movesAt.x >= 0 && movesAt.x + movesAt.width <= 390, `the first player's Moves button is off screen (${JSON.stringify(movesAt)})`);
+await movesButton.click();
 const moves = await page.locator('tr.expand .actions').boundingBox();
 assert.ok(moves && moves.x >= 0 && moves.x + moves.width <= 390, `the roster moves open off screen (${JSON.stringify(moves)})`);
 await page.locator('tr.expand button', { hasText: 'Designate for assignment' }).click();

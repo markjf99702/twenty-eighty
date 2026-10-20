@@ -255,6 +255,21 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
   const toolIndex = (label: string) => tools.indexOf(label);
   const scouting = view === "scouting";
 
+  // A row's Trade for (another club's roster) or Moves (your own): the last column on a wide screen. On a phone that's
+  // a long swipe away, so they go under the name, which stays in view while the table scrolls.
+  const tradeButton = (p: PlayerSummary) =>
+    tradeFrom !== undefined && (
+      <button type="button" class="btn small" aria-label={`Trade for ${p.name}`} onClick={() => tradeFor(tradeFrom, [p.id])}>
+        Trade for
+      </button>
+    );
+  const movesButton = (p: PlayerSummary) =>
+    manage && (
+      <button type="button" class="btn small" aria-expanded={open === p.id} onClick={() => setOpen(open === p.id ? null : p.id)}>
+        Moves {open === p.id ? "▴" : "▾"}
+      </button>
+    );
+
   let columns: Column<PlayerSummary>[] = [
     { key: "pos", label: "Pos", render: (p) => p.pos, sort: (p) => p.pos, asc: true },
     {
@@ -267,6 +282,12 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
         <>
           <a href={playerHref(p.id)}>{p.name}</a>
           <StatusBadges p={p} />
+          {(manage || tradeFrom !== undefined) && (
+            <div class="row-act narrow-only">
+              {tradeButton(p)}
+              {movesButton(p)}
+            </div>
+          )}
         </>
       ),
     },
@@ -335,31 +356,8 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
   );
   // The stat views trade salary and service time for width; the grades and option status stay.
   if (!scouting) columns = columns.filter((c) => c.key !== "pay" && c.key !== "svc");
-  if (tradeFrom !== undefined) {
-    columns = [
-      ...columns,
-      {
-        key: "trade",
-        label: "",
-        render: (p) => (
-          <button type="button" class="btn small" aria-label={`Trade for ${p.name}`} onClick={() => tradeFor(tradeFrom, [p.id])}>
-            Trade for
-          </button>
-        ),
-      },
-    ];
-  }
-  if (manage) {
-    columns.push({
-      key: "moves",
-      label: "",
-      render: (p) => (
-        <button type="button" class="btn small" aria-expanded={open === p.id} onClick={() => setOpen(open === p.id ? null : p.id)}>
-          Moves {open === p.id ? "▴" : "▾"}
-        </button>
-      ),
-    });
-  }
+  if (tradeFrom !== undefined) columns.push({ key: "trade", label: "", cls: "wide-only", render: tradeButton });
+  if (manage) columns.push({ key: "moves", label: "", cls: "wide-only", render: movesButton });
 
   // Stat views sort by WAR when there is one; recent form (no WAR) by wRC+ or ERA.
   let initialSort = sortKey;
