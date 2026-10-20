@@ -13,7 +13,7 @@ import {
   restOfSeason,
   revenueOf,
 } from "../src/finance/finance";
-import { acceptJob, FIRING_LINE, hireGm, reviewSeason } from "../src/finance/owner";
+import { acceptJob, FIRING_LINE, hireGm, ownerCheckIn, reviewSeason } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { advanceOffseason, beginOffseason } from "../src/offseason/offseason";
 import { payroll } from "../src/org/contracts";
@@ -206,7 +206,8 @@ describe("the owner's goals during the season", () => {
   });
 
   it("dates the owner's midseason letter, for the front office to show it for two weeks", () => {
-    const letter = ownerView(s)!.messages.find((m) => m.text.startsWith("We're on pace for"))!;
+    // The only letter between Opening Day and the end of the season.
+    const letter = ownerView(s)!.messages.find((m) => m.year === l.year && m.day > 0 && m.day < s.totalDays)!;
     expect(letter).toMatchObject({ year: l.year, day: Math.floor(s.totalDays / 2) });
     expect(letter.date).toBe(`${letter.date.split(",")[0]}, ${l.year}`);
   });
@@ -237,6 +238,96 @@ describe("the owner", () => {
     expect(l.gm!.reviews).toHaveLength(1);
     // A new job is a first season again (the front office welcomes a GM only then).
     expect(status(l, s, true).owner!.seasons).toBe(0);
+  });
+});
+
+describe("the owner's letters", () => {
+  const ID = 4;
+  const l = generateLeague({ seed: "owner-letters" });
+  l.teams[ID]!.owner = { name: "The Okafor family", style: "patient" };
+  hireGm(l, ID);
+  const s = new Season(l, { minors: false });
+  const team = l.teams[ID]!;
+  const gm = l.gm!;
+  const first = l.year;
+  const written = gm.messages.map((m) => m.text);
+  const last = () => {
+    written.push(gm.messages.at(-1)!.text);
+    return gm.messages.at(-1)!.text;
+  };
+  /** The review of `year`, with one wins goal met or missed by a mile, from this much confidence after `seasons` seasons. */
+  const review = (year: number, met: boolean, weight: number, confidence: number, seasons = 1) => {
+    l.year = year;
+    gm.goalYear = year;
+    gm.fired = false;
+    gm.seasons = seasons;
+    gm.confidence = confidence;
+    gm.expectedWins = s.records[ID]!.w;
+    gm.goals = [{ kind: "wins", target: met ? 0 : 200, weight }];
+    reviewSeason(l, s);
+    return last();
+  };
+  /** The midseason letter in `year`, on pace for `pace` wins against a goal of 85. */
+  const midseason = (year: number, pace: number) => {
+    l.year = year;
+    gm.goalYear = year;
+    gm.midseason = null;
+    gm.goals = [{ kind: "wins", target: 85, weight: 1 }];
+    Object.assign(s.records[ID]!, { w: pace, l: 162 - pace });
+    s.day = Math.floor(s.totalDays / 2);
+    ownerCheckIn(s);
+    return last();
+  };
+  const years = Array.from({ length: 10 }, (_, i) => first + i);
+  /** The phrasings a letter used over ten seasons, with its numbers taken out. */
+  const phrasings = (letters: string[]) => new Set(letters.map((t) => t.replace(/\d+/g, "N")));
+
+  it("vary from year to year, the same every time they're written", () => {
+    expect(phrasings(years.map((y) => midseason(y, 95))).size).toBe(3);
+    expect(phrasings(years.map((y) => midseason(y, 84))).size).toBe(3);
+    expect(phrasings(years.map((y) => midseason(y, 70))).size).toBe(3);
+    expect(phrasings(years.map((y) => review(y, true, 2.5, 60))).size).toBe(3);
+    expect(phrasings(years.map((y) => review(y, true, 1, 60))).size).toBe(3);
+    expect(phrasings(years.map((y) => review(y, false, 1, 30))).size).toBe(3);
+    expect(phrasings(years.map((y) => review(y, false, 1, 60))).size).toBe(3);
+    expect(midseason(first + 3, 70)).toBe(midseason(first + 3, 70));
+  });
+
+  it("speak for the whole family when a family owns the club", () => {
+    review(first, false, 1, 10, 2);
+    expect(gm.fired).toBe(true);
+    expect(written.length).toBeGreaterThan(70);
+    for (const text of written) expect(text).not.toMatch(/\b(I|I'm|I've|I'll|my|me)\b/i);
+    // The patient owner's pitch, the goals and the firing in the family's voice.
+    expect(written[0]).toMatch(/^We're glad to have you running the .+ we'll give you time to do it\.$/);
+    expect(written[1]).toMatch(/Here's what we want from \d{4}: Give \d players .+; win \d+ games; draw [\d.]+ million fans\.$/);
+    expect(written.at(-1)).toMatch(/We've decided to go in a different direction/);
+  });
+
+  it("open with the season: a title, a pennant, October or the wins against the projection", () => {
+    const other = l.teams.find((t) => t.league !== team.league)!;
+    const rival = l.teams.find((t) => t.league === team.league && t.id !== ID)!;
+    const seeds = team.league === 0 ? [[ID, rival.id], [other.id]] : [[other.id], [ID, rival.id]];
+    const october = (champion: number, pennant: number) => {
+      s.postseason = {
+        seeds,
+        series: [
+          { round: "Championship Series", league: team.league, higher: ID, lower: rival.id, wins: [4, 2], winner: pennant, games: [] },
+          { round: "World Series", league: null, higher: other.id, lower: pennant, wins: [4, 3], winner: champion, games: [] },
+        ],
+        champion,
+      };
+      const text = review(first + 20, true, 1, 60);
+      s.postseason = null;
+      return text;
+    };
+    expect(october(ID, ID)).toMatch(/^We won the World Series\. You met 1 of 1 goal\. /);
+    expect(october(other.id, ID)).toMatch(/^We won the pennant\. You met 1 of 1 goal\. /);
+    expect(gm.reviews.at(-1)!.notes.map((n) => n.text)).toContain("Won the pennant");
+    expect(october(other.id, rival.id)).toMatch(/^We won \d+ games and made it to October\. /);
+    gm.expectedWins = null;
+    Object.assign(s.records[ID]!, { w: 88, l: 74 });
+    expect(review(first + 21, true, 1, 60)).toMatch(/^We won 88 games, just what the forecasters expected\. /);
   });
 });
 

@@ -13,10 +13,14 @@ const weightWord = (w: number) => WEIGHT.find(([min]) => w >= min)![1];
 
 const NUMBERS = ["no", "one", "two", "three", "four", "five"];
 
-/** When the owner can let you go: on Easy not for a few seasons; otherwise a first-year GM only for a disaster. */
-function firingRule(grace: number): string {
-  if (grace > 0) return `Fall below 20 and you're out, though not in your first ${NUMBERS[grace] ?? grace} seasons.`;
-  return "Fall below 20 and you're out (below 10 in your first season).";
+/**
+ * When the owner can let you go: on Easy not for a few seasons; otherwise a first-year GM only for a disaster. Once
+ * those seasons are behind you (`seasons` reviewed), just the line.
+ */
+function firingRule(grace: number, seasons: number): string {
+  if (grace > seasons) return `Fall below 20 and you're out, though not in your first ${NUMBERS[grace] ?? grace} seasons.`;
+  if (seasons === 0) return "Fall below 20 and you're out (below 10 in your first season).";
+  return "Fall below 20 and you're out.";
 }
 
 /** Where the owner's confidence stands, with the firing line marked. */
@@ -134,7 +138,7 @@ export function Owner({ onStatus }: { onStatus: (s: Status) => void }) {
           <ConfidenceMeter value={v.confidence} mood={v.mood} />
           <p class="dim small" style={{ margin: 0 }}>
             Each winter the owner reviews your season: the goals below, your wins against the preseason projection, the postseason,
-            and whether you kept to the budget. {firingRule(v.graceSeasons)}
+            and whether you kept to the budget. {firingRule(v.graceSeasons, v.seasons)}
           </p>
         </Section>
         <Section title={`${v.goalYear} goals`}>

@@ -1,6 +1,7 @@
-import { hashNormal, seedHash } from "../core/hash";
+import { hashNormal, hashUniform, seedHash } from "../core/hash";
 import { clamp } from "../core/math";
 import { Rng } from "../core/rng";
+import { withArticle } from "../core/text";
 import { dials } from "../league/settings";
 import type { League, Team } from "../league/types";
 import { orgPlayers } from "../org/contracts";
@@ -61,6 +62,29 @@ export function mood(confidence: number): string {
 /** "I" for a person, "we" for a family. */
 const family = (o: Owner) => o.name.startsWith("The ");
 
+/** How an owner writes: I, I'm, I've, I'll and my for a person; we, we're, we've, we'll and our for a family. */
+export interface Voice {
+  I: string;
+  Im: string;
+  Ive: string;
+  Ill: string;
+  my: string;
+}
+
+export const voice = (o: Owner): Voice =>
+  family(o) ? { I: "we", Im: "we're", Ive: "we've", Ill: "we'll", my: "our" } : { I: "I", Im: "I'm", Ive: "I've", Ill: "I'll", my: "my" };
+
+/** The first letter capitalized, to open a sentence. */
+const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * One of a letter's phrasings, so the owner doesn't write the same letter every year. Fixed by the league, the year and
+ * the club (`k` tells the letters apart), so nothing is drawn from the season's stream.
+ */
+function phrasing(league: League, teamId: number, k: number, options: readonly string[]): string {
+  return options[Math.floor(hashUniform(seedHash(league.seed), league.year, teamId, k) * options.length)]!;
+}
+
 /**
  * The preseason projection: wins from the club's projected strength against
  * the league's (fit on simulated seasons), plus the forecaster's own error.
@@ -102,22 +126,22 @@ export function hireGm(league: League, teamId: number, confidence?: number, day 
   league.gm = gm;
   league.userTeamId = teamId;
   const o = team.owner;
-  const voice = family(o) ? "We're" : "I'm";
+  const v = voice(o);
   say(gm, {
     year: league.offseason ? league.year : year,
     day,
     tone: "neutral",
-    text: `${voice} glad to have you running the ${team.nickname}. ${STYLE_PITCH[o.style]}`,
+    text: `${cap(v.Im)} glad to have you running the ${team.nickname}. ${STYLE_PITCH[o.style](v)}`,
   });
   if (!league.offseason) setGoals(league, day);
   return gm;
 }
 
-const STYLE_PITCH: Record<OwnerStyle, string> = {
-  "win-now": "This city has waited long enough. Spend what it takes and bring home a winner.",
-  balanced: "Win games, fill the ballpark, and don't lose money doing it.",
-  frugal: "Run a tight ship. Every dollar you spend has to earn its keep.",
-  patient: "Build something that lasts. Develop our own players and I'll give you time to do it.",
+const STYLE_PITCH: Record<OwnerStyle, (v: Voice) => string> = {
+  "win-now": () => "This city has waited long enough. Spend what it takes and bring home a winner.",
+  balanced: () => "Win games, fill the ballpark, and don't lose money doing it.",
+  frugal: () => "Run a tight ship. Every dollar you spend has to earn its keep.",
+  patient: (v) => `Build something that lasts. Develop our own players and ${v.Ill} give you time to do it.`,
 };
 
 export function goalLabel(g: OwnerGoal): string {
@@ -179,12 +203,13 @@ export function setGoals(league: League, day = 0): void {
   gm.expectedWins = e;
   gm.goals = goals;
   gm.goalYear = year;
-  const lines = goals.map((g) => goalLabel(g)).join("; ");
+  // In the middle of the sentence, each goal after the first starts in lower case.
+  const lines = goals.map((g, i) => (i === 0 ? goalLabel(g) : goalLabel(g).charAt(0).toLowerCase() + goalLabel(g).slice(1))).join("; ");
   say(gm, {
     year: league.offseason ? league.year : year,
     day,
     tone: "neutral",
-    text: `The forecasters have us at ${e} wins this year. Here's what I want from ${year}: ${lines}.`,
+    text: `The forecasters have us at ${e} wins this year. Here's what ${voice(team.owner).I} want from ${year}: ${lines}.`,
   });
 }
 
@@ -290,10 +315,19 @@ export function reviewSeason(league: League, season: Season): GmReview | null {
     note(text, clamp(0.4 * diff, -6, 6));
   }
   const post = season.postseason;
+  // The letter opens with the season in a sentence: October first, then the wins against the projection.
+  let opening = `We won ${rec.w} games${expected === null ? "" : rec.w === expected ? ", just what the forecasters expected" : `, ${Math.abs(rec.w - expected)} ${rec.w > expected ? "more" : "fewer"} than the forecasters expected`}.`;
   if (post?.seeds.flat().includes(team.id)) {
-    if (post.champion === team.id) note("Won the World Series", 18);
-    else if (post.series.some((s) => s.round === "Championship Series" && s.winner === team.id)) note("Won the pennant", 9);
-    else note("Reached the postseason", 3);
+    if (post.champion === team.id) {
+      note("Won the World Series", 18);
+      opening = "We won the World Series.";
+    } else if (post.series.some((s) => s.round === "Championship Series" && s.winner === team.id)) {
+      note("Won the pennant", 9);
+      opening = "We won the pennant.";
+    } else {
+      note("Reached the postseason", 3);
+      opening = `We won ${rec.w} games and made it to October.`;
+    }
   }
   const spent = l.payroll + l.deadMoney + l.staff;
   if (spent > team.budget * 1.03) {
@@ -312,20 +346,37 @@ export function reviewSeason(league: League, season: Season): GmReview | null {
   const day = season.totalDays + 30;
   const tally = goals.length ? `You met ${met} of ${goals.length} goal${goals.length === 1 ? "" : "s"}. ` : "";
   const fired = gm.seasons > d.graceSeasons && gm.confidence < FIRING_LINE && (gm.seasons >= 2 || gm.confidence < 10);
+  const v = voice(owner);
   if (fired) {
     gm.fired = true;
     gm.offers = jobOffers(league, season, team.id);
-    say(gm, { year: league.year, day, tone: "bad", text: `${tally}This isn't working. ${family(owner) ? "We've" : "I've"} decided to go in a different direction; thank you for your work.` });
+    say(gm, { year: league.year, day, tone: "bad", text: `${opening} ${tally}This isn't working. ${cap(v.Ive)} decided to go in a different direction; thank you for your work.` });
   } else {
-    const verdict =
+    const verdict = phrasing(
+      league,
+      team.id,
+      61,
       total >= 8
-        ? "That's the kind of season I hoped for. Keep it going."
+        ? [
+            `That's the kind of season ${v.I} hoped for. Keep it going.`,
+            `That's what ${v.I} hired you to do. Let's do it again.`,
+            `${cap(v.I)} couldn't have asked for much more. Keep it going.`,
+          ]
         : total >= 0
-          ? "A solid year. Let's build on it."
+          ? ["A solid year. Let's build on it.", "Good work. Now let's take the next step.", "That's a step forward. Let's keep building."]
           : gm.confidence < 35
-            ? "I'm running out of patience. Next season has to be better."
-            : "Not what I wanted. I expect more next year.";
-    say(gm, { year: league.year, day, tone: total >= 0 ? "good" : "bad", text: `${league.year} is in the books. ${tally}${verdict}` });
+            ? [
+                `${cap(v.Im)} running out of patience. Next season has to be better.`,
+                `${cap(v.my)} patience is wearing thin. Next season has to be better.`,
+                `${cap(v.I)} can't keep waiting for this to turn around. Next season has to be better.`,
+              ]
+            : [
+                `Not what ${v.I} wanted. ${cap(v.I)} expect more next year.`,
+                `That isn't good enough. ${cap(v.I)} expect more next year.`,
+                `${cap(v.I)} hoped for more than that. Next year needs to be better.`,
+              ],
+    );
+    say(gm, { year: league.year, day, tone: total >= 0 ? "good" : "bad", text: `${opening} ${tally}${verdict}` });
   }
   return review;
 }
@@ -373,11 +424,29 @@ export function ownerCheckIn(season: Season): void {
   const winGoal = gm.goals.find((g) => g.kind === "wins");
   const target = winGoal?.target ?? gm.expectedWins ?? 81;
   const diff = pace - target;
-  const text =
+  const v = voice(team.owner);
+  const aPace = cap(withArticle(pace));
+  const text = phrasing(
+    league,
+    team.id,
+    62,
     diff >= 4
-      ? `We're on pace for ${pace} wins. The whole city is talking about this club. Keep it up.`
+      ? [
+          `We're on pace for ${pace} wins. The whole city is talking about this club. Keep it up.`,
+          `${aPace}-win pace is more than ${v.I} hoped for. Keep it up.`,
+          `We're halfway there and on pace for ${pace} wins. The ballpark can feel it; don't let up now.`,
+        ]
       : diff >= -2
-        ? `We're on pace for ${pace} wins, about where I hoped. The second half decides it.`
-        : `We're on pace for ${pace} wins. That's well short of ${target}. I expect a better second half.`;
+        ? [
+            `We're on pace for ${pace} wins, about where ${v.I} hoped. The second half decides it.`,
+            `${aPace}-win pace is close to what ${v.I} wanted. The second half will settle it.`,
+            `Halfway through, we're on pace for ${pace} wins. That's about what ${v.I} expected; let's see a strong finish.`,
+          ]
+        : [
+            `We're on pace for ${pace} wins. That's well short of ${target}. ${cap(v.I)} expect a better second half.`,
+            `${aPace}-win pace won't get us to ${target}. ${cap(v.I)} expect a better second half.`,
+            `Halfway through, we're on pace for ${pace} wins, well short of ${target}. Something has to change.`,
+          ],
+  );
   say(gm, { year: league.year, day: season.day, tone: diff >= 4 ? "good" : diff >= -2 ? "neutral" : "bad", text });
 }
