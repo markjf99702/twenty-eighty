@@ -1015,24 +1015,28 @@ export function gameItems(season: Season, day: number, boxes: Map<string, BoxSco
 export function boxScoreView(season: Season, r: GameResult, day: number): BoxScoreView {
   const P = season.league.players;
   const teams: [Team, Team] = [season.team(r.awayId), season.team(r.homeId)];
+  // Each lineup slot lists its starter, then whoever came in for the one before him.
   const batting = [0, 1].map((i) =>
-    r.battingOrder[i]!.flat().map((slot) => {
-      const b = r.batting.get(slot.id);
-      return {
-        id: slot.id,
-        name: playerName(P[slot.id]!),
-        pos: slot.pos,
-        ...(slot.sub ? { sub: slot.sub } : {}),
-        ab: b.AB,
-        r: b.R,
-        h: b.H,
-        rbi: b.RBI,
-        bb: b.BB,
-        so: b.SO,
-        hr: b.HR,
-        avgEv: b.BBE > 0 ? Math.round((10 * b.evSum) / b.BBE) / 10 : null,
-      };
-    }),
+    r.battingOrder[i]!.flatMap((slot) =>
+      slot.map((entry, k) => {
+        const b = r.batting.get(entry.id);
+        const replaced = k > 0 ? slot[k - 1]! : null;
+        return {
+          id: entry.id,
+          name: playerName(P[entry.id]!),
+          pos: entry.pos,
+          ...(entry.sub && replaced ? { sub: { type: entry.sub, for: P[replaced.id]!.lastName } } : {}),
+          ab: b.AB,
+          r: b.R,
+          h: b.H,
+          rbi: b.RBI,
+          bb: b.BB,
+          so: b.SO,
+          hr: b.HR,
+          avgEv: b.BBE > 0 ? Math.round((10 * b.evSum) / b.BBE) / 10 : null,
+        };
+      }),
+    ),
   ) as BoxScoreView["batting"];
   const pitching = [0, 1].map((i) =>
     r.pitchersUsed[i]!.map((id) => {
@@ -1042,10 +1046,22 @@ export function boxScoreView(season: Season, r: GameResult, day: number): BoxSco
     }),
   ) as BoxScoreView["pitching"];
   const notes: string[] = [];
-  for (const i of [0, 1]) {
-    const hrs = batting[i]!.filter((b) => b.hr > 0).map((b) => `${P[b.id]!.lastName}${b.hr > 1 ? ` ${b.hr}` : ""}`);
-    if (hrs.length) notes.push(`HR (${teams[i]!.abbrev}): ${hrs.join(", ")}`);
-  }
+  /** A line for each club with any: "2B (NYE): Ruiz, Walker 2". */
+  const tally = (label: string, ids: number[][], count: (id: number) => number) => {
+    for (const i of [0, 1]) {
+      const who = ids[i]!.filter((id) => count(id) > 0).map((id) => `${P[id]!.lastName}${count(id) > 1 ? ` ${count(id)}` : ""}`);
+      if (who.length) notes.push(`${label} (${teams[i]!.abbrev}): ${who.join(", ")}`);
+    }
+  };
+  const batters = batting.map((side) => side.map((b) => b.id));
+  const line = (id: number) => r.batting.lines.get(id);
+  tally("2B", batters, (id) => line(id)?.["2B"] ?? 0);
+  tally("3B", batters, (id) => line(id)?.["3B"] ?? 0);
+  tally("HR", batters, (id) => line(id)?.HR ?? 0);
+  tally("SB", batters, (id) => line(id)?.SB ?? 0);
+  // A pitcher can make an error too.
+  const fielders = [0, 1].map((i) => [...batters[i]!, ...r.pitchersUsed[i]!.filter((id) => !batters[i]!.includes(id))]);
+  tally("E", fielders, (id) => r.fielding.lines.get(id)?.errors ?? 0);
   for (const inj of r.injuries) notes.push(`Injury: ${playerName(P[inj.playerId]!)}, ${injuryName(inj.injury.name)} (~${inj.injury.days} days)`);
   return {
     key: gameKey(day, r.homeId),

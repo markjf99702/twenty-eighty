@@ -87,6 +87,9 @@ export function BoxScorePage({ gameKey }: { gameKey: string; status: Status }) {
   );
 }
 
+/** A substitute's tag: "PH for Ruiz", or "for West, hurt" when he replaced a player who got hurt. */
+const subText = (s: NonNullable<BoxBatter["sub"]>) => (s.type === "INJ" ? `for ${s.for}, hurt` : `${s.type} for ${s.for}`);
+
 function Batting({ rows }: { rows: BoxBatter[] }) {
   const tot = rows.reduce((a, r) => ({ ab: a.ab + r.ab, r: a.r + r.r, h: a.h + r.h, rbi: a.rbi + r.rbi, bb: a.bb + r.bb, so: a.so + r.so }), { ab: 0, r: 0, h: 0, rbi: 0, bb: 0, so: 0 });
   return (
@@ -111,7 +114,7 @@ function Batting({ rows }: { rows: BoxBatter[] }) {
             <tr key={r.id} class={r.sub ? "sub-row" : ""}>
               <td class="name">
                 <a href={playerHref(r.id)}>{r.name}</a>
-                {r.sub && <span class="muted small"> ({r.sub})</span>}
+                {r.sub && <span class="muted small"> ({subText(r.sub)})</span>}
               </td>
               <td>{r.pos}</td>
               <td class="num">{r.ab}</td>

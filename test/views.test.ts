@@ -10,7 +10,8 @@ import { evaluateTrade, tradeValue } from "../src/org/trades";
 import { warShift } from "../src/scouting/analytics";
 import { blockView, historyView, tradeSide } from "../web/src/worker/winter";
 import { acceptJob } from "../src/finance/owner";
-import { dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, teamView, transactions } from "../web/src/worker/views";
+import { boxScoreView, dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, teamView, transactions } from "../web/src/worker/views";
+import type { GameResult } from "../src/sim/game";
 import { budgetRoom } from "../src/org/contracts";
 import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
 import { playerValue } from "../src/org/value";
@@ -160,6 +161,45 @@ describe("the front office", () => {
     Object.assign(season.records[mates[1]!.id]!, { w: 65, l: 56, rs: 600, ra: 500 });
     expect(record()).toMatchObject({ divRank: 2, tied: true, gb: 0.5 });
     [team, ...mates].forEach((t, i) => Object.assign(season.records[t.id]!, saved[i]));
+  });
+});
+
+describe("box scores", () => {
+  const l = generateLeague({ seed: "box-subs" });
+  hireGm(l, 1);
+  const s = new Season(l, { minors: false });
+  const games: { r: GameResult; day: number }[] = [];
+  s.onGame = (level, r, day) => {
+    if (level === "MLB") games.push({ r, day });
+  };
+  s.simDays(8);
+  const boxes = games.map(({ r, day }) => ({ r, box: boxScoreView(s, r, day) }));
+
+  it("say whom each substitute replaced, and that an injured player's replacement isn't the one hurt", () => {
+    const subs = boxes.flatMap(({ r, box }) =>
+      [0, 1].flatMap((i) =>
+        r.battingOrder[i]!.flatMap((slot) => slot.slice(1).map((entry, k) => ({ row: box.batting[i]!.find((b) => b.id === entry.id)!, before: slot[k]!, entry }))),
+      ),
+    );
+    expect(subs.length).toBeGreaterThan(20);
+    for (const { row, before, entry } of subs) expect(row.sub).toEqual({ type: entry.sub, for: l.players[before.id]!.lastName });
+    // A forced replacement after an injury names the player who got hurt.
+    const hurt = subs.filter((x) => x.entry.sub === "INJ");
+    expect(hurt.length).toBeGreaterThan(0);
+    for (const { before, r } of hurt.map((x) => ({ ...x, r: boxes.find((b) => b.box.batting.some((side) => side.includes(x.row)))!.r }))) {
+      expect(r.injuries.some((inj) => inj.playerId === before.id)).toBe(true);
+    }
+  });
+
+  it("list doubles, triples, homers, steals and errors by club", () => {
+    const labels = new Set(boxes.flatMap(({ box }) => box.notes.map((n) => n.split(" (")[0])));
+    for (const label of ["2B", "3B", "HR", "SB", "E"]) expect(labels).toContain(label);
+    for (const { r, box } of boxes) {
+      const errors = box.notes.filter((n) => n.startsWith("E (")).map((n) => n.split(": ")[1]!.split(", ").reduce((sum, x) => sum + (Number(x.split(" ").at(-1)) || 1), 0));
+      expect(errors.reduce((a, b) => a + b, 0)).toBe(r.errors[0] + r.errors[1]);
+      const doubles = box.notes.filter((n) => n.startsWith("2B (")).map((n) => n.split(": ")[1]!.split(", ").reduce((sum, x) => sum + (Number(x.split(" ").at(-1)) || 1), 0));
+      expect(doubles.reduce((a, b) => a + b, 0)).toBe([0, 1].reduce((sum, i) => sum + r.battingOrder[i]!.flat().reduce((n, e) => n + r.batting.get(e.id)["2B"], 0), 0));
+    }
   });
 });
 

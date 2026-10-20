@@ -437,7 +437,8 @@ export interface BoxBatter {
   id: number;
   name: string;
   pos: string;
-  sub?: string;
+  /** How he came into the game (absent for a starter), and the last name of the player he replaced in the order. */
+  sub?: { type: "PH" | "PR" | "DEF" | "INJ"; for: string };
   ab: number;
   r: number;
   h: number;
