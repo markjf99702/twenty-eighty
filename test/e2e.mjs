@@ -172,6 +172,19 @@ await page.waitForSelector('.meter-wrap');
 assert.match(await page.textContent('main'), /below 10 in your first season/, 'the owner\'s office misstates when a new GM can be fired');
 await fits('the owner\'s office');
 
+// A toast (setting the ticket price) sits at the foot of a phone's screen, off the middle of the page, and a tap puts
+// it away. The business office then takes the prices back.
+await page.goto(base + '#finances');
+await page.locator('.price-actions .btn.primary').click();
+const toast = page.locator('.toast', { hasText: 'Tickets now average' });
+await toast.waitFor({ timeout: 10000 });
+const toastAt = await toast.boundingBox();
+assert.ok(844 - (toastAt.y + toastAt.height) <= 20, `a toast floats ${Math.round(844 - toastAt.y - toastAt.height)}px above the foot of a phone's screen`);
+await toast.click();
+await toast.waitFor({ state: 'detached', timeout: 2000 });
+await page.locator('.price-actions .btn', { hasText: 'Let the business office decide' }).click();
+await page.locator('.toast', { hasText: 'The business office will set prices' }).waitFor({ timeout: 10000 });
+
 // The league saves itself: a reload comes back to the same club.
 await page.reload();
 const nickname = club.split(' ').at(-1);
@@ -254,14 +267,6 @@ for (let i = 0; i < 40 && !(await board('Start the postseason').count()); i++) {
 assert.ok(blockSeen, 'nobody was on the block all season');
 await board('Start the postseason').click();
 await board('To the end').click({ timeout: 60000 });
-// October's last game comes up in a toast: on a phone it sits at the foot of the screen, and a tap puts it away.
-const recap = page.locator('.toast').last();
-await recap.waitFor({ timeout: 120000 });
-const recapText = await recap.textContent();
-const recapBox = await recap.boundingBox();
-assert.ok(844 - (recapBox.y + recapBox.height) <= 20, `a toast floats ${Math.round(844 - recapBox.y - recapBox.height)}px above the foot of a phone's screen`);
-await recap.click();
-await page.locator('.toast', { hasText: recapText }).waitFor({ state: 'detached', timeout: 2000 });
 await board('Start the offseason').click({ timeout: 120000 });
 await page.waitForSelector('.winter-steps', { timeout: 120000 });
 await board('Go to the tender deadline').click({ timeout: 60000 });
