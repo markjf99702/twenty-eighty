@@ -64,6 +64,13 @@ const fail = (reason: string): RosterResult => ({ ok: false, reason });
 export const activeLimit = (ctx: RosterContext) => (ctx.expanded ? EXPANDED_ACTIVE_LIMIT : ACTIVE_LIMIT);
 export const pitcherLimit = (ctx: RosterContext) => (ctx.expanded ? EXPANDED_PITCHER_LIMIT : PITCHER_LIMIT);
 
+/**
+ * Whether the active roster's limits (26 players, 13 pitchers) hold: all season, and in the winter once spring
+ * training has set the Opening Day 26. Until then everyone back from the injured list is on it and nobody plays.
+ * (By the winter's phase, not its calendar day: offseason.ts imports this file.)
+ */
+export const activeLimitsApply = (ctx: RosterContext): boolean => !ctx.offseason || ctx.league.offseason?.phase === "spring";
+
 export function positionLabel(p: Player): string {
   if (p.pitching) return p.throws === "L" ? "LHP" : "RHP";
   return p.position;
@@ -531,8 +538,10 @@ export function releasePlayer(ctx: RosterContext, team: Team, p: Player): Roster
 export function rosterProblems(ctx: RosterContext, team: Team): string[] {
   const problems: string[] = [];
   const league = ctx.league;
-  if (team.rosters.MLB.length > activeLimit(ctx)) problems.push(`Active roster has ${team.rosters.MLB.length} (max ${activeLimit(ctx)}).`);
-  if (activePitchers(league, team) > pitcherLimit(ctx)) problems.push(`Carrying ${activePitchers(league, team)} pitchers (max ${pitcherLimit(ctx)}).`);
+  if (activeLimitsApply(ctx)) {
+    if (team.rosters.MLB.length > activeLimit(ctx)) problems.push(`Active roster has ${team.rosters.MLB.length} (max ${activeLimit(ctx)}).`);
+    if (activePitchers(league, team) > pitcherLimit(ctx)) problems.push(`Carrying ${activePitchers(league, team)} pitchers (max ${pitcherLimit(ctx)}).`);
+  }
   if (team.fortyMan.length > FORTY_MAN_LIMIT) problems.push(`40-man roster has ${team.fortyMan.length}.`);
   for (const id of team.rosters.MLB) {
     const p = league.players[id]!;

@@ -107,15 +107,20 @@ export function TeamPage({ teamId, tab, status }: { teamId: number; tab: Tab; st
   );
 }
 
+/** In the winter there's no active limit until spring training. */
+const NO_LIMIT_YET = "Spring training sets the Opening Day 26";
+
 function Counts({ d }: { d: TeamView }) {
   const c = d.counts;
   return (
     <div class="counts">
-      <span class={c.active > c.activeLimit ? "over" : ""}>
-        Active <b>{c.active}</b>/{c.activeLimit}
+      <span class={c.activeLimit !== null && c.active > c.activeLimit ? "over" : ""} title={c.activeLimit === null ? NO_LIMIT_YET : undefined}>
+        Active <b>{c.active}</b>
+        {c.activeLimit !== null && `/${c.activeLimit}`}
       </span>
-      <span class={c.pitchers > c.pitcherLimit ? "over" : ""}>
-        Pitchers <b>{c.pitchers}</b>/{c.pitcherLimit}
+      <span class={c.pitcherLimit !== null && c.pitchers > c.pitcherLimit ? "over" : ""} title={c.pitcherLimit === null ? NO_LIMIT_YET : undefined}>
+        Pitchers <b>{c.pitchers}</b>
+        {c.pitcherLimit !== null && `/${c.pitcherLimit}`}
       </span>
       <span class={c.fortyMan > 40 ? "over" : ""}>
         40-man <b>{c.fortyMan}</b>/40

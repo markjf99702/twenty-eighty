@@ -6,6 +6,7 @@ import { autoDepthChart, slotValue } from "../src/org/depth";
 import { loadGame, type SaveGame, saveGame, serialize } from "../src/save/save";
 import {
   activateFromIl,
+  activePitchers,
   callUp,
   designateForAssignment,
   handSetDepth,
@@ -18,7 +19,8 @@ import {
   type RosterContext,
   setDepthOwners,
 } from "../src/org/roster";
-import type { Tender } from "../src/offseason/types";
+import { winterContext } from "../src/offseason/offseason";
+import type { OffseasonPhase, Tender } from "../src/offseason/types";
 import { playerValue } from "../src/org/value";
 import { FIELD_POSITIONS, type Player, playerName } from "../src/players/types";
 import { staffCost } from "../src/scouting/scouting";
@@ -402,5 +404,51 @@ describe("roster rules", () => {
     const other = loadGame(save).league.teams[team.id === 0 ? 1 : 0]!;
     expect(other.manualLineup).toBeFalsy();
     expect(other.depthPlan).toBeUndefined();
+  });
+});
+
+describe("the winter's rosters", () => {
+  /** The winter in this phase, nothing else going on. */
+  const winter = (phase: OffseasonPhase): RosterContext => {
+    league.offseason = {
+      year: league.year,
+      phase,
+      development: { risers: [], fallers: [], retirements: [] },
+      shift: {},
+      tenders: [],
+      expiring: [],
+      draft: null,
+      freeAgency: null,
+      international: null,
+    };
+    return winterContext(league, phase);
+  };
+  /** 40-man players brought up from the farm, the way the injured come back after the World Series. */
+  const bringUp = (pitchers: number, hitters: number) => {
+    const down = team.fortyMan.filter((id) => !team.rosters.MLB.includes(id)).map(player);
+    for (const p of [...down.filter((x) => x.pitching).slice(0, pitchers), ...down.filter((x) => !x.pitching).slice(0, hitters)]) {
+      team.rosters[p.level] = team.rosters[p.level].filter((id) => id !== p.id);
+      p.level = "MLB";
+      team.rosters.MLB.push(p.id);
+    }
+  };
+
+  it("have no active-roster limit until spring training sets the Opening Day 26", () => {
+    const pitchers = activePitchers(league, team);
+    bringUp(15 - pitchers, 4 - (15 - pitchers));
+    expect(team.rosters.MLB).toHaveLength(30);
+    expect(activePitchers(league, team)).toBe(15);
+    expect(rosterProblems(winter("review"), team)).toEqual([]);
+    expect(rosterProblems(winter("draft"), team)).toEqual([]);
+    expect(rosterProblems(winter("spring"), team)).toEqual(["Active roster has 30 (max 26).", "Carrying 15 pitchers (max 13)."]);
+  });
+
+  it("hold the 26 again in spring, and the 40-man all winter", () => {
+    bringUp(0, 1);
+    expect(rosterProblems(winter("spring"), team)).toEqual(["Active roster has 27 (max 26)."]);
+    const extra = team.rosters.AAA.map(player).find((p) => !p.onFortyMan)!;
+    team.fortyMan.push(extra.id);
+    extra.onFortyMan = true;
+    expect(rosterProblems(winter("review"), team)).toEqual([`40-man roster has ${team.fortyMan.length}.`]);
   });
 });

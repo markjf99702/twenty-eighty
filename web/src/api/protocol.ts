@@ -309,7 +309,8 @@ export interface TeamView {
   manualLineup: boolean;
   manualPitching: boolean;
   record: { w: number; l: number; rs: number; ra: number } | null;
-  counts: { active: number; activeLimit: number; pitchers: number; pitcherLimit: number; fortyMan: number };
+  /** The active and pitcher limits are null in the winter until spring training sets the Opening Day 26. */
+  counts: { active: number; activeLimit: number | null; pitchers: number; pitcherLimit: number | null; fortyMan: number };
   problems: string[];
   /** Whether last season is on the record (the tables' "last season" view); not in a league's first year. */
   hasLastSeason: boolean;

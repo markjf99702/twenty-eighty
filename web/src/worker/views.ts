@@ -12,6 +12,7 @@ import { defenseGrade } from "../../../src/players/defense";
 import { injuryName } from "../../../src/players/injuries";
 import {
   activeLimit,
+  activeLimitsApply,
   activePitchers,
   canActivate,
   canBeOptioned,
@@ -752,9 +753,9 @@ export function teamView(season: Season, stats: StatsCache, teamId: number, ctx:
     record: { w: rec.w, l: rec.l, rs: rec.rs, ra: rec.ra },
     counts: {
       active: team.rosters.MLB.length,
-      activeLimit: activeLimit(ctx),
+      activeLimit: activeLimitsApply(ctx) ? activeLimit(ctx) : null,
       pitchers: activePitchers(league, team),
-      pitcherLimit: pitcherLimit(ctx),
+      pitcherLimit: activeLimitsApply(ctx) ? pitcherLimit(ctx) : null,
       fortyMan: team.fortyMan.length,
     },
     problems: rosterProblems(ctx, team),
