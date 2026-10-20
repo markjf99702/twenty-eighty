@@ -1,9 +1,9 @@
 import { Rng } from "../core/rng";
-import { withArticle } from "../core/text";
+import { tenth, withArticle } from "../core/text";
 import { expectedGate, formFactor, referencePrice } from "../finance/finance";
 import { settingsOf } from "../league/settings";
 import type { AdviceNote, League, Team } from "../league/types";
-import { arbCase, arbitrationSalary, budgetRoom, orgPlayers, payroll, tenderWorth } from "../org/contracts";
+import { arbCase, arbitrationSalary, budgetRoom, leavesAtDeadline, orgPlayers, payroll, tenderWorth } from "../org/contracts";
 import { extensionCandidates } from "../org/extensions";
 import { onTheBlock } from "../org/market";
 import { gamesOut } from "../org/offers";
@@ -77,7 +77,7 @@ const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M
 const names = (ps: Player[]) => (ps.length <= 2 ? ps.map(tag).join(" and ") : `${ps.slice(0, -1).map(tag).join(", ")} and ${tag(ps.at(-1)!)}`);
 
 /** The user's read of what a player would give in the majors now, in wins (the 20-80 grade bunches up for big leaguers). */
-const ourWar = (season: Season, user: number, p: Player) => `about ${believedWar(season, user, p).toFixed(1)} WAR a season`;
+const ourWar = (season: Season, user: number, p: Player) => `about ${tenth(believedWar(season, user, p))} WAR a season`;
 const ourFv = (league: League, user: number, p: Player) => overallGrade(perceive(league, user, p), true);
 
 function slash(b: BattingLine | undefined): string | null {
@@ -355,10 +355,13 @@ function analytics(season: Season, team: Team, day: number): void {
   // Once the deadline passes, nobody can cash in on a hot start until the winter.
   const selling = day < TRADE_DEADLINE_DAY ? "his trade value may never be higher" : "don't pay for that ERA this winter";
   let best: { id: number; gap: number; text: string; title: string } | null = null;
+  const lgEra = stats.context.lgEra;
   for (const p of stats.pitchers) {
     if (!mine.has(p.id) || p.IP < 50) continue;
     const gap = p.ERA - p.FIP;
     if (Math.abs(gap) < 1.1 || (best && Math.abs(gap) <= best.gap)) continue;
+    // An ERA well over his FIP says he's pitched better, but only a FIP about league average or better is worth keeping faith in.
+    if (gap > 0 && p.FIP > lgEra + 0.25 && p.FIPminus > 105) continue;
     const name = playerName(league.players[p.id]!);
     best =
       gap < 0
@@ -474,7 +477,8 @@ export function winterAdvice(league: League, season: Season, now: number): void 
         from: "assistant",
         urgent: false,
         title: `Time to lock up ${playerName(top.p)}?`,
-        text: `${tag(top.p)} would sign for ${t.years} years at ${money(t.salary)} a year, through ${t.through}. By our read that's worth ${money(top.best.gain)} more than going year to year. The risk is ours if he gets hurt or fades.`,
+        // A veteran whose deal is up leaves at the tender deadline, so the deal is weighed against losing him.
+        text: `${tag(top.p)} would sign for ${t.years} years at ${money(t.salary)} a year, through ${t.through}. By our read that's worth ${money(top.best.gain)} more than ${leavesAtDeadline(league, top.p) ? "letting him go to free agency" : "going year to year"}. The risk is ours if he gets hurt or fades.`,
         href: `#player-${top.p.id}`,
       });
     }
@@ -525,7 +529,7 @@ export function winterAdvice(league: League, season: Season, now: number): void 
         text:
           `By our read ${spot.label} is the weakest spot on the club (${tag(spot.p)}, ${ourWar(season, user, spot.p)}). ` +
           (fits.length
-            ? `Best fits on the market: ${fits.map((p) => `${tag(p)} (about ${war(p).toFixed(1)} wins, asking ${money(asks.get(p.id)!.salary)} for ${asks.get(p.id)!.years} yr)`).join("; ")}. `
+            ? `Best fits on the market: ${fits.map((p) => `${tag(p)} (about ${tenth(war(p))} wins, asking ${money(asks.get(p.id)!.salary)} for ${asks.get(p.id)!.years} yr)`).join("; ")}. `
             : "Nobody on the market is a clear upgrade; a trade may be the way. ") +
           (room > 0 ? `We have ${money(room)} of room under the budget.` : `We're ${money(-room)} over the budget already.`),
         href: "#winter",

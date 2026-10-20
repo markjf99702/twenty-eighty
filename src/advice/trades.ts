@@ -1,5 +1,5 @@
 import { clamp } from "../core/math";
-import { withArticle } from "../core/text";
+import { tenth, withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
 import { budgetRoom, pendingContract } from "../org/contracts";
 import { gamesOut } from "../org/offers";
@@ -182,7 +182,7 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
       const fv = Math.max(nowGrade, overallGrade(perceive(league, user, p), true));
       const where = p.level === "MLB" ? "" : ` in ${LEVEL_WORDS[p.level]}`;
       read = `${nowGrade} now and ${fv} at his peak${where}`;
-    } else read = `about ${believedWar(season, user, p).toFixed(1)} WAR a season`;
+    } else read = `about ${tenth(believedWar(season, user, p))} WAR a season`;
     const seen = looks[p.id] ?? 0;
     const text =
       c === "high"

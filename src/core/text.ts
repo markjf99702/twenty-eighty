@@ -13,3 +13,6 @@ export function article(n: number | string): "a" | "an" {
 
 /** The number with its article: "an 8", "a 10", "an 8.31". */
 export const withArticle = (n: number | string): string => `${article(n)} ${n}`;
+
+/** Wins to a tenth, the way the staff writes them: a WAR of -0.04 is "0.0", never "-0.0". */
+export const tenth = (x: number): string => (Math.abs(x) < 0.05 ? 0 : x).toFixed(1);
