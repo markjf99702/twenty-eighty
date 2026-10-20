@@ -45,27 +45,33 @@ function emit() {
   for (const l of toastListeners) l(toasts);
 }
 
+function dismiss(id: number): void {
+  toasts = toasts.filter((x) => x.id !== id);
+  emit();
+}
+
 export function notify(text: string, bad = false): void {
   const t = { id: ++toastId, text, bad };
   toasts = [...toasts, t].slice(-4);
   emit();
   // Long enough to read: a sentence about a roster move stays up longer than "Saved".
-  setTimeout(() => {
-    toasts = toasts.filter((x) => x.id !== t.id);
-    emit();
-  }, Math.max(bad ? 6000 : 3500, 60 * text.length));
+  setTimeout(() => dismiss(t.id), Math.max(bad ? 6000 : 3500, 60 * text.length));
 }
 
-export function Toasts() {
+/**
+ * The toasts, in a corner; a tap puts one away. `overBar`: the page keeps a bar at the foot of the screen (the title
+ * screen's start bar), so they stay above it.
+ */
+export function Toasts({ overBar = false }: { overBar?: boolean }) {
   const [list, setList] = useState<Toast[]>(toasts);
   useEffect(() => {
     toastListeners.add(setList);
     return () => void toastListeners.delete(setList);
   }, []);
   return (
-    <div class="toasts" role="status" aria-live="polite">
+    <div class={`toasts${overBar ? " over-bar" : ""}`} role="status" aria-live="polite">
       {list.map((t) => (
-        <div key={t.id} class={`toast${t.bad ? " bad" : ""}`}>
+        <div key={t.id} class={`toast${t.bad ? " bad" : ""}`} onClick={() => dismiss(t.id)}>
           {t.text}
         </div>
       ))}

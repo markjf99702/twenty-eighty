@@ -1079,6 +1079,8 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 
 /* ------------------------------------------------------------------ toast */
 
+/* Above the title screen's start bar and the winter's (pinned on a wide screen). Only the toasts themselves catch taps,
+   and a tap puts one away. */
 .toasts {
   position: fixed;
   right: 16px;
@@ -1087,6 +1089,7 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
   display: grid;
   gap: 8px;
   max-width: min(380px, calc(100vw - 32px));
+  pointer-events: none;
 }
 .toast {
   background: var(--ink);
@@ -1095,8 +1098,12 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
   padding: 9px 14px;
   font-size: 13.5px;
   box-shadow: 0 6px 20px rgba(0, 0, 0, 0.18);
+  pointer-events: auto;
+  cursor: pointer;
 }
 .toast.bad { background: var(--alert); color: #fff; }
+/* In the game a phone has no bar at the foot of the screen, so they sit at the edge, off the middle of the page. */
+@media (max-width: 820px) { .toasts:not(.over-bar) { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); } }
 
 .confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 

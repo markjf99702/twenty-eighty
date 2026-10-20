@@ -254,6 +254,14 @@ for (let i = 0; i < 40 && !(await board('Start the postseason').count()); i++) {
 assert.ok(blockSeen, 'nobody was on the block all season');
 await board('Start the postseason').click();
 await board('To the end').click({ timeout: 60000 });
+// October's last game comes up in a toast: on a phone it sits at the foot of the screen, and a tap puts it away.
+const recap = page.locator('.toast').last();
+await recap.waitFor({ timeout: 120000 });
+const recapText = await recap.textContent();
+const recapBox = await recap.boundingBox();
+assert.ok(844 - (recapBox.y + recapBox.height) <= 20, `a toast floats ${Math.round(844 - recapBox.y - recapBox.height)}px above the foot of a phone's screen`);
+await recap.click();
+await page.locator('.toast', { hasText: recapText }).waitFor({ state: 'detached', timeout: 2000 });
 await board('Start the offseason').click({ timeout: 120000 });
 await page.waitForSelector('.winter-steps', { timeout: 120000 });
 await board('Go to the tender deadline').click({ timeout: 60000 });

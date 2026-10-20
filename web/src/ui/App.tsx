@@ -317,7 +317,7 @@ export function App() {
         <main style={{ gridColumn: "1 / -1" }}>
           <NewGame onStarted={(st) => { setStatus(st); location.hash = "#home"; bump(); }} />
         </main>
-        <Toasts />
+        <Toasts overBar />
       </div>
     );
   }
