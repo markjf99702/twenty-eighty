@@ -1156,6 +1156,11 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
   .winter-steps { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .winter-steps li:nth-child(3) { border-right: 0; }
   .winter-steps li:nth-child(-n + 3) { border-bottom: 1px solid var(--line); }
+  /* A third of a phone is narrow for INTERNATIONAL: a little smaller, and a done step's check goes on its date. */
+  .winter-steps li { padding: 7px 8px; }
+  .winter-steps .l { font-size: 14px; letter-spacing: 0.03em; }
+  .winter-steps li.done .l::after { content: none; }
+  .winter-steps li.done .d::after { content: " ✓"; color: var(--accent-text); }
 }
 
 .fa-offer { display: flex; align-items: center; gap: 4px; }

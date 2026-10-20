@@ -292,6 +292,17 @@ const step = await page.locator('.board .progress')
   .catch(() => null);
 if (step !== null) assert.deepEqual(step, { text: 'Running the tender deadline…', motion: 'bar-stripes' }, 'a winter step did not say what it was doing over a moving bar');
 await board('Finish the draft').waitFor({ timeout: 120000 });
+// The offseason calendar has every step's name whole on a 360px phone, and a done step's check on its date line
+// (INTERNATIONAL used to lose its last letters, and the check was the first thing cut).
+await page.locator('.winter-steps li.on', { hasText: 'Draft' }).waitFor({ timeout: 60000 });
+await page.setViewportSize({ width: 360, height: 844 });
+const steps = await page.evaluate(() => [...document.querySelectorAll('.winter-steps li')].map((li) => {
+  const l = li.querySelector('.l');
+  const check = [l, li.querySelector('.d')].some((el) => getComputedStyle(el, '::after').content.includes('✓'));
+  return `${l.textContent}${l.scrollWidth > l.clientWidth + 0.5 ? ' (cut)' : ''}${li.classList.contains('done') && !check ? ' (no check)' : ''}`;
+}));
+assert.deepEqual(steps.filter((s) => s.includes('(')), [], `the offseason calendar on a phone: ${steps.join(', ')}`);
+await page.setViewportSize({ width: 390, height: 844 });
 // On the clock, the Draft button is in view: under the name, which stays put while the board scrolls sideways.
 // The scoreboard can show the draft before the page does, so wait for the page's note either way.
 const toMyPick = page.locator('.note button', { hasText: 'Sim to my pick' });
