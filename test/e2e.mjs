@@ -67,6 +67,23 @@ await idle();
 const record = (await page.textContent('.board-cells')).replace(/\s+/g, ' ');
 assert.match(record, /\d+[–-]\d+/, 'no record after a week');
 await fits('the front office');
+// A day's sim leaves the scoreboard as tall as it was, so the page doesn't jump: the Sim buttons stay, with Day saying
+// it's playing (the progress line that replaced them was a row shorter on a phone).
+await page.evaluate(() => {
+  window.__heights = new Set();
+  const tick = () => {
+    if (!window.__heights) return;
+    window.__heights.add(Math.round(document.querySelector('.board').getBoundingClientRect().height));
+    requestAnimationFrame(tick);
+  };
+  requestAnimationFrame(tick);
+});
+await board('Day').click();
+await page.locator('.board .progress').waitFor({ timeout: 3000 }).catch(() => {});
+await idle();
+await page.waitForTimeout(300);
+const heights = await page.evaluate(() => { const h = [...window.__heights]; window.__heights = null; return h; });
+assert.equal(heights.length, 1, `the scoreboard changed height while a day played (${heights.join(' and ')}px)`);
 // Once a game is played the budgets wait for the winter, and the scouting page says when they open again.
 await page.goto(base + '#scouting');
 assert.match(await page.locator('.note').first().textContent({ timeout: 10000 }), /set in the offseason and on Opening Day, before the first game/, 'the scouting page does not say when budgets can change');

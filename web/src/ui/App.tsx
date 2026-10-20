@@ -463,6 +463,28 @@ function Board({
     </div>
   );
   const user = game?.teams?.find((t) => t.id === game.userTeamId);
+  // The season's Sim buttons. While a single day plays they stay where they are, Day saying so: swapping them for the
+  // progress line, a row shorter on a phone, made the page jump up and back.
+  const simButtons = (playing: boolean) =>
+    onSim && (
+      <>
+        <span class="label">Sim</span>
+        <button type="button" class="btn primary" disabled={playing} onClick={() => onSim(1)}>
+          {playing ? "Playing…" : "Day"}
+        </button>
+        <button type="button" class="btn" disabled={playing} onClick={() => onSim(7)}>
+          Week
+        </button>
+        <button type="button" class="btn" disabled={playing} onClick={() => onSim(30)}>
+          Month
+        </button>
+        <button type="button" class="btn" disabled={playing} onClick={() => onSim("end")}>
+          To end
+        </button>
+        {speed}
+        {stops && onStops && <StopsMenu stops={stops} onChange={onStops} />}
+      </>
+    );
   return (
     <header class={`board${sim && sim.total > 1 ? " simming" : ""}`}>
       <a class="wordmark" href="#home">
@@ -501,7 +523,11 @@ function Board({
       )}
       {game && onSim && (
         <div class="sim">
-          {sim ? (
+          {sim && sim.total === 1 && !sim.label ? (
+            <div class="progress one-day" aria-live="polite">
+              {simButtons(true)}
+            </div>
+          ) : sim ? (
             <div class="progress" aria-live="polite">
               {/* Without a day count (October, the winter) the bar can't fill, so it moves instead. */}
               <div class={sim.total ? "bar" : "bar indeterminate"}>
@@ -517,23 +543,7 @@ function Board({
               )}
             </div>
           ) : game.phase === "regular" ? (
-            <>
-              <span class="label">Sim</span>
-              <button type="button" class="btn primary" onClick={() => onSim(1)}>
-                Day
-              </button>
-              <button type="button" class="btn" onClick={() => onSim(7)}>
-                Week
-              </button>
-              <button type="button" class="btn" onClick={() => onSim(30)}>
-                Month
-              </button>
-              <button type="button" class="btn" onClick={() => onSim("end")}>
-                To end
-              </button>
-              {speed}
-              {stops && onStops && <StopsMenu stops={stops} onChange={onStops} />}
-            </>
+            simButtons(false)
           ) : game.phase === "postseason" ? (
             !game.october?.started ? (
               <button type="button" class="btn primary" onClick={onPlayoffs}>

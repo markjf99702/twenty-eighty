@@ -375,6 +375,9 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
 }
 @keyframes bar-stripes { to { background-position: 16px 0; } }
 @media (prefers-reduced-motion: reduce) { .progress .bar.indeterminate span { animation: none; } }
+/* A single day: the Sim buttons stay as they are (the board keeps its height), with Day saying it's playing. */
+.progress.one-day { display: contents; }
+.board .progress.one-day .btn.primary:disabled { opacity: 1; cursor: progress; }
 .progress .txt {
   font-family: var(--display);
   font-size: 15px;
