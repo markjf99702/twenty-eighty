@@ -190,6 +190,20 @@ describe("the owner's goals during the season", () => {
     }
   });
 
+  it("gives the attendance pace to the thousand when it rounds to the goal's own figure", () => {
+    const team = l.teams[3]!;
+    const pace = Math.round(team.finance.ledger.attendance + restOfSeason(s, team).fans);
+    const goal = l.gm!.goals.find((g) => g.kind === "attendance")!;
+    const before = goal.target;
+    // A goal a fan more than the pace: the same two decimals in millions, and not met.
+    goal.target = pace + 1;
+    expect((goal.target / 1e6).toFixed(2)).toBe((pace / 1e6).toFixed(2));
+    const about = Math.floor(pace / 1000) * 1000;
+    expect(card().attendance).toMatchObject({ status: "behind", progress: expect.stringMatching(new RegExp(`, on pace for about ${about.toLocaleString("en-US")}, ${(goal.target - about).toLocaleString("en-US")}\u00a0short$`)) });
+    goal.target = before;
+    expect(card().attendance!.progress).toMatch(/, on pace for [\d.]+M$/);
+  });
+
   it("doesn't call profit final while October's gates are still to come", () => {
     s.simToEnd();
     const seeded = playoffSeeds(s).flat();
@@ -203,6 +217,16 @@ describe("the owner's goals during the season", () => {
     runPostseason(s);
     l.gm!.teamId = seeded[0]!;
     expect(["met", "missed"]).toContain(card().profit!.status);
+  });
+
+  it("gives the count when a missed attendance goal rounds to its own figure", () => {
+    const missed = (target: number) => ({ kind: "attendance" as const, target, weight: 1, actual: 1_957_620, met: false, delta: -1.6 });
+    l.gm!.reviews.push({ year: l.year, goals: [missed(1_960_000), missed(2_000_000)], expectedWins: null, wins: 80, notes: [], before: 60, after: 57 });
+    expect(ownerView(s)!.reviews[0]!.goals.map((g) => [g.label, g.actual])).toEqual([
+      ["Draw 1.96 million fans", "1,957,620\u00a0fans, 2,380\u00a0short"],
+      ["Draw 2.00 million fans", "1.96M fans"],
+    ]);
+    l.gm!.reviews.pop();
   });
 
   it("dates the owner's midseason letter, for the front office to show it for two weeks", () => {

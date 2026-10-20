@@ -181,7 +181,7 @@ export function Owner({ onStatus }: { onStatus: (s: Status) => void }) {
                           <td class="wrap">
                             <span class={`goal-status ${g.met ? "met" : "missed"}`}>{g.met ? "met" : "missed"}</span> {g.label}
                           </td>
-                          <td>{g.actual}</td>
+                          <td class="wrap">{g.actual}</td>
                           <td class={`num ${g.delta >= 0 ? "good" : "bad"}`}>{signed(g.delta, 1)}</td>
                         </tr>
                       ))}

@@ -1305,6 +1305,8 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
 .letter.tone-good { border-left-color: var(--accent); }
 .letter.tone-bad { border-left-color: var(--alert); }
 .review { display: grid; gap: 4px; margin-bottom: 12px; }
+/* A goal and its result wrap as a phone needs (a missed crowd can read "1,957,620 fans, 2,380 short"), keeping the change in view. */
+.review .tbl td.wrap { min-width: 0; }
 .review-head { display: flex; justify-content: space-between; gap: 12px; font-variant-numeric: tabular-nums; }
 
 .offers { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }

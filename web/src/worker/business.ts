@@ -135,8 +135,24 @@ export function financeView(season: Season, team: Team): FinanceView {
 }
 
 const fans = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(2)}M` : `${Math.round(n / 1000)}K`);
+const count = (n: number) => n.toLocaleString("en-US");
+/** Whether a crowd short of an attendance goal rounds to the goal's own figure (1.96M against "Draw 1.96 million fans"). */
+const looksMet = (n: number, target: number) => n < target && (n / 1e6).toFixed(2) === (target / 1e6).toFixed(2);
 
-function actualText(kind: string, actual: number): string {
+/**
+ * A season's crowds against the goal: the exact count and how far short when the rounded figure would read like the
+ * goal's. No-break spaces keep "2,380 short" together when a phone wraps it.
+ */
+const fansAgainst = (n: number, target: number) => (looksMet(n, target) ? `${count(n)}\u00a0fans, ${count(target - n)}\u00a0short` : `${fans(n)} fans`);
+
+/** The pace against the goal, likewise: to the thousand below, and how far short. */
+function paceAgainst(pace: number, target: number): string {
+  if (!looksMet(pace, target)) return fans(pace);
+  const about = Math.floor(pace / 1000) * 1000;
+  return `about ${count(about)}, ${count(target - about)}\u00a0short`;
+}
+
+function actualText(kind: string, actual: number, target?: number): string {
   switch (kind) {
     case "wins":
       return `${actual} wins`;
@@ -145,7 +161,7 @@ function actualText(kind: string, actual: number): string {
     case "profit":
       return `${actual < 0 ? "-" : ""}$${Math.abs(actual).toFixed(1)}M`;
     case "attendance":
-      return `${fans(actual)} fans`;
+      return target === undefined ? `${fans(actual)} fans` : fansAgainst(actual, target);
     case "youth":
       return `${actual} young regular${actual === 1 ? "" : "s"}`;
     case "budget":
@@ -205,7 +221,7 @@ function goalViews(league: League, season: Season): GoalView[] {
       case "attendance": {
         if (!done && l.homeGames === 0) return { ...base, status: "early" as const, progress: "No home games yet" };
         pace = Math.round(actual + rest.fans);
-        progress = done ? `${fans(actual)} fans` : early ? `${fans(actual)} so far` : `${fans(actual)} so far, on pace for ${fans(pace)}`;
+        progress = done ? fansAgainst(actual, goal.target) : early ? `${fans(actual)} so far` : `${fans(actual)} so far, on pace for ${paceAgainst(pace, goal.target)}`;
         break;
       }
       case "youth": {
@@ -236,7 +252,7 @@ function reviewView(r: { year: number; wins: number; expectedWins: number | null
     year: r.year,
     wins: r.wins,
     expectedWins: r.expectedWins,
-    goals: r.goals.map((g) => ({ label: goalLabel(g), met: g.met, delta: g.delta, actual: actualText(g.kind, g.actual) })),
+    goals: r.goals.map((g) => ({ label: goalLabel(g), met: g.met, delta: g.delta, actual: actualText(g.kind, g.actual, g.target) })),
     notes: r.notes,
     before: r.before,
     after: r.after,
