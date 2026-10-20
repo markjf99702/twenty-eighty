@@ -83,9 +83,16 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
             League seed
           </label>
           <div class="row">
+            {/* Seeds are case-sensitive, so a phone's keyboard mustn't capitalize or correct one. autoCorrect and
+                autoCapitalize go in as attributes: iOS has a true-or-false autocorrect property that "off" would turn on. */}
             <input
               id="seed"
               class="txt"
+              autoCapitalize="none"
+              autoCorrect="off"
+              spellcheck={false}
+              autoComplete="off"
+              enterKeyHint="go"
               value={draft}
               onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
               onKeyDown={(e) => e.key === "Enter" && draft.trim() && setSeed(draft.trim())}

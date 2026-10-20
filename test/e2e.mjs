@@ -44,6 +44,9 @@ await page.waitForSelector('.club-pick', { timeout: 30000 });
 assert.ok(await page.locator('.jd-foot a[href="https://junkdrawer.works/"]').count(), 'no link back to the drawer');
 assert.equal(await page.evaluate(() => getComputedStyle(document.body).fontFamily.includes('Source Sans 3') && document.fonts.check('16px "Source Sans 3"')), true, 'the fonts did not load');
 await fits('the title screen');
+// A phone's keyboard leaves a seed as typed: seeds are case-sensitive, so a capital or a correction builds another league.
+const seedBox = await page.evaluate(() => ['autocapitalize', 'autocorrect', 'spellcheck', 'autocomplete', 'enterkeyhint'].map((a) => `${a}=${document.querySelector('#seed').getAttribute(a)}`).join(' '));
+assert.equal(seedBox, 'autocapitalize=none autocorrect=off spellcheck=false autocomplete=off enterkeyhint=go', 'a phone can capitalize or correct the seed');
 const club = (await page.locator('.club-pick .nm').nth(3).textContent()).trim();
 await page.locator('.club-pick').nth(3).click();
 await page.locator('.setup .check input').first().uncheck();
