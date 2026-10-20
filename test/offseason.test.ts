@@ -228,6 +228,27 @@ describe("international signings", () => {
   });
 });
 
+describe("spring extensions", () => {
+  it("go only to players who make the spring cut", () => {
+    // A league with its affiliates, straight to October and then the winter.
+    const l = generateLeague({ seed: "extcut-c" });
+    const s = new Season(l);
+    runPostseason(s);
+    beginOffseason(l, s);
+    while (l.offseason!.phase !== "spring") advanceOffseason(l, s);
+    const spring = winterContext(l, "spring").day;
+    const moves = l.transactions.filter((t) => t.year === l.year && t.day === spring);
+    const deals = moves.filter((t) => t.type === "extension");
+    expect(deals.length).toBeGreaterThan(5);
+    // Extensions came before the cut, and Portland signed Anderson Ramos for five years and $58.3M, then designated him.
+    for (const deal of deals) {
+      const after = moves.slice(moves.indexOf(deal) + 1).filter((t) => t.playerId === deal.playerId);
+      expect(after.filter((t) => ["dfa", "outright", "release", "claim"].includes(t.type)), deal.text).toEqual([]);
+      expect(l.players[deal.playerId]!.onFortyMan).toBe(true);
+    }
+  });
+});
+
 describe("old saves", () => {
   it("load with contracts assigned", () => {
     const l = generateLeague({ seed: "migrate-test" });

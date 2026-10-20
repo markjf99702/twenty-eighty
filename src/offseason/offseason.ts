@@ -333,9 +333,9 @@ function advancePhase(league: League, season: Season): Season | null {
     }
     case "international":
       finishInternational(league, s.international!, WINTER_DAYS.international, null);
-      // Spring is when clubs lock up the players they believe in.
-      aiExtensions(winterContext(league, "spring"), winterRng(league, "extensions"), (viewer, p) => warShift(season, viewer, p));
       springTraining(winterContext(league, "spring"), waivers);
+      // Spring is when clubs lock up the players they believe in, once they've made the cut.
+      aiExtensions(winterContext(league, "spring"), winterRng(league, "extensions"), (viewer, p) => warShift(season, viewer, p));
       setGoals(league, WINTER_DAYS.spring);
       s.phase = "spring";
       return null;
