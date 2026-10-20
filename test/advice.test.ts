@@ -4,6 +4,9 @@ import { tenth } from "../src/core/text";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { FREE_AGENT_YEARS, serviceYears } from "../src/org/contracts";
+import { TRADE_DEADLINE_DAY } from "../src/org/trades";
+import { createDraft } from "../src/offseason/draft";
+import { winterRng } from "../src/offseason/offseason";
 import { playerName } from "../src/players/types";
 import { Season } from "../src/season/season";
 import { emptyPitching, type PitchingLine } from "../src/stats/lines";
@@ -102,5 +105,61 @@ describe("the assistant GM's extension note", () => {
 
   it("weighs a deal for a player under contract against going year to year", () => {
     expect(noteIn([])).toMatch(/By our read that's worth \$[\d.]+M more than going year to year\. The risk is ours/);
+  });
+});
+
+describe("the scouting director's draft note", () => {
+  const league = generateLeague({ seed: "advice-draft" });
+  hireGm(league, USER);
+  const season = new Season(league, { minors: false });
+  /** The note as the draft opens, with the user's club finishing at w-l and everyone else at .500. */
+  const noteAfter = (w: number, l: number) => {
+    for (const r of season.records) Object.assign(r, { w: 81, l: 81 });
+    Object.assign(season.records[USER]!, { w, l });
+    league.offseason = {
+      year: league.year,
+      phase: "draft",
+      development: { risers: [], fallers: [], retirements: [] },
+      shift: {},
+      tenders: [],
+      expiring: [],
+      draft: createDraft(league, season, winterRng(league, "draft")),
+      freeAgency: null,
+      international: null,
+    };
+    league.advice = [];
+    winterAdvice(league, season, 1060);
+    return league.advice.find((a) => a.key === `draft:${league.year}`)!.text;
+  };
+
+  it("gives FVs in the scouts' 5-point steps, as the board does", () => {
+    const fvs = [...noteAfter(81, 81).matchAll(/FV (\d+)/g)].map((m) => Number(m[1]));
+    expect(fvs).toHaveLength(3);
+    for (const fv of fvs) expect(fv % 5).toBe(0);
+  });
+
+  it("says when the top of our board will be gone before our first pick", () => {
+    expect(noteAfter(100, 62)).toMatch(/ We pick #30 and #60 overall; most of these will be gone by then\.$/);
+    expect(noteAfter(55, 107)).toMatch(/ We pick #1 and #31 overall\.$/);
+  });
+});
+
+describe("the weakest spot", () => {
+  it("names a pitcher by the slot he fills, not his role", () => {
+    const league = generateLeague({ seed: "advice-slot" });
+    hireGm(league, USER);
+    const season = new Season(league, { minors: false });
+    const team = league.teams[USER]!;
+    // A reliever by trade, starting for us, and not well.
+    const p = league.players[team.depth.rotation[0]!]!;
+    p.role = "RP";
+    const poor = { present: 20, future: 20 };
+    for (const x of p.pitching!.pitches) x.grade = { ...poor };
+    p.pitching!.control = { ...poor };
+    p.pitching!.command = { ...poor };
+    for (const t of league.teams.filter((x) => x.league === team.league)) Object.assign(season.records[t.id]!, { w: 60, l: 55 });
+    season.day = TRADE_DEADLINE_DAY - 7;
+    seasonAdvice(season);
+    expect(league.advice.find((a) => a.key.startsWith("buy"))!.text).toContain(`the weakest spot on the club is the rotation: SP ${playerName(p)} (about `);
   });
 });

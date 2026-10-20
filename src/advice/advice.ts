@@ -1,3 +1,4 @@
+import { scoutRound } from "../core/grades";
 import { Rng } from "../core/rng";
 import { tenth, withArticle } from "../core/text";
 import { expectedGate, formFactor, referencePrice } from "../finance/finance";
@@ -73,6 +74,8 @@ const POS_NAMES: Record<FieldPosition | "DH", string> = {
 
 const pos = (p: Player) => (p.pitching ? (p.role === "SP" ? "SP" : "RP") : p.position);
 const tag = (p: Player) => `${pos(p)} ${playerName(p)}`;
+/** A player at a spot on the club: a pitcher by the slot he fills there (SP in the rotation, whatever his role). */
+const slotTag = (p: Player, slot: "SP" | "RP" | undefined) => (p.pitching && slot ? `${slot} ${playerName(p)}` : tag(p));
 const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
 /** Games out of a playoff spot, said aloud: "half a game", "a game", "1½ games", "3 games". */
 const gbText = (gb: number) => (gb === 0.5 ? "half a game" : gb === 1 ? "a game" : Number.isInteger(gb) ? `${gb} games` : `${Math.floor(gb)}½ games`);
@@ -80,7 +83,8 @@ const names = (ps: Player[]) => (ps.length <= 2 ? ps.map(tag).join(" and ") : `$
 
 /** The user's read of what a player would give in the majors now, in wins (the 20-80 grade bunches up for big leaguers). */
 const ourWar = (season: Season, user: number, p: Player) => `about ${tenth(believedWar(season, user, p))} WAR a season`;
-const ourFv = (league: League, user: number, p: Player) => overallGrade(perceive(league, user, p), true);
+/** The user's scouts' future value, in their 5-point steps as the boards show it. */
+const ourFv = (league: League, user: number, p: Player) => scoutRound(overallGrade(perceive(league, user, p), true));
 
 function slash(b: BattingLine | undefined): string | null {
   if (!b || b.PA < 30) return null;
@@ -287,14 +291,14 @@ function deadline(season: Season, team: Team, day: number): void {
     const group = spot.pitcher ?? spot.hitterPos!;
     const there = onTheBlock(season, user).filter((b) => b.group === group);
     const fits = there.filter((b) => b.fit >= 0.3).slice(0, 3);
-    const of = (b: (typeof fits)[number]) => `${tag(b.player)} of the ${b.team.nickname}`;
+    const of = (b: (typeof fits)[number]) => `${slotTag(b.player, spot.pitcher)} of the ${b.team.nickname}`;
     const market = fits.length
       ? ` On the block, the best ${fits.length === 1 ? "fit is" : "fits are"} ${fits.length <= 2 ? fits.map(of).join(" and ") : `${fits.slice(0, -1).map(of).join(", ")} and ${of(fits.at(-1)!)}`}.`
       : " Nobody on the block there is a clear upgrade, but any club will listen on its players.";
     deadlineNote(league, day, "buy", lastWeek, {
       from: "scouting",
       title: `A trade could shore up ${spot.label}`,
-      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gbText(gb)} out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
+      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gbText(gb)} out`}. By our read the weakest spot on the club is ${spot.label}: ${slotTag(spot.p, spot.pitcher)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
       href: there.length ? `#trades-block-${group.toLowerCase()}` : "#trades",
     });
   }
@@ -493,12 +497,19 @@ export function winterAdvice(league: League, season: Season, now: number): void 
     for (let n = d.picks.length; n < total && picks.length < 2; n++) if (d.order[n % d.order.length] === user) picks.push(n + 1);
     const board = [...d.pool].sort((a, b) => boardValue(b) + valueShift(league, user, b, true) - (boardValue(a) + valueShift(league, user, a, true))).slice(0, 3);
     if (board.length) {
+      // Where the other clubs are likely to take them: the market's read of the class (a league-average
+      // department's look), not ours. A player it ranks ahead of the picks before ours is likely gone by then.
+      const market = (p: Player) => boardValue(p) + valueShift(league, null, p, true);
+      const consensus = [...d.pool].sort((a, b) => market(b) - market(a));
+      const before = picks.length ? picks[0]! - 1 - d.picks.length : 0;
+      const gone = board.filter((p) => consensus.indexOf(p) < before).length;
+      const when = picks.length ? `We pick ${picks.map((n) => `#${n}`).join(" and ")} overall${2 * gone > board.length ? "; most of these will be gone by then" : ""}.` : "";
       add(league, now, {
         key: `draft:${league.year}`,
         from: "scouting",
         urgent: false,
         title: "Our draft board",
-        text: `The top of our board: ${board.map((p) => `${tag(p)} (${p.age >= 21 ? "college" : "high school"}, FV ${ourFv(league, user, p)})`).join(", ")}. ${picks.length ? `We pick ${picks.map((n) => `#${n}`).join(" and ")} overall.` : ""}`.trim(),
+        text: `The top of our board: ${board.map((p) => `${tag(p)} (${p.age >= 21 ? "college" : "high school"}, FV ${ourFv(league, user, p)})`).join(", ")}. ${when}`.trim(),
         href: "#winter",
       });
     }
@@ -529,9 +540,9 @@ export function winterAdvice(league: League, season: Season, now: number): void 
         urgent: false,
         title: `Our biggest hole: ${spot.label}`,
         text:
-          `By our read ${spot.label} is the weakest spot on the club (${tag(spot.p)}, ${ourWar(season, user, spot.p)}). ` +
+          `By our read ${spot.label} is the weakest spot on the club (${slotTag(spot.p, spot.pitcher)}, ${ourWar(season, user, spot.p)}). ` +
           (fits.length
-            ? `Best fits on the market: ${fits.map((p) => `${tag(p)} (about ${tenth(war(p))} wins, asking ${money(asks.get(p.id)!.salary)} for ${asks.get(p.id)!.years} yr)`).join("; ")}. `
+            ? `Best fits on the market: ${fits.map((p) => `${slotTag(p, spot.pitcher)} (about ${tenth(war(p))} wins, asking ${money(asks.get(p.id)!.salary)} for ${asks.get(p.id)!.years} yr)`).join("; ")}. `
             : "Nobody on the market is a clear upgrade; a trade may be the way. ") +
           (room > 0 ? `We have ${money(room)} of room under the budget.` : `We're ${money(-room)} over the budget already.`),
         href: "#winter",
