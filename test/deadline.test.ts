@@ -125,6 +125,23 @@ describe("the staff's deadline notes", () => {
     expect(notes("buy")[0]!.key).toBe(`buy-last:${league.year}`);
   });
 
+  it("say how far out of a playoff spot we are the way people do", () => {
+    /** The last week's note with the user's club at w-l, every other club in its league at 60-55. */
+    const at = (w: number, l: number) => {
+      for (const t of sameLeague) Object.assign(season.records[t.id]!, { w: 60, l: 55 });
+      Object.assign(season.records[USER]!, { w, l });
+      league.advice = [];
+      days(lastWeek);
+      return [...notes("buy"), ...notes("sell")][0]?.text ?? "";
+    };
+    expect(at(60, 56)).toMatch(/^We're half a game out\. /);
+    expect(at(59, 56)).toMatch(/^We're a game out\. /);
+    expect(at(58, 56)).toMatch(/^We're 1½ games out\. /);
+    expect(at(57, 58)).toMatch(/^We're 3 games out\. /);
+    expect(at(52, 62)).toMatch(/^We're 7½ games out of a playoff spot\. /);
+    expect(at(52, 63)).toMatch(/^We're 8 games out of a playoff spot\. /);
+  });
+
   it("keep a note from weeks before alongside the last week's reminder", () => {
     league.advice = [];
     standings(-2);

@@ -143,6 +143,24 @@ describe("the front office", () => {
     expect(fvs).toHaveLength(8);
     expect(fvs).toEqual([...fvs].sort((a, b) => b - a));
   });
+
+  it("calls a club level with the division leader tied for first, whatever the tiebreak", () => {
+    const team = league.teams[3]!;
+    const mates = league.teams.filter((t) => t.league === team.league && t.division === team.division && t.id !== 3);
+    const saved = [team, ...mates].map((t) => ({ ...season.records[t.id]! }));
+    for (const t of mates) Object.assign(season.records[t.id]!, { w: 60, l: 60, rs: 500, ra: 500 });
+    // Level with a club that has the better run differential.
+    Object.assign(season.records[3]!, { w: 65, l: 55, rs: 500, ra: 520 });
+    Object.assign(season.records[mates[0]!.id]!, { w: 65, l: 55, rs: 540, ra: 500 });
+    const record = () => dashboardView(season, stats, new Map(), status(league, season, true)).record;
+    expect(record()).toMatchObject({ divRank: 1, tied: true, gb: 0 });
+    // Half a game back, alone in second; then level with a third club there.
+    Object.assign(season.records[3]!, { w: 65, l: 56 });
+    expect(record()).toMatchObject({ divRank: 2, tied: false, gb: 0.5 });
+    Object.assign(season.records[mates[1]!.id]!, { w: 65, l: 56, rs: 600, ra: 500 });
+    expect(record()).toMatchObject({ divRank: 2, tied: true, gb: 0.5 });
+    [team, ...mates].forEach((t, i) => Object.assign(season.records[t.id]!, saved[i]));
+  });
 });
 
 describe("a roster move's toast", () => {

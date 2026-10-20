@@ -154,6 +154,9 @@ function AllStarNote({ day }: { day: number }) {
   );
 }
 
+/** A club's place in its division: "2nd", "Tied for 1st", "T-3rd". */
+const place = (rank: number, tied: boolean) => (!tied ? ordinal(rank) : rank === 1 ? "Tied for 1st" : `T-${ordinal(rank)}`);
+
 /** For two weeks after the owner writes during the season (the midseason check-in), the letter. */
 function OwnerNote({ year, day }: { year: number; day: number }) {
   const view = useApi("owner", undefined);
@@ -193,7 +196,7 @@ export function Dashboard({ status }: { status: Status }) {
         <div class="stat-strip">
           <div>
             <span class="k">{division}</span>
-            <span class="v">{played ? `${ordinal(r.divRank)}${r.gb > 0 ? `, ${gamesBack(r.gb)} GB` : ""}` : "—"}</span>
+            <span class="v">{played ? `${place(r.divRank, r.tied)}${r.gb > 0 ? `, ${gamesBack(r.gb)} GB` : ""}` : "—"}</span>
           </div>
           <div>
             <span class="k">Run diff</span>

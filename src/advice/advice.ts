@@ -74,6 +74,8 @@ const POS_NAMES: Record<FieldPosition | "DH", string> = {
 const pos = (p: Player) => (p.pitching ? (p.role === "SP" ? "SP" : "RP") : p.position);
 const tag = (p: Player) => `${pos(p)} ${playerName(p)}`;
 const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M`);
+/** Games out of a playoff spot, said aloud: "half a game", "a game", "1½ games", "3 games". */
+const gbText = (gb: number) => (gb === 0.5 ? "half a game" : gb === 1 ? "a game" : Number.isInteger(gb) ? `${gb} games` : `${Math.floor(gb)}½ games`);
 const names = (ps: Player[]) => (ps.length <= 2 ? ps.map(tag).join(" and ") : `${ps.slice(0, -1).map(tag).join(", ")} and ${tag(ps.at(-1)!)}`);
 
 /** The user's read of what a player would give in the majors now, in wins (the 20-80 grade bunches up for big leaguers). */
@@ -270,7 +272,7 @@ function deadline(season: Season, team: Team, day: number): void {
       from: "scouting",
       title: "Contenders will pay for our veterans",
       text:
-        `We're ${gb} games out of a playoff spot. ` +
+        `We're ${gbText(gb)} out of a playoff spot. ` +
         (rentals.length
           ? `${names(pool)} can walk as ${pool.length === 1 ? "a free agent" : "free agents"} after the season; contenders would give us young players for ${pool.length === 1 ? "him" : "them"} now. `
           : `Veterans like ${names(pool)} would bring back young players from a contender. `) +
@@ -292,7 +294,7 @@ function deadline(season: Season, team: Team, day: number): void {
     deadlineNote(league, day, "buy", lastWeek, {
       from: "scouting",
       title: `A trade could shore up ${spot.label}`,
-      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gb} games out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
+      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gbText(gb)} out`}. By our read the weakest spot on the club is ${spot.label}: ${tag(spot.p)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
       href: there.length ? `#trades-block-${group.toLowerCase()}` : "#trades",
     });
   }

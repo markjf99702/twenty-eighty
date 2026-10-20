@@ -1073,6 +1073,10 @@ export function dashboardView(season: Season, stats: StatsCache, boxes: Map<stri
   const standings = season.standings();
   const div = standings[team.league]![team.division]!;
   const leader = div[0]!;
+  // Place by games behind, as the division table shows it: clubs level with each other are tied, whatever the tiebreak.
+  const gb = season.gamesBehind(leader, rec);
+  const ahead = div.filter((r) => season.gamesBehind(leader, r) < gb).length;
+  const tied = div.some((r) => r !== rec && season.gamesBehind(leader, r) === gb);
   const l10w = rec.last10.filter(Boolean).length;
   const recentDays = [...new Set(season.games.filter((g) => g.awayId === team.id || g.homeId === team.id).map((g) => g.day))].slice(-8);
   const recent = recentDays.flatMap((d) => gameItems(season, d, boxes).filter((g) => g.awayId === team.id || g.homeId === team.id)).reverse();
@@ -1116,8 +1120,9 @@ export function dashboardView(season: Season, stats: StatsCache, boxes: Map<stri
       ra: rec.ra,
       streak: rec.streak,
       last10: `${l10w}-${rec.last10.length - l10w}`,
-      divRank: div.indexOf(rec) + 1,
-      gb: season.gamesBehind(leader, rec),
+      divRank: ahead + 1,
+      tied,
+      gb,
     },
     division: div.map((r) => standingRow(season, r, leader)),
     recent,

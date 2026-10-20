@@ -478,7 +478,8 @@ export interface BoxScoreView {
 export interface DashboardView {
   status: Status;
   team: TeamRef;
-  record: { w: number; l: number; rs: number; ra: number; streak: number; last10: string; divRank: number; gb: number };
+  /** `divRank`: 1 plus the division clubs ahead by games behind; `tied`, another club is level with it. */
+  record: { w: number; l: number; rs: number; ra: number; streak: number; last10: string; divRank: number; tied: boolean; gb: number };
   division: StandingRow[];
   recent: GameItem[];
   leaders: { label: string; name: string; playerId: number; value: string }[];
