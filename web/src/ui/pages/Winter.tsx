@@ -39,14 +39,19 @@ function OwnerDesk({ phase, onStatus }: { phase: OffseasonPhase; onStatus: (s: S
   }
   const r = o.reviews[0];
   if (phase !== "review" || !r) return null;
+  // After a firing and a new job, the last review is the old club's (the season before you were hired): the new
+  // owner's welcome is what there is to say.
+  const mine = r.year >= o.hired;
   return (
-    <Section title="The owner's review" aside={<a href={href({ page: "owner" })}>Details</a>}>
+    <Section title={mine ? "The owner's review" : "Your new owner"} aside={<a href={href({ page: "owner" })}>Details</a>}>
       <div class="grid-2">
         <ConfidenceMeter value={o.confidence} mood={o.mood} />
         <div class="small">
-          <div>
-            {r.goals.filter((g) => g.met).length} of {r.goals.length} goals met; confidence {r.before} → <b>{r.after}</b>.
-          </div>
+          {mine && (
+            <div>
+              {r.goals.filter((g) => g.met).length} of {r.goals.length} goals met; confidence {r.before} → <b>{r.after}</b>.
+            </div>
+          )}
           {o.messages[0] && <div class="dim">"{o.messages[0].text}"</div>}
         </div>
       </div>

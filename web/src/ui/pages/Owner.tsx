@@ -1,5 +1,5 @@
 import { bump, call, useApi } from "../../api/client";
-import type { GoalView, OwnerView, Status } from "../../api/protocol";
+import type { GoalView, OwnerView, ReviewView, Status } from "../../api/protocol";
 import { ErrorNote, Loading, notify, Section } from "../components/Common";
 import { signed } from "../format";
 import { href } from "../router";
@@ -104,11 +104,50 @@ export function JobOffers({ view, onStatus }: { view: OwnerView; onStatus?: (s: 
   );
 }
 
+function Review({ r }: { r: ReviewView }) {
+  return (
+    <div class="review">
+      <div class="review-head">
+        <b>{r.year}</b>
+        <span>
+          {r.before} → <b>{r.after}</b> ({signed(r.after - r.before)})
+        </span>
+      </div>
+      <div class="tbl-wrap">
+        <table class="tbl">
+          <tbody>
+            {r.goals.map((g, i) => (
+              <tr key={`g${i}`}>
+                <td class="wrap">
+                  <span class={`goal-status ${g.met ? "met" : "missed"}`}>{g.met ? "met" : "missed"}</span> {g.label}
+                </td>
+                <td class="wrap">{g.actual}</td>
+                <td class={`num ${g.delta >= 0 ? "good" : "bad"}`}>{signed(g.delta, 1)}</td>
+              </tr>
+            ))}
+            {r.notes.map((n, i) => (
+              <tr key={`n${i}`}>
+                <td class="wrap" colSpan={2}>
+                  {n.text}
+                </td>
+                <td class={`num ${n.delta >= 0 ? "good" : "bad"}`}>{signed(n.delta, 1)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 export function Owner({ onStatus }: { onStatus: (s: Status) => void }) {
   const view = useApi("owner", undefined);
   if (view.error) return <ErrorNote error={view.error} />;
   if (!view.data) return <Loading />;
   const v = view.data;
+  // A review of a season before you took this job is from your last club (after a firing, they come along).
+  const here = v.reviews.filter((r) => r.year >= v.hired);
+  const before = v.reviews.filter((r) => r.year < v.hired);
   return (
     <>
       <div class="page-head">
@@ -162,43 +201,14 @@ export function Owner({ onStatus }: { onStatus: (s: Status) => void }) {
           )}
         </Section>
         <Section title="Season reviews">
-          {v.reviews.length === 0 ? (
-            <div class="empty">Your first review comes when the offseason starts, after the World Series.</div>
-          ) : (
-            v.reviews.map((r) => (
-              <div class="review" key={r.year}>
-                <div class="review-head">
-                  <b>{r.year}</b>
-                  <span>
-                    {r.before} → <b>{r.after}</b> ({signed(r.after - r.before)})
-                  </span>
-                </div>
-                <div class="tbl-wrap">
-                  <table class="tbl">
-                    <tbody>
-                      {r.goals.map((g, i) => (
-                        <tr key={`g${i}`}>
-                          <td class="wrap">
-                            <span class={`goal-status ${g.met ? "met" : "missed"}`}>{g.met ? "met" : "missed"}</span> {g.label}
-                          </td>
-                          <td class="wrap">{g.actual}</td>
-                          <td class={`num ${g.delta >= 0 ? "good" : "bad"}`}>{signed(g.delta, 1)}</td>
-                        </tr>
-                      ))}
-                      {r.notes.map((n, i) => (
-                        <tr key={`n${i}`}>
-                          <td class="wrap" colSpan={2}>
-                            {n.text}
-                          </td>
-                          <td class={`num ${n.delta >= 0 ? "good" : "bad"}`}>{signed(n.delta, 1)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            ))
-          )}
+          {here.length === 0 && <div class="empty">Your first review comes when the offseason starts, after the World Series.</div>}
+          {here.map((r) => (
+            <Review r={r} key={r.year} />
+          ))}
+          {before.length > 0 && <div class="eyebrow">With your last club</div>}
+          {before.map((r) => (
+            <Review r={r} key={r.year} />
+          ))}
         </Section>
       </div>
     </>
