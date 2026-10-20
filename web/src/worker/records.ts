@@ -4,7 +4,7 @@ import type { Season } from "../../../src/season/season";
 import { avgOf, type CareerBat, type CareerPit, careerTotals, type CareerTotals, eraOf } from "../../../src/stats/career";
 import { CAREER_STATS, careerRecords, careerTable, formatRecord, liveSeason, type RecordRow, SEASON_STATS, seasonRecords, STATS } from "../../../src/stats/records";
 import type { HallPlaque, HallView, MomentView, RecordRowView, RecordsView } from "../api/protocol";
-import { dateLabel } from "./views";
+import { dateLabel, linkedClub } from "./views";
 
 const abbrev = (league: League, id: number | null) => (id === null ? "—" : (league.teams[id]?.abbrev ?? "—"));
 const teamName = (league: League, id: number) => `${league.teams[id]!.city} ${league.teams[id]!.nickname}`;
@@ -30,6 +30,7 @@ export function momentViews(season: Season, limit: number, boxes: ReadonlyMap<st
 
 export function recordsView(season: Season, kind: "season" | "career" | "moments", teamId: number | null, boxes: ReadonlyMap<string, unknown>): RecordsView {
   const league = season.league;
+  if (teamId !== null) linkedClub(season, teamId);
   const live = kind === "moments" ? null : liveSeason(season);
   const club = teamId ?? undefined;
   const since = league.history[0]?.year ?? league.year;

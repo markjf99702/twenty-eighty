@@ -75,11 +75,12 @@ import {
   dashboardView,
   dateLabel,
   deskFraction,
-  FIRED_NOTE,
   extensionCandidatesView,
   extensionView,
+  FIRED_NOTE,
   gameItems,
   gameKey,
+  linkedClub,
   playerView,
   rosterMessage,
   StatsCache,
@@ -734,14 +735,14 @@ const handlers: Handlers = {
 
   tradeSides({ partnerId }) {
     const s = requireSeason();
-    return { mine: tradeSide(s, stats, userTeam(), ctx()), theirs: tradeSide(s, stats, s.team(partnerId)) };
+    return { mine: tradeSide(s, stats, userTeam(), ctx()), theirs: tradeSide(s, stats, linkedClub(s, partnerId)) };
   },
 
   trade({ partnerId, give, get, moves = [], execute }) {
     const s = requireSeason();
     const c = ctx();
     const mine = userTeam();
-    const partner = s.team(partnerId);
+    const partner = linkedClub(s, partnerId);
     const st = currentStatus();
     const fraction = deskFraction(s);
     const check = evaluateTrade(s.league, mine, partner, give, get, fraction, (viewer, p) => warShift(s, viewer, p), moves);

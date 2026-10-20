@@ -737,9 +737,16 @@ export function payrollView(season: Season, stats: StatsCache, team: Team): Payr
   };
 }
 
+/** The club a link names, or an error that says there's none (an old link, or one from another league). */
+export function linkedClub(season: Season, teamId: number): Team {
+  const team = season.league.teams[teamId];
+  if (!team) throw new Error("There's no club with that number in this league.");
+  return team;
+}
+
 export function teamView(season: Season, stats: StatsCache, teamId: number, ctx: RosterContext): TeamView {
   const league = season.league;
-  const team = season.team(teamId);
+  const team = linkedClub(season, teamId);
   const isUser = league.userTeamId === teamId;
   // Your club, unless it has let you go and you haven't taken another job yet.
   const manage = isUser && !league.gm?.fired;

@@ -3,7 +3,7 @@ import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { allStarLine } from "../web/src/worker/allstar";
-import { careerLine, hallView } from "../web/src/worker/records";
+import { careerLine, hallView, recordsView } from "../web/src/worker/records";
 import { careerTotals } from "../src/stats/career";
 import { liveLines, liveSeason } from "../src/stats/records";
 import { evaluateTrade, tradeValue } from "../src/org/trades";
@@ -39,6 +39,16 @@ describe("a player's page", () => {
       const raw = p.pitching!.pitches;
       expect(v.pitches[0]!.usage / v.pitches[1]!.usage).toBeCloseTo(raw[0]!.usage / raw[1]!.usage, 6);
     }
+  });
+});
+
+describe("a club's pages", () => {
+  it("say so when the link points at no club in this league", () => {
+    expect(() => teamView(season, stats, 99, ctx)).toThrow("There's no club with that number in this league.");
+    for (const kind of ["season", "career", "moments"] as const) {
+      expect(() => recordsView(season, kind, 99, new Map())).toThrow("There's no club with that number in this league.");
+    }
+    expect(recordsView(season, "moments", 4, new Map()).scope).toBe(`${league.teams[4]!.city} ${league.teams[4]!.nickname}`);
   });
 });
 
