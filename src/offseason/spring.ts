@@ -34,16 +34,25 @@ export function healOverWinter(league: League): void {
 /** Worth keeping in the organization: today's value, or a prospect's projected peak. */
 export const keepScore = (p: Player) => Math.max(playerValue(p), peakValue(p) - 8) - (p.age >= 28 && !p.onFortyMan ? 6 : 0);
 
+/**
+ * Sorts a fresh list of players by a score worked out once each: a prospect's peak is a projection of his career,
+ * far too slow to redo on every comparison.
+ */
+function sortedBy(players: Player[], score: (p: Player) => number, highFirst = false): Player[] {
+  const s = new Map(players.map((p) => [p, score(p)]));
+  return players.sort((a, b) => (highFirst ? s.get(b)! - s.get(a)! : s.get(a)! - s.get(b)!));
+}
+
 /** DFA the weakest until the 40-man fits (long-term injuries are headed to the 60-day list and don't count). */
 function trimFortyMan(ctx: RosterContext, team: Team, waiverOrder: Team[]): void {
   const league = ctx.league;
   const counted = () => team.fortyMan.filter((id) => (league.players[id]!.injury?.daysLeft ?? 0) <= 60).length;
   let guard = 0;
   while (counted() > FORTY_MAN_LIMIT && guard++ < 20) {
-    const cut = team.fortyMan
-      .map((id) => league.players[id]!)
-      .filter((p) => !p.il && (p.injury?.daysLeft ?? 0) <= 60)
-      .sort((a, b) => keepScore(a) - keepScore(b))[0];
+    const cut = sortedBy(
+      team.fortyMan.map((id) => league.players[id]!).filter((p) => !p.il && (p.injury?.daysLeft ?? 0) <= 60),
+      keepScore,
+    )[0];
     if (!cut || !designateForAssignment(ctx, team, cut, waiverOrder).ok) break;
   }
 }
@@ -61,14 +70,16 @@ function protectProspects(ctx: RosterContext, team: Team, waiverOrder: Team[]): 
   const league = ctx.league;
   const org = () => [...new Set(MINOR_LEVELS.flatMap((l) => team.rosters[l]))].map((id) => league.players[id]!);
   for (let n = 0; n < MAX_PROTECTED; n++) {
-    const best = org()
-      .filter((p) => !p.onFortyMan && !hurt(p) && !p.il)
-      .sort((a, b) => keepScore(b) - keepScore(a))[0];
+    const best = sortedBy(
+      org().filter((p) => !p.onFortyMan && !hurt(p) && !p.il),
+      keepScore,
+      true,
+    )[0];
     if (!best) return;
-    const weakest = team.fortyMan
-      .map((id) => league.players[id]!)
-      .filter((p) => !p.il && !hurt(p) && Boolean(p.pitching) === Boolean(best.pitching))
-      .sort((a, b) => keepScore(a) - keepScore(b))[0];
+    const weakest = sortedBy(
+      team.fortyMan.map((id) => league.players[id]!).filter((p) => !p.il && !hurt(p) && Boolean(p.pitching) === Boolean(best.pitching)),
+      keepScore,
+    )[0];
     if (team.fortyMan.length >= FORTY_MAN_LIMIT) {
       if (!weakest || keepScore(best) < keepScore(weakest) + PROTECT_MARGIN) return;
       if (!designateForAssignment(ctx, team, weakest, waiverOrder).ok) return;
@@ -96,14 +107,16 @@ function balanceFortyMan(ctx: RosterContext, team: Team, waiverOrder: Team[]): v
       const onForty = members.filter((p) => p.onFortyMan && !hurt(p));
       const have = onForty.filter((p) => Boolean(p.pitching) === pitchers).length;
       if (have >= need) break;
-      const add = members
-        .filter((p) => !p.onFortyMan && !hurt(p) && Boolean(p.pitching) === pitchers && !p.il)
-        .sort((a, b) => playerValue(b) - playerValue(a))[0];
+      const add = sortedBy(
+        members.filter((p) => !p.onFortyMan && !hurt(p) && Boolean(p.pitching) === pitchers && !p.il),
+        playerValue,
+        true,
+      )[0];
       if (!add) break;
       if (team.fortyMan.length >= FORTY_MAN_LIMIT) {
         const others = onForty.filter((p) => Boolean(p.pitching) !== pitchers);
         if (others.length <= otherNeed) break;
-        const cut = others.filter((p) => !p.il).sort((a, b) => keepScore(a) - keepScore(b))[0];
+        const cut = sortedBy(others.filter((p) => !p.il), keepScore)[0];
         if (!cut || !designateForAssignment(ctx, team, cut, waiverOrder).ok) break;
       }
       add.onFortyMan = true;
@@ -177,7 +190,7 @@ function reorganize(ctx: RosterContext, team: Team): void {
   }
 
   // Everyone else to the farm, best first, with age floors. Released if there's no room.
-  const farm = rest.filter((p) => !active.has(p.id)).sort((a, b) => keepScore(b) - keepScore(a));
+  const farm = sortedBy(rest.filter((p) => !active.has(p.id)), keepScore, true);
   const capacity = PER_LEVEL * 2 * MINOR_LEVELS.length;
   const keep = farm.filter((p, i) => p.onFortyMan || i < capacity);
   const cut = farm.filter((p) => !keep.includes(p));
