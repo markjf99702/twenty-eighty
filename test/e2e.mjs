@@ -206,6 +206,11 @@ await board('Start the offseason').click({ timeout: 120000 });
 await page.waitForSelector('.winter-steps', { timeout: 120000 });
 await board('Go to the tender deadline').click({ timeout: 60000 });
 await board('Tender contracts').click({ timeout: 60000 });
+// A winter step says what it's doing, and with no day count to fill, its bar moves.
+const step = await page.locator('.board .progress')
+  .evaluate((el) => ({ text: el.textContent, motion: getComputedStyle(el.querySelector('.bar span')).animationName }), null, { timeout: 2000 })
+  .catch(() => null);
+if (step !== null) assert.deepEqual(step, { text: 'Running the tender deadline…', motion: 'bar-stripes' }, 'a winter step did not say what it was doing over a moving bar');
 await board('Finish the draft').waitFor({ timeout: 120000 });
 // On the clock, the Draft button is in view: under the name, which stays put while the board scrolls sideways.
 // The scoreboard can show the draft before the page does, so wait for the page's note either way.

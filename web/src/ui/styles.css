@@ -367,6 +367,14 @@ h1, h2, h3 { margin: 0; text-wrap: balance; }
   overflow: hidden;
 }
 .progress .bar span { display: block; height: 100%; background: var(--bulb); transition: width 0.15s linear; }
+/* A step with no day count to fill the bar (October, the winter): stripes that move, standing still for reduced motion. */
+.progress .bar.indeterminate span {
+  width: 100%;
+  background: linear-gradient(-45deg, var(--bulb) 25%, transparent 25% 50%, var(--bulb) 50% 75%, transparent 75%) 0 0 / 16px 16px;
+  animation: bar-stripes 0.6s linear infinite;
+}
+@keyframes bar-stripes { to { background-position: 16px 0; } }
+@media (prefers-reduced-motion: reduce) { .progress .bar.indeterminate span { animation: none; } }
 .progress .txt {
   font-family: var(--display);
   font-size: 15px;

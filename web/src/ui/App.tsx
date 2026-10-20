@@ -62,6 +62,26 @@ function storedStops(): StopRules {
   }
 }
 
+/** What finishing a winter phase is doing, for the scoreboard while it runs. */
+function winterWork(status: Status | null): string {
+  switch (status?.winter?.phase) {
+    case "review":
+      return "Heading to the tender deadline";
+    case "tenders":
+      return "Running the tender deadline";
+    case "draft":
+      return "Finishing the draft";
+    case "freeAgency":
+      return "Finishing free agency";
+    case "international":
+      return "Closing the signing period";
+    case "spring":
+      return `Starting the ${(status.year ?? 0) + 1} season`;
+    default:
+      return "Working";
+  }
+}
+
 function storedPace(): Pace {
   try {
     const v = localStorage.getItem(PACE_KEY);
@@ -236,7 +256,7 @@ export function App() {
 
   /** Winter steps: open the offseason, finish a phase, or play a week of free agency. */
   const winterStep = async (kind: "beginOffseason" | "advance" | "winterWeek") => {
-    const label = kind === "beginOffseason" ? "Closing the books" : kind === "winterWeek" ? "A week of free agency" : "Working";
+    const label = kind === "beginOffseason" ? "Closing the books" : kind === "winterWeek" ? "A week of free agency" : winterWork(statusRef.current);
     setSim({ done: 0, total: 0, label });
     try {
       const st = await call(kind, undefined);
@@ -461,10 +481,11 @@ function Board({
         <div class="sim">
           {sim ? (
             <div class="progress" aria-live="polite">
-              <div class="bar">
-                <span style={{ width: `${sim.total ? (100 * sim.done) / sim.total : 100}%` }} />
+              {/* Without a day count (October, the winter) the bar can't fill, so it moves instead. */}
+              <div class={sim.total ? "bar" : "bar indeterminate"}>
+                <span style={sim.total ? { width: `${(100 * sim.done) / sim.total}%` } : undefined} />
               </div>
-              <span class="txt">{sim.total ? `Day ${sim.done} of ${sim.total}` : (sim.label ?? "Working")}</span>
+              <span class="txt">{sim.total ? `Day ${sim.done} of ${sim.total}` : `${sim.label ?? "Working"}…`}</span>
               {sim.total > 1 && speed}
               {sim.total > 1 && stops && onStops && <StopsMenu stops={stops} onChange={onStops} />}
               {sim.total > 1 && (
