@@ -87,6 +87,18 @@ await idle();
 await page.waitForTimeout(300);
 const heights = await page.evaluate(() => { const h = [...window.__heights]; window.__heights = null; return h; });
 assert.equal(heights.length, 1, `the scoreboard changed height while a day played (${heights.join(' and ')}px)`);
+// A box score's batting fits a phone with its columns closer together and a substitute's tag under his name (EV, the
+// last column, used to be cut off). Checked by the rule, since how much room a table needs depends on the names.
+await page.goto(base + '#scores');
+await page.locator('main a.game-card').first().click();
+await page.waitForSelector('main .tbl tbody tr');
+const boxCells = await page.evaluate(() => {
+  const td = document.querySelector('main .tbl.box-batting td.num');
+  const tag = document.querySelector('main .tbl.box-batting .sub-row td.name .muted');
+  return { padding: td && `${getComputedStyle(td).paddingLeft} ${getComputedStyle(td).paddingRight}`, tag: tag ? getComputedStyle(tag).display : 'block' };
+});
+assert.deepEqual(boxCells, { padding: '5px 5px', tag: 'block' }, 'a box score\'s batting is laid out too wide for a phone');
+await fits('a box score');
 // Once a game is played the budgets wait for the winter, and the scouting page says when they open again.
 await page.goto(base + '#scouting');
 assert.match(await page.locator('.note').first().textContent({ timeout: 10000 }), /set in the offseason and on Opening Day, before the first game/, 'the scouting page does not say when budgets can change');

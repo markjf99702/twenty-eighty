@@ -91,7 +91,7 @@ function Batting({ rows }: { rows: BoxBatter[] }) {
   const tot = rows.reduce((a, r) => ({ ab: a.ab + r.ab, r: a.r + r.r, h: a.h + r.h, rbi: a.rbi + r.rbi, bb: a.bb + r.bb, so: a.so + r.so }), { ab: 0, r: 0, h: 0, rbi: 0, bb: 0, so: 0 });
   return (
     <div class="tbl-wrap">
-      <table class="tbl">
+      <table class="tbl box-batting">
         <thead>
           <tr>
             <th class="name">Batter</th>
