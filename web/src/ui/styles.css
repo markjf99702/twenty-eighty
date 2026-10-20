@@ -540,6 +540,8 @@ main > * { min-width: 0; }
 .seg button:last-child { border-right: 0; }
 .seg button:hover { color: var(--ink); background: var(--surface-2); }
 .seg button.on { background: var(--accent); color: var(--accent-ink); }
+/* A strip that wraps on a phone fills each line, rather than leaving its last button alone beside a gap. */
+@media (max-width: 820px) { .seg button { flex: 1 1 auto; } }
 
 .check { display: inline-flex; align-items: center; gap: 6px; font-size: 13.5px; color: var(--ink-2); cursor: pointer; }
 .check input { accent-color: var(--accent); }
@@ -939,6 +941,16 @@ table.tbl {
 .counts { display: flex; flex-wrap: wrap; gap: 6px 18px; font-size: 13.5px; color: var(--ink-2); }
 .counts b { color: var(--ink); font-variant-numeric: tabular-nums; }
 .counts .over b { color: var(--alert); }
+/* My club's two switches. On a phone each is one line and what they do waits under "What these do", so the roster
+   starts on the first screen. */
+.flags { display: grid; gap: 8px; }
+.flag-notes { display: none; }
+.flag-notes summary { width: max-content; cursor: pointer; font-size: 13.5px; font-weight: 600; color: var(--accent-text); }
+.flag-notes p { margin: 6px 0 0; font-size: 13.5px; color: var(--ink-2); }
+@media (max-width: 820px) {
+  .flags .flag-note { display: none; }
+  .flag-notes { display: block; }
+}
 
 .depth { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 22px 28px; align-items: start; }
 @media (max-width: 1000px) { .depth { grid-template-columns: minmax(0, 1fr); } }

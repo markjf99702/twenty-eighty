@@ -127,19 +127,23 @@ function Counts({ d }: { d: TeamView }) {
   );
 }
 
+const ROSTER_FLAG =
+  "Injuries, call-ups, weekly swaps with Triple-A, farm promotions and waiver claims happen automatically. Your own moves still work, but he may undo them later. Turn this off to run everything yourself.";
+const DEPTH_FLAG =
+  "Turn this off to choose the lineup, rotation and bullpen order yourself, or change the lineup or the pitching staff on the depth chart to take over just that part. While someone you placed is hurt or sent down, the manager fills in, and he gets his spot back when he returns.";
+
+/** The two switches. On a phone what they do waits behind a disclosure, so the roster starts on the first screen. */
 function Flags({ d }: { d: TeamView }) {
   const set = async (flags: { manualRoster?: boolean; manualLineup?: boolean; manualPitching?: boolean }) => {
     await call("setFlags", flags);
     bump();
   };
   return (
-    <div class="panel" style={{ display: "grid", gap: "8px" }}>
+    <div class="panel flags">
       <label class="check">
         <input type="checkbox" checked={!d.manualRoster} onChange={(e) => set({ manualRoster: !(e.target as HTMLInputElement).checked })} />
         <span>
-          <b>Assistant GM handles roster moves.</b> Injuries, call-ups, weekly swaps with Triple-A, farm promotions and waiver
-          claims happen automatically. Your own moves still work, but he may undo them later. Turn this off to run everything
-          yourself.
+          <b>Assistant GM handles roster moves.</b> <span class="flag-note">{ROSTER_FLAG}</span>
         </span>
       </label>
       <label class="check">
@@ -152,11 +156,18 @@ function Flags({ d }: { d: TeamView }) {
           }}
         />
         <span>
-          <b>Manager sets the depth chart.</b> Turn this off to choose the lineup, rotation and bullpen order yourself, or change the
-          lineup or the pitching staff on the depth chart to take over just that part. While someone you placed is hurt or sent down,
-          the manager fills in, and he gets his spot back when he returns.
+          <b>Manager sets the depth chart.</b> <span class="flag-note">{DEPTH_FLAG}</span>
         </span>
       </label>
+      <details class="flag-notes">
+        <summary>What these do</summary>
+        <p>
+          <b>Assistant GM:</b> {ROSTER_FLAG}
+        </p>
+        <p>
+          <b>Manager:</b> {DEPTH_FLAG}
+        </p>
+      </details>
     </div>
   );
 }

@@ -119,6 +119,12 @@ const mine = await page.evaluate(() => document.querySelector("a[href^='#team-']
 await page.goto(base + mine);
 await page.waitForSelector('.tbl tbody tr');
 await fits('the roster');
+// On a phone the roster starts on the first screen: the two switches take a line each, and what they do is a tap away.
+const firstPlayer = await page.evaluate(() => document.querySelector('main .tbl tbody tr').getBoundingClientRect().bottom + scrollY);
+assert.ok(firstPlayer <= 844, `My club's first player is below the first screen (his row ends ${Math.round(firstPlayer)}px down)`);
+await page.locator('.flag-notes summary').click();
+assert.match(await page.locator('.flag-notes').innerText(), /weekly swaps with Triple-A/, 'what the switches do is out of reach on a phone');
+await page.locator('.flag-notes summary').click();
 // A new league has no season before this one, so the tables offer this season's stats and not last season's.
 const statViews = await page.locator('.seg[aria-label="Show"] button').allTextContents();
 assert.deepEqual(statViews.filter((t) => / stats$/.test(t)).length, 1, `the roster offers ${statViews.join(', ')}`);
