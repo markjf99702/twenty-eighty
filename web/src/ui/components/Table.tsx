@@ -34,6 +34,13 @@ interface Props<T> {
   pinName?: boolean;
 }
 
+/**
+ * A long table repeats its header row every 20 rows (shown on a phone only), since the real one is soon far up the page
+ * and can't stick: the table scrolls sideways in its own box.
+ */
+const REPEAT_HEAD_EVERY = 20;
+const REPEAT_HEAD_ROWS = 25;
+
 export function Table<T>(props: Props<T>) {
   const { columns, rows, rowKey, rowClass, expanded, ranked } = props;
   const [sort, setSort] = useState<{ key: string | undefined; asc: boolean }>({ key: props.sortKey, asc: props.sortAsc ?? false });
@@ -90,6 +97,16 @@ export function Table<T>(props: Props<T>) {
             {shown.map((r, i) => {
               const extra = expanded?.(r);
               return [
+                shown.length >= REPEAT_HEAD_ROWS && i > 0 && i % REPEAT_HEAD_EVERY === 0 ? (
+                  <tr key={`head-${i}`} class="rehead" aria-hidden="true">
+                    {ranked && <th class="rank num">#</th>}
+                    {columns.map((c) => (
+                      <th key={c.key} class={c.cls ?? ""}>
+                        {c.label}
+                      </th>
+                    ))}
+                  </tr>
+                ) : null,
                 <tr key={rowKey(r)} class={rowClass?.(r, i) ?? ""}>
                   {ranked && <td class="rank num">{i + 1}</td>}
                   {columns.map((c) => (

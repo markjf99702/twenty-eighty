@@ -112,6 +112,9 @@ const ranked = await page.evaluate(() => {
 });
 assert.ok(ranked.right <= ranked.edge, `the leaderboard is ranked by ${ranked.label}, off the edge of the table on a phone`);
 await fits('the stats leaderboard');
+// On a phone a long board repeats its header every 20 rows, since the real one is far up the page by then.
+const repeated = await page.evaluate(() => [...document.querySelectorAll('main .tbl tbody tr.rehead')].filter((r) => r.getClientRects().length).map((r) => r.textContent));
+assert.ok(repeated.length > 0 && repeated.every((t) => t.includes('Name') && t.includes('WAR')), `the leaderboard's header isn't repeated down the board (${JSON.stringify(repeated)})`);
 const mine = await page.evaluate(() => document.querySelector("a[href^='#team-']")?.getAttribute('href'));
 await page.goto(base + mine);
 await page.waitForSelector('.tbl tbody tr');
