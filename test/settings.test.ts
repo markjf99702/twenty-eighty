@@ -127,11 +127,11 @@ describe("staff advice", () => {
     late.scouting.analytics[9] = 5;
     const s = new Season(late, { minors: false });
     s.simToEnd();
-    // When the analysts write after the deadline (day 139), one of our starters has an ERA far ahead of his FIP:
-    // before the deadline they'd say his trade value may never be higher.
+    // When the analysts write after the deadline (day 139), one of our starters has an ERA far ahead of a good FIP
+    // (0.90 on about 3.60): before the deadline they'd say his trade value may never be higher.
     const noted = new Set(late.advice.map((a) => a.key));
     const sp = late.teams[9]!.depth.rotation.map((id) => late.players[id]!).find((p) => !noted.has(`luck:${p.id}:${late.year}`))!;
-    s.pitching.lines.set(sp.id, { ...emptyPitching(), G: 11, GS: 11, outs: 180, BF: 238, H: 40, HR: 9, BB: 18, SO: 45, ER: 6, R: 6 });
+    s.pitching.lines.set(sp.id, { ...emptyPitching(), G: 11, GS: 11, outs: 180, BF: 232, H: 40, HR: 6, BB: 12, SO: 45, ER: 6, R: 6 });
     s.day = 139;
     seasonAdvice(s);
     const after = late.advice.filter((a) => a.at > TRADE_DEADLINE_DAY && a.at < 1000);
@@ -140,6 +140,11 @@ describe("staff advice", () => {
       expect(a.text).not.toMatch(/trade/i);
       expect(a.href).not.toBe("#trades");
     }
+    // On day 111, before it, they do: the quiet above is the deadline's doing, not his FIP's.
+    late.advice = [];
+    s.day = 111;
+    seasonAdvice(s);
+    expect(late.advice.find((a) => a.key === `luck:${sp.id}:${late.year}`)?.text).toMatch(/his trade value may never be higher\.$/);
   });
 
   /** A club whose payroll and front office already run past its budget. */
