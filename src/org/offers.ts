@@ -60,6 +60,23 @@ export function gamesOut(season: Season, teamId: number): number {
   return rank <= 5 ? Math.min(0, gb) : Math.max(0, gb);
 }
 
+/**
+ * Whether the club is level with the last playoff spot and a club on the other side of the line is too, so the
+ * tiebreak alone decides which of them holds it (gamesOut is 0 for both).
+ */
+export function tiedForLastSpot(season: Season, teamId: number): boolean {
+  const league = season.league;
+  const lg = league.teams[teamId]!.league;
+  const recs = season.records.filter((r) => league.teams[r.teamId]!.league === lg).sort((a, b) => season.compare(a, b));
+  const line = recs[5];
+  if (!line) return false;
+  const me = season.records[teamId]!;
+  // Level: no games behind, the way the standings count them.
+  const level = (r: { w: number; l: number }) => r.w - r.l === line.w - line.l;
+  if (!level(me)) return false;
+  return recs.indexOf(me) > 5 || recs.slice(6).some(level);
+}
+
 /** Buyers and sellers by the standings (the user's club left out). */
 export function raceSides(season: Season): Side {
   const league = season.league;

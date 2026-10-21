@@ -2,7 +2,7 @@ import { clamp } from "../core/math";
 import { tenth, withArticle } from "../core/text";
 import type { League, Team } from "../league/types";
 import { budgetRoom, pendingContract } from "../org/contracts";
-import { gamesOut } from "../org/offers";
+import { gamesOut, tiedForLastSpot } from "../org/offers";
 import { freeAfterSeason, tradeValue } from "../org/trades";
 import { isProspect, overallGrade } from "../org/value";
 import { injuryName } from "../players/injuries";
@@ -101,7 +101,16 @@ export function tradeAdvice(season: Season, give: number[], get: number[], fract
 
   if (inSeason && Math.abs(now) >= 0.2) {
     const rec = season.records[user]!;
-    const race = rec.w + rec.l === 0 ? "" : gb <= 0 ? "we're holding a playoff spot" : gb <= 4 ? `we're ${gb} game${gb === 1 ? "" : "s"} out of a playoff spot` : "";
+    const race =
+      rec.w + rec.l === 0
+        ? ""
+        : tiedForLastSpot(season, user)
+          ? "we're tied for the last playoff spot"
+          : gb <= 0
+            ? "we're holding a playoff spot"
+            : gb <= 4
+              ? `we're ${gb} game${gb === 1 ? "" : "s"} out of a playoff spot`
+              : "";
     const why = race ? `, and ${race}` : gb >= 8 ? `, but at ${gb} games out the seasons after this one matter more` : "";
     notes.push({ from: "assistant", text: `For the rest of this season it makes us about ${wins(now)} ${now > 0 ? "better" : "worse"}${why}.` });
   }

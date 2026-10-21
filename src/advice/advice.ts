@@ -7,7 +7,7 @@ import type { AdviceNote, League, Team } from "../league/types";
 import { arbCase, arbitrationSalary, budgetRoom, leavesAtDeadline, orgPlayers, payroll, tenderWorth } from "../org/contracts";
 import { extensionCandidates } from "../org/extensions";
 import { onTheBlock } from "../org/market";
-import { gamesOut } from "../org/offers";
+import { gamesOut, tiedForLastSpot } from "../org/offers";
 import { rosterProblems } from "../org/roster";
 import { freeAfterSeason, TRADE_DEADLINE_DAY } from "../org/trades";
 import { canStart, overallGrade } from "../org/value";
@@ -305,7 +305,7 @@ function deadline(season: Season, team: Team, day: number): void {
     deadlineNote(league, day, "buy", lastWeek, {
       from: "scouting",
       title: `A trade could shore up ${spot.label}`,
-      text: `We're ${gb <= 0 ? "in a playoff spot" : `${gbText(gb)} out`}. By our read the weakest spot on the club is ${spot.label}: ${slotTag(spot.p, spot.pitcher)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
+      text: `We're ${tiedForLastSpot(season, user) ? "tied for the last playoff spot" : gb <= 0 ? "in a playoff spot" : `${gbText(gb)} out`}. By our read the weakest spot on the club is ${spot.label}: ${slotTag(spot.p, spot.pitcher)} (${ourWar(season, user, spot.p)}). That's where a trade helps most.${market} ${when}`,
       href: there.length ? `#trades-block-${group.toLowerCase()}` : "#trades",
     });
   }

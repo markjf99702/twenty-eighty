@@ -1,12 +1,14 @@
-import { describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { notesSince, seasonAdvice } from "../src/advice/advice";
 import { tradeAdvice } from "../src/advice/trades";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
 import type { Contract } from "../src/players/types";
-import { pitch } from "../src/org/offers";
+import { gamesOut, pitch } from "../src/org/offers";
 import { freeAfterSeason, TRADE_DEADLINE_DAY } from "../src/org/trades";
 import { type Player, SERVICE_DAYS_PER_YEAR } from "../src/players/types";
+import { believedWar } from "../src/scouting/analytics";
+import { playoffSeeds } from "../src/season/postseason";
 import { Season } from "../src/season/season";
 
 const USER = 4;
@@ -140,6 +142,68 @@ describe("the staff's deadline notes", () => {
     expect(at(57, 58)).toMatch(/^We're 3 games out\. /);
     expect(at(52, 62)).toMatch(/^We're 7½ games out of a playoff spot\. /);
     expect(at(52, 63)).toMatch(/^We're 8 games out of a playoff spot\. /);
+  });
+
+  describe("with the last playoff spot level", () => {
+    const others = sameLeague.filter((t) => t.id !== USER);
+    // Five clubs well clear, one in each division among them, so they hold the division titles and two wild cards.
+    const clear = [...new Map(others.map((t) => [t.division, t])).values()];
+    for (const t of others) if (clear.length < 5 && !clear.includes(t)) clear.push(t);
+    const rival = others.find((t) => !clear.includes(t))!;
+    /**
+     * The clear clubs at 70-45 and the rest of the league at 55-60, but for the user's club at 62-53 with this run
+     * differential (the tiebreak) and the rival at w-l and +20; `also` drops a clear club to 62-53 and +60.
+     */
+    const race = (diff: number, w = 62, l = 53, also = false) => {
+      for (const t of others) Object.assign(season.records[t.id]!, clear.includes(t) ? { w: 70, l: 45 } : { w: 55, l: 60 });
+      Object.assign(season.records[rival.id]!, { w, l, rs: 520, ra: 500 });
+      if (also) Object.assign(season.records[clear[4]!.id]!, { w: 62, l: 53, rs: 560, ra: 500 });
+      Object.assign(season.records[USER]!, { w: 62, l: 53, rs: 500 + diff, ra: 500 });
+    };
+    /** The last week's note to buy. */
+    const buy = () => {
+      league.advice = [];
+      days(lastWeek);
+      return notes("buy")[0]?.text ?? "";
+    };
+    // Our best regular, gone for nothing: the trade desk's word on this season's race.
+    const war = (p: Player) => believedWar(season, USER, p);
+    const best = Object.values(mine.depth.starters).map(P).sort((a, b) => war(b) - war(a))[0]!;
+    const desk = () => {
+      season.day = lastWeek;
+      return tradeAdvice(season, [best.id], [], left(lastWeek))!.notes.find((n) => n.text.startsWith("For the rest of this season"))?.text ?? "";
+    };
+    let saved: (typeof season.records)[number][] = [];
+    beforeAll(() => {
+      saved = sameLeague.map((t) => ({ ...season.records[t.id]! }));
+    });
+    afterAll(() => sameLeague.forEach((t, i) => Object.assign(season.records[t.id]!, saved[i])));
+
+    it("call us tied for it when the tiebreak leaves us out", () => {
+      race(-20);
+      expect(gamesOut(season, USER)).toBe(0);
+      expect(playoffSeeds(season)[user]).not.toContain(USER);
+      expect(playoffSeeds(season)[user]).toContain(rival.id);
+      expect(buy()).toMatch(/^We're tied for the last playoff spot\. By our read/);
+      expect(desk()).toMatch(/ worse, and we're tied for the last playoff spot\.$/);
+    });
+
+    it("call us tied for it when the tiebreak puts us in", () => {
+      race(40);
+      expect(playoffSeeds(season)[user]).toContain(USER);
+      expect(playoffSeeds(season)[user]).not.toContain(rival.id);
+      expect(buy()).toMatch(/^We're tied for the last playoff spot\. /);
+      expect(desk()).toMatch(/, and we're tied for the last playoff spot\.$/);
+    });
+
+    it("say we're in a playoff spot when nobody outside is level with us", () => {
+      race(-20, 61, 54);
+      expect(buy()).toMatch(/^We're in a playoff spot\. /);
+      expect(desk()).toMatch(/, and we're holding a playoff spot\.$/);
+      // Level with the club in the spot ahead of ours, and a game clear of the next one.
+      race(-20, 61, 54, true);
+      expect(buy()).toMatch(/^We're in a playoff spot\. /);
+    });
   });
 
   it("keep a note from weeks before alongside the last week's reminder", () => {
