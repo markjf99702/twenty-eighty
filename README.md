@@ -445,7 +445,8 @@ Every winter the whole universe moves forward a year:
   a player, priced at $8M a win and discounted 10% a year, minus salary. A cheap young
   star is worth a fortune; an aging star on a big deal can be worth less than nothing.
   AI contenders buy veterans from rebuilding clubs with prospects, too, though an AI club
-  doesn't trade a free agent it signed that winter until June 15.
+  doesn't trade a free agent it signed that winter until June 15, or offer him to you or
+  put him on the block before then (your trade desk can still ask for him).
 - **Spring training** heals most injuries, trims every 40-man roster and adds each
   club's best prospects to it, sets an Opening Day 26 and sorts each farm system by
   ability (with age floors).

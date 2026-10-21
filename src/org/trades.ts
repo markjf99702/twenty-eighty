@@ -349,10 +349,11 @@ export function marketSides(league: League): { buyers: Team[]; sellers: Team[] }
 
 /**
  * Free agents signed this winter (in season, the winter just past), whom the
- * AI clubs don't trade until June 15. Signings are logged under the season
- * just finished, and the log runs in order of the year.
+ * AI clubs don't trade, shop to the user or list on the block until June 15.
+ * Signings are logged under the season just finished, and the log runs in
+ * order of the year.
  */
-export function freshSignings(ctx: RosterContext): Set<number> {
+export function freshSignings(ctx: Pick<RosterContext, "league" | "day" | "offseason">): Set<number> {
   const out = new Set<number>();
   if (!ctx.offseason && ctx.day >= FREE_AGENT_TRADE_DAY) return out;
   const tx = ctx.league.transactions;

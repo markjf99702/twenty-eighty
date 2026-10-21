@@ -1,12 +1,17 @@
 import { describe, expect, it } from "vitest";
 import { Rng } from "../src/core/rng";
+import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
+import type { League, Team } from "../src/league/types";
 import { acceptBar, FREE_AGENCY_WEEKS, freeAgencyWeek, openFreeAgency, signFreeAgent } from "../src/offseason/freeAgency";
 import { budgetRoom, MIN_SALARY, payroll, seasonWar } from "../src/org/contracts";
+import { onTheBlock } from "../src/org/market";
+import { proposeToUser } from "../src/org/offers";
 import { releasePlayer } from "../src/org/roster";
 import { aiTradeMarket, FREE_AGENT_TRADE_DAY, freshSignings } from "../src/org/trades";
 import { canStart } from "../src/org/value";
 import { advanceOffseason, beginOffseason, winterContext } from "../src/offseason/offseason";
+import { type Player, playerName } from "../src/players/types";
 import { warShift } from "../src/scouting/analytics";
 import { staffCost } from "../src/scouting/scouting";
 import { Season } from "../src/season/season";
@@ -108,5 +113,70 @@ describe("a free agent who just signed", () => {
     expect(freshSignings(next.rosterContext(FREE_AGENT_TRADE_DAY - 1))).toEqual(signed);
     expect(freshSignings(next.rosterContext(FREE_AGENT_TRADE_DAY)).size).toBe(0);
     expect(next.dateOf(FREE_AGENT_TRADE_DAY).toISOString().slice(5, 10)).toBe("06-15");
+  });
+});
+
+describe("a free agent his club just signed", () => {
+  const USER = 3;
+  /** Free agency's line in the log for each of these players, in the winter that closes `year`. */
+  const sign = (league: League, ps: Player[], year: number) => {
+    for (const p of ps) league.transactions.push({ year, day: 230, teamId: p.teamId!, playerId: p.id, type: "sign", text: `Signed free agent ${playerName(p)} to a 2-year, $12.0M deal` });
+  };
+  /** Whom a club shops to the user over thirty tries (on the offer clock `now`), with nothing else open. */
+  const shopped = (season: Season, seller: Team, now: number, inSeason: boolean) => {
+    const league = season.league;
+    const fraction = inSeason ? 1 - season.day / season.totalDays : 1;
+    const out = new Set<number>();
+    for (let i = 0; i < 30; i++) {
+      league.tradeOffers = [];
+      const o = proposeToUser(league, new Rng(`fresh-${i}`), now, now + 3, { buyers: [], sellers: [seller] }, "contender", fraction, (v, p) => warShift(season, v, p), inSeason);
+      if (o) out.add(o.get[0]!);
+    }
+    league.tradeOffers = [];
+    return out;
+  };
+  const listed = (season: Season) => new Set(onTheBlock(season, USER).map((b) => b.player.id));
+  const both = (a: Set<number>, b: Set<number>) => [...a].filter((id) => b.has(id));
+
+  it("isn't shopped to the user or put on the block until June 15", () => {
+    const league = generateLeague({ seed: "fresh-shop" });
+    hireGm(league, USER);
+    const season = new Season(league, { minors: false });
+    season.simDays(40);
+    const block = onTheBlock(season, USER);
+    const seller = block[0]!.team;
+    const before = shopped(season, seller, season.day, true);
+    expect(before.size).toBeGreaterThan(0);
+    // Last winter, the club signed everyone it would shop us and its three best fits for us on the block.
+    const fresh = new Set([...before, ...block.slice(0, 3).map((b) => b.player.id)]);
+    sign(league, [...fresh].map((id) => league.players[id]!), league.year - 1);
+    expect(both(listed(season), fresh)).toEqual([]);
+    // Everyone else stays on it.
+    expect(listed(season).size).toBe(block.filter((b) => !fresh.has(b.player.id)).length);
+    expect(listed(season).size).toBeGreaterThan(0);
+    expect(both(shopped(season, seller, season.day, true), fresh)).toEqual([]);
+    // On June 15 they're on the market again.
+    season.day = FREE_AGENT_TRADE_DAY;
+    expect(both(listed(season), fresh).length).toBeGreaterThanOrEqual(3);
+    expect(both(shopped(season, seller, season.day, true), fresh).length).toBeGreaterThan(0);
+  });
+
+  it("isn't shopped to the user or put on the block the winter he signs", () => {
+    const league = generateLeague({ seed: "fresh-shop-winter" });
+    hireGm(league, USER);
+    const season = new Season(league, { minors: false });
+    beginOffseason(league, season);
+    const block = onTheBlock(season, USER);
+    const seller = block[0]!.team;
+    const now = 1000 + 230;
+    const before = shopped(season, seller, now, false);
+    expect(before.size).toBeGreaterThan(0);
+    const fresh = new Set([...before, ...block.slice(0, 3).map((b) => b.player.id)]);
+    // Signed last winter, they'd be fair game now; signed this winter, they aren't.
+    sign(league, [...fresh].map((id) => league.players[id]!), league.year - 1);
+    expect(listed(season).size).toBe(block.length);
+    sign(league, [...fresh].map((id) => league.players[id]!), league.year);
+    expect(both(listed(season), fresh)).toEqual([]);
+    expect(both(shopped(season, seller, now, false), fresh)).toEqual([]);
   });
 });

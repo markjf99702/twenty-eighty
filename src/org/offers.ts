@@ -12,6 +12,7 @@ import {
   evaluateTrade,
   executeTrade,
   freeAfterSeason,
+  freshSignings,
   marketSides,
   teamStrength,
   tradeValue,
@@ -206,13 +207,23 @@ function buyOffer(league: League, user: Team, buyers: Team[], rng: Rng, now: num
 
 /**
  * A seller shops one of its veterans where he'd fill a hole on the user's
- * club, asking for young players it values a bit above him.
+ * club, asking for young players it values a bit above him. Free agents it
+ * signed this winter (`fresh`) aren't shopped until June 15.
  */
-function sellOffer(league: League, user: Team, sellers: Team[], rng: Rng, now: number, fraction: number, seen: WarShift): Draft | null {
+function sellOffer(
+  league: League,
+  user: Team,
+  sellers: Team[],
+  rng: Rng,
+  now: number,
+  fraction: number,
+  seen: WarShift,
+  fresh: ReadonlySet<number>,
+): Draft | null {
   const seller = rng.pick(sellers);
   const sellerEyes: WarShift = (_viewer, p) => seen(seller.id, p);
   const vets = orgPlayers(league, seller)
-    .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 26 && seasonWar(p) >= 1.5 && !leavesAtDeadline(league, p))
+    .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 26 && seasonWar(p) >= 1.5 && !leavesAtDeadline(league, p) && !fresh.has(p.id))
     .map((p) => {
       const asked = interest(league, p.id, now);
       const gain = upgrade(league, user, p, sellerEyes);
@@ -287,12 +298,14 @@ export function proposeToUser(
   const recent = new Set(league.tradeOffers.filter((o) => now - o.made < OFFER_GAP).map((o) => o.teamId));
   const available = (teams: Team[]) => teams.filter((t) => !recent.has(t.id));
   const user = league.teams[userId]!;
+  // Free agents a club signed this winter aren't shopped until June 15 (in season the offer clock is the day).
+  const fresh = freshSignings({ league, day: now, offseason: !inSeason });
   const sellFirst = race === "contender" ? rng.chance(0.7) : race === "seller" ? rng.chance(0.2) : rng.chance(0.5);
   const tries: ("buy" | "sell")[] = sellFirst ? ["sell", "buy"] : ["buy", "sell"];
   for (const kind of tries) {
     const pool = available(kind === "buy" ? sides.buyers : sides.sellers);
     if (pool.length === 0) continue;
-    const d = kind === "buy" ? buyOffer(league, user, pool, rng, now, fraction, seen) : sellOffer(league, user, pool, rng, now, fraction, seen);
+    const d = kind === "buy" ? buyOffer(league, user, pool, rng, now, fraction, seen) : sellOffer(league, user, pool, rng, now, fraction, seen, fresh);
     if (!d) continue;
     const give = d.give.map((p) => p.id);
     const get = d.get.map((p) => p.id);

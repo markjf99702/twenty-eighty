@@ -4,7 +4,7 @@ import { warShift } from "../scouting/analytics";
 import type { Season } from "../season/season";
 import { leavesAtDeadline, orgPlayers, seasonWar } from "./contracts";
 import { BUYER_GB, chips, gamesOut, raceSides, upgrade } from "./offers";
-import { asking, evaluateTrade, marketSides, tradeValue, type WarShift } from "./trades";
+import { asking, evaluateTrade, freshSignings, marketSides, tradeValue, type WarShift } from "./trades";
 import { canStart } from "./value";
 
 /**
@@ -47,17 +47,19 @@ const regular = (group: Group, war: number) => war >= (group === "RP" ? 0.25 : 1
 /**
  * Veterans sellers would move: healthy big leaguers 26 or older whom their
  * own club counts as regulars, with how much each would help the viewer.
+ * A free agent a club signed this winter isn't on it until June 15.
  */
 export function onTheBlock(season: Season, viewer: number): BlockEntry[] {
   const league = season.league;
   const me = league.teams[viewer]!;
   const seen: WarShift = (v, p) => warShift(season, v, p);
+  const fresh = freshSignings({ league, day: season.day, offseason: Boolean(league.offseason) });
   const out: BlockEntry[] = [];
   for (const team of shopping(season)) {
     if (team.id === viewer) continue;
     const gb = league.offseason ? null : gamesOut(season, team.id);
     for (const p of orgPlayers(league, team)) {
-      if (p.level !== "MLB" || p.il || p.injury || p.age < 26 || leavesAtDeadline(league, p)) continue;
+      if (p.level !== "MLB" || p.il || p.injury || p.age < 26 || leavesAtDeadline(league, p) || fresh.has(p.id)) continue;
       const group = groupOf(p);
       if (!regular(group, seasonWar(p) + seen(team.id, p))) continue;
       out.push({ player: p, team, gamesOut: gb, group, fit: upgrade(league, me, p, seen) });
