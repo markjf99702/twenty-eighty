@@ -580,13 +580,13 @@ runs** (this fielder vs. a league-average fielder on the same ball).
 
 | | Sim | MLB | | Sim | MLB |
 |---|---:|---:|---|---:|---:|
-| Runs/game | 4.41 | 4.40 | Avg exit velo | 89.1 | 88.7 |
-| AVG / OBP / SLG | .247/.319/.402 | .244/.313/.401 | Hard-hit % | 38.4 | 38.5 |
-| K% / BB% | 22.5 / 8.6 | 22.4 / 8.3 | Barrel % | 7.5 | 7.8 |
-| HR% of PA | 2.99 | 3.00 | GB / LD / FB % | 43.6 / 25.0 / 22.4 | 43 / 24.5 / 24.5 |
-| BABIP | .296 | .291 | SB per game / SB% | 0.76 / 77% | 0.72 / 79% |
+| Runs/game | 4.38 | 4.40 | Avg exit velo | 89.0 | 88.7 |
+| AVG / OBP / SLG | .246/.317/.400 | .244/.313/.401 | Hard-hit % | 38.3 | 38.5 |
+| K% / BB% | 22.5 / 8.5 | 22.4 / 8.3 | Barrel % | 7.4 | 7.8 |
+| HR% of PA | 2.97 | 3.00 | GB / LD / FB % | 43.7 / 25.0 / 22.4 | 43 / 24.5 / 24.5 |
+| BABIP | .295 | .291 | SB per game / SB% | 0.78 / 78% | 0.72 / 79% |
 | Pitches per PA | 3.99 | 3.90 | Errors per game | 0.47 | 0.52 |
-| Swing % / CSW % | 48.2 / 27.7 | 47.3 / 28.2 | SP innings per start | 5.3 | 5.3 |
+| Swing % / CSW % | 48.2 / 27.7 | 47.3 / 28.2 | SP innings per start | 5.2 | 5.3 |
 
 It also checks the *spread*, which is what makes the 20-80 scale honest. A typical
 season has a 50-56 HR leader, a batting champion around .330, a 250-strikeout ace, a
