@@ -11,7 +11,7 @@ import { releasePlayer } from "../src/org/roster";
 import { aiTradeMarket, FREE_AGENT_TRADE_DAY, freshSignings } from "../src/org/trades";
 import { canStart } from "../src/org/value";
 import { advanceOffseason, beginOffseason, winterContext } from "../src/offseason/offseason";
-import { type Player, playerName } from "../src/players/types";
+import { playerName } from "../src/players/types";
 import { warShift } from "../src/scouting/analytics";
 import { staffCost } from "../src/scouting/scouting";
 import { Season } from "../src/season/season";
@@ -119,8 +119,11 @@ describe("a free agent who just signed", () => {
 describe("a free agent his club just signed", () => {
   const USER = 3;
   /** Free agency's line in the log for each of these players, in the winter that closes `year`. */
-  const sign = (league: League, ps: Player[], year: number) => {
-    for (const p of ps) league.transactions.push({ year, day: 230, teamId: p.teamId!, playerId: p.id, type: "sign", text: `Signed free agent ${playerName(p)} to a 2-year, $12.0M deal` });
+  const sign = (league: League, ids: Iterable<number>, year: number) => {
+    for (const id of ids) {
+      const p = league.players[id]!;
+      league.transactions.push({ year, day: 230, teamId: p.teamId!, playerId: p.id, type: "sign", text: `Signed free agent ${playerName(p)} to a 2-year, $12.0M deal` });
+    }
   };
   /** Whom a club shops to the user over thirty tries (on the offer clock `now`), with nothing else open. */
   const shopped = (season: Season, seller: Team, now: number, inSeason: boolean) => {
@@ -135,6 +138,15 @@ describe("a free agent his club just signed", () => {
     league.tradeOffers = [];
     return out;
   };
+  /** The first club that would shop the user someone then, and whom. */
+  const shopper = (season: Season, now: number, inSeason: boolean) => {
+    for (const team of season.league.teams) {
+      if (team.id === USER) continue;
+      const got = shopped(season, team, now, inSeason);
+      if (got.size > 0) return { team, got };
+    }
+    throw new Error("nobody shops the user anyone");
+  };
   const listed = (season: Season) => new Set(onTheBlock(season, USER).map((b) => b.player.id));
   const both = (a: Set<number>, b: Set<number>) => [...a].filter((id) => b.has(id));
 
@@ -144,21 +156,24 @@ describe("a free agent his club just signed", () => {
     const season = new Season(league, { minors: false });
     season.simDays(40);
     const block = onTheBlock(season, USER);
-    const seller = block[0]!.team;
-    const before = shopped(season, seller, season.day, true);
-    expect(before.size).toBeGreaterThan(0);
-    // Last winter, the club signed everyone it would shop us and its three best fits for us on the block.
-    const fresh = new Set([...before, ...block.slice(0, 3).map((b) => b.player.id)]);
-    sign(league, [...fresh].map((id) => league.players[id]!), league.year - 1);
+    const may = shopper(season, season.day, true);
+    // Last winter, that club signed everyone it would shop us, and the three best fits for us on the block signed too.
+    const fresh = new Set([...may.got, ...block.slice(0, 3).map((b) => b.player.id)]);
+    sign(league, fresh, league.year - 1);
     expect(both(listed(season), fresh)).toEqual([]);
     // Everyone else stays on it.
     expect(listed(season).size).toBe(block.filter((b) => !fresh.has(b.player.id)).length);
     expect(listed(season).size).toBeGreaterThan(0);
-    expect(both(shopped(season, seller, season.day, true), fresh)).toEqual([]);
-    // On June 15 they're on the market again.
+    expect(both(shopped(season, may.team, season.day, true), fresh)).toEqual([]);
+    // On June 15 they're on the block again, and whoever a club shops us then it would shop us had he signed last
+    // winter, but not the day before.
     season.day = FREE_AGENT_TRADE_DAY;
     expect(both(listed(season), fresh).length).toBeGreaterThanOrEqual(3);
-    expect(both(shopped(season, seller, season.day, true), fresh).length).toBeGreaterThan(0);
+    const june = shopper(season, season.day, true);
+    sign(league, june.got, league.year - 1);
+    expect(shopped(season, june.team, season.day, true)).toEqual(june.got);
+    season.day = FREE_AGENT_TRADE_DAY - 1;
+    expect(both(shopped(season, june.team, season.day, true), june.got)).toEqual([]);
   });
 
   it("isn't shopped to the user or put on the block the winter he signs", () => {
@@ -167,16 +182,14 @@ describe("a free agent his club just signed", () => {
     const season = new Season(league, { minors: false });
     beginOffseason(league, season);
     const block = onTheBlock(season, USER);
-    const seller = block[0]!.team;
     const now = 1000 + 230;
-    const before = shopped(season, seller, now, false);
-    expect(before.size).toBeGreaterThan(0);
-    const fresh = new Set([...before, ...block.slice(0, 3).map((b) => b.player.id)]);
+    const winter = shopper(season, now, false);
+    const fresh = new Set([...winter.got, ...block.slice(0, 3).map((b) => b.player.id)]);
     // Signed last winter, they'd be fair game now; signed this winter, they aren't.
-    sign(league, [...fresh].map((id) => league.players[id]!), league.year - 1);
+    sign(league, fresh, league.year - 1);
     expect(listed(season).size).toBe(block.length);
-    sign(league, [...fresh].map((id) => league.players[id]!), league.year);
+    sign(league, fresh, league.year);
     expect(both(listed(season), fresh)).toEqual([]);
-    expect(both(shopped(season, seller, now, false), fresh)).toEqual([]);
+    expect(both(shopped(season, winter.team, now, false), fresh)).toEqual([]);
   });
 });
