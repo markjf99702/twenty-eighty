@@ -26,7 +26,7 @@ import {
   type RosterContext,
   transferTo60,
 } from "./roster";
-import { canStart, offenseValue, pitchingValue, playerValue } from "./value";
+import { canStart, type FarmKind, farmKind, offenseValue, pitchingValue, playerValue } from "./value";
 
 /**
  * The AI front office. Every club (and the user's, unless they take the
@@ -251,7 +251,15 @@ function performanceMoves(ctx: RosterContext, team: Team, opts: AiOptions): void
   }
 }
 
-/** Every couple of weeks: move players up the ladder when they've outgrown a level. */
+const FARM_KINDS: FarmKind[] = ["starter", "reliever", "hitter"];
+/** What an affiliate needs of each kind: a lineup and bench, a rotation, and the rest of its arms. */
+const FARM_NEEDS: Record<FarmKind, number> = { hitter: MIN_HITTERS, starter: ROTATION, reliever: MIN_PITCHERS - ROTATION };
+
+/**
+ * Every couple of weeks: move players up the ladder when they've outgrown a level, like for like (a starter for a
+ * starter, a reliever for a reliever; `farmKind` says why). Swapping arms of either kind sank every affiliate's
+ * starters to Single-A and left the upper minors starting relievers.
+ */
 function farmMoves(ctx: RosterContext, team: Team, opts: AiOptions): void {
   // Top of the ladder first, and nobody moves twice in one day.
   const ladder: [MinorLevel, MinorLevel][] = [
@@ -261,8 +269,8 @@ function farmMoves(ctx: RosterContext, team: Team, opts: AiOptions): void {
   ];
   const moved = new Set<number>();
   for (const [from, to] of ladder) {
-    for (const wantPitcher of [true, false]) {
-      const eligible = (p: Player) => isPitcher(p) === wantPitcher && healthy(p) && !moved.has(p.id);
+    for (const kind of FARM_KINDS) {
+      const eligible = (p: Player) => farmKind(p) === kind && healthy(p) && !moved.has(p.id);
       const lower = players(ctx, team.rosters[from]).filter(eligible);
       const upper = players(ctx, team.rosters[to]).filter(eligible);
       if (lower.length === 0 || upper.length === 0) continue;
@@ -278,13 +286,14 @@ function farmMoves(ctx: RosterContext, team: Team, opts: AiOptions): void {
   }
 }
 
-function signFiller(ctx: RosterContext, team: Team, level: MinorLevel, pitcher: boolean, rng: Rng): void {
+function signFiller(ctx: RosterContext, team: Team, level: MinorLevel, kind: FarmKind, rng: Rng): void {
   const age = rng.int(19, 23);
   const value = -48 + rng.normal(0, 7);
   const id = ctx.league.players.length;
-  const p = pitcher
-    ? generatePitcher(rng, { id, role: rng.chance(0.5) ? "SP" : "RP", value, age })
-    : generateHitter(rng, { id, position: rng.pick(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"] as const), value, age });
+  const p =
+    kind !== "hitter"
+      ? generatePitcher(rng, { id, role: kind === "starter" ? "SP" : "RP", value, age })
+      : generateHitter(rng, { id, position: rng.pick(["C", "1B", "2B", "3B", "SS", "LF", "CF", "RF"] as const), value, age });
   p.teamId = team.id;
   p.level = level;
   uniqueNames(ctx.league, [p], "filler");
@@ -293,7 +302,10 @@ function signFiller(ctx: RosterContext, team: Team, level: MinorLevel, pitcher: 
   logTransaction(ctx.league, ctx.day, team, p, "promote", `Signed ${p.firstName} ${p.lastName} to a minor league contract (${level})`);
 }
 
-/** Keep every affiliate able to field a team: enough healthy hitters, a catcher, and arms. */
+/**
+ * Keep every affiliate able to field a team: enough healthy hitters, a catcher, and arms, starters first until its
+ * rotation is whole and then relievers, each weighed only against his own kind (`farmKind`).
+ */
 function balanceMinors(ctx: RosterContext, team: Team, opts: AiOptions): void {
   const levels = MINOR_LEVELS;
   for (let i = 0; i < levels.length; i++) {
@@ -308,12 +320,14 @@ function balanceMinors(ctx: RosterContext, team: Team, opts: AiOptions): void {
         const short = have.length < need || (!wantPitcher && catchers === 0);
         if (!short) break;
         const wantCatcher = !wantPitcher && catchers === 0;
+        const kind: FarmKind = !wantPitcher ? "hitter" : have.filter(canStart).length < ROTATION ? "starter" : "reliever";
         if (below) {
           const pool = players(ctx, team.rosters[below]).filter(
             (p) => isPitcher(p) === wantPitcher && healthy(p) && (!wantCatcher || p.position === "C"),
           );
           if (pool.length > need - 3 || wantCatcher) {
-            const up = pool.sort(byValueDesc(opts.performance))[0];
+            const fits = pool.filter((p) => farmKind(p) === kind);
+            const up = (fits.length > 0 ? fits : pool).sort(byValueDesc(opts.performance))[0];
             if (up) {
               assignMinors(ctx, team, up, level);
               continue;
@@ -331,16 +345,21 @@ function balanceMinors(ctx: RosterContext, team: Team, opts: AiOptions): void {
           logTransaction(ctx.league, ctx.day, team, p, "promote", `Signed C ${p.firstName} ${p.lastName} to a minor league contract (${level})`);
           continue;
         }
-        signFiller(ctx, team, level, wantPitcher, opts.rng);
+        signFiller(ctx, team, level, kind, opts.rng);
       }
     }
-    // Trim bloated rosters from the bottom (injured players don't count against
-    // the limit): send the weakest down, or release at the lowest level.
+    // Trim bloated rosters from the bottom (injured players don't count against the limit): send the weakest of the
+    // kind furthest over what the level needs down (hitters first, starters last on a tie), or release him at the
+    // lowest level.
     let guard = 0;
     while (players(ctx, team.rosters[level]).filter(healthy).length > MAX_MINOR_ROSTER && guard++ < 6) {
-      const worst = players(ctx, team.rosters[level])
-        .filter((p) => !p.onFortyMan && healthy(p) && p.optionedDay !== ctx.day)
-        .sort((a, b) => playerValue(a, true) - playerValue(b, true))[0];
+      const here = players(ctx, team.rosters[level]).filter(healthy);
+      const movable = here.filter((p) => !p.onFortyMan && p.optionedDay !== ctx.day);
+      const surplus = (k: FarmKind) => here.filter((p) => farmKind(p) === k).length - FARM_NEEDS[k];
+      const kind = (["hitter", "reliever", "starter"] as const)
+        .filter((k) => movable.some((p) => farmKind(p) === k))
+        .sort((a, b) => surplus(b) - surplus(a))[0];
+      const worst = movable.filter((p) => farmKind(p) === kind).sort((a, b) => playerValue(a, true) - playerValue(b, true))[0];
       if (!worst) break;
       if (below) assignMinors(ctx, team, worst, below);
       else releasePlayer(ctx, team, worst);

@@ -383,7 +383,8 @@ replacements protecting a late lead, and forced replacements when someone gets h
 **AI front offices** run every club each day. They put injured players on the IL and call
 up replacements, activate players when they heal (optioning or DFA'ing someone to make
 room), make weekly swaps between the majors and AAA, and promote players up the farm
-system every couple of weeks. They judge players by their grades blended with actual
+system every couple of weeks, a starter for a starter and a reliever for a reliever, so
+every affiliate keeps a rotation. They judge players by their grades blended with actual
 production, so a slumping veteran can lose his job and a hot prospect can force his way
 up. A typical season has about 530 IL placements, 780 call-ups and 220 designations
 for assignment (about half of them claimed off waivers), all in a transaction log.
@@ -582,11 +583,11 @@ runs** (this fielder vs. a league-average fielder on the same ball).
 
 | | Sim | MLB | | Sim | MLB |
 |---|---:|---:|---|---:|---:|
-| Runs/game | 4.38 | 4.40 | Avg exit velo | 89.1 | 88.7 |
-| AVG / OBP / SLG | .247/.318/.402 | .244/.313/.401 | Hard-hit % | 38.5 | 38.5 |
-| K% / BB% | 22.6 / 8.5 | 22.4 / 8.3 | Barrel % | 7.5 | 7.8 |
-| HR% of PA | 3.02 | 3.00 | GB / LD / FB % | 43.6 / 25.0 / 22.5 | 43 / 24.5 / 24.5 |
-| BABIP | .296 | .291 | SB per game / SB% | 0.77 / 77% | 0.72 / 79% |
+| Runs/game | 4.40 | 4.40 | Avg exit velo | 89.1 | 88.7 |
+| AVG / OBP / SLG | .247/.318/.403 | .244/.313/.401 | Hard-hit % | 38.6 | 38.5 |
+| K% / BB% | 22.6 / 8.5 | 22.4 / 8.3 | Barrel % | 7.6 | 7.8 |
+| HR% of PA | 3.03 | 3.00 | GB / LD / FB % | 43.6 / 25.0 / 22.6 | 43 / 24.5 / 24.5 |
+| BABIP | .297 | .291 | SB per game / SB% | 0.76 / 77% | 0.72 / 79% |
 | Pitches per PA | 3.99 | 3.90 | Errors per game | 0.46 | 0.52 |
 | Swing % / CSW % | 48.2 / 27.8 | 47.3 / 28.2 | SP innings per start | 5.1 | 5.3 |
 

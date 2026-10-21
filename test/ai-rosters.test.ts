@@ -7,7 +7,7 @@ import { manageOrganization } from "../src/org/ai";
 import { seasonWar } from "../src/org/contracts";
 import { canOption, refreshDepth } from "../src/org/roster";
 import { canStart, playerValue } from "../src/org/value";
-import type { Player } from "../src/players/types";
+import { MINOR_LEVELS, type MinorLevel, type Player } from "../src/players/types";
 
 const healthy = (p: Player) => !p.injury || p.injury.daysLeft <= 0;
 const startersActive = (league: League, team: Team) =>
@@ -71,6 +71,86 @@ describe("AI rotations", () => {
       manageOrganization({ league, day: 1, expanded: false }, team, { weekly: false, farmCheck: false, waiverOrder: league.teams, rng: new Rng(`fifth-${team.id}`) });
     }
     expect(short.filter((t) => startersActive(league, t).length < 5).map((t) => t.abbrev)).toEqual([]);
+  });
+});
+
+describe("AI farm system", () => {
+  const opts = (league: League, team: Team, farmCheck: boolean) => ({ weekly: false, farmCheck, waiverOrder: league.teams, rng: new Rng(`farm-${team.id}`) });
+  const arms = (league: League, team: Team, level: MinorLevel) => team.rosters[level].map((id) => league.players[id]!).filter((p) => p.pitching && healthy(p));
+  const starters = (league: League, team: Team, level: MinorLevel) => arms(league, team, level).filter(canStart).length;
+  const hurt = (p: Player, day: number) => (p.injury = { name: "Elbow inflammation", days: 30, daysLeft: 30, startDay: day });
+
+  it("swap a starter for a starter and a reliever for a reliever up the ladder", () => {
+    const league = generateLeague({ seed: "farm-kinds" });
+    const ctx = { league, day: 14, expanded: false };
+    const moved: string[] = [];
+    let pitcherSwaps = 0;
+    let checked = 0;
+    for (const team of league.teams) {
+      const mlb = team.rosters.MLB.join();
+      const before = MINOR_LEVELS.map((l) => starters(league, team, l));
+      const from = league.transactions.length;
+      manageOrganization(ctx, team, opts(league, team, true));
+      // A call-up for the big club's rotation takes a starter from the farm; only the farm's own swaps count here.
+      if (team.rosters.MLB.join() !== mlb) continue;
+      checked++;
+      pitcherSwaps += league.transactions.slice(from).filter((t) => t.type === "promote" && league.players[t.playerId]!.pitching).length;
+      const after = MINOR_LEVELS.map((l) => starters(league, team, l));
+      if (after.some((n, i) => n !== before[i])) moved.push(`${team.abbrev}: starters AAA/AA/A+/A ${before.join("/")} -> ${after.join("/")}`);
+    }
+    expect(checked).toBeGreaterThan(20);
+    expect(pitcherSwaps).toBeGreaterThan(20);
+    expect(moved).toEqual([]);
+  });
+
+  it("bring up starters first for an affiliate short of arms and of starters", () => {
+    const league = generateLeague({ seed: "farm-kinds" });
+    const ctx = { league, day: 20, expanded: false };
+    const short: string[] = [];
+    let checked = 0;
+    for (const team of league.teams) {
+      const staff = arms(league, team, "AAA");
+      const sp = staff.filter(canStart);
+      const rp = staff.filter((p) => !canStart(p));
+      if (sp.length < 5 || rp.length < 2 || starters(league, team, "AA") < 2) continue;
+      // Two starters and two relievers hurt: nine healthy arms, three or four of them starters.
+      for (const p of [sp[0]!, sp[1]!, rp[0]!, rp[1]!]) hurt(p, ctx.day);
+      const mlb = team.rosters.MLB.join();
+      manageOrganization(ctx, team, opts(league, team, false));
+      if (team.rosters.MLB.join() !== mlb) continue;
+      checked++;
+      if (starters(league, team, "AAA") < 5) short.push(`${team.abbrev}: ${starters(league, team, "AAA")} healthy starters of ${arms(league, team, "AAA").length} arms`);
+    }
+    expect(checked).toBeGreaterThan(15);
+    expect(short).toEqual([]);
+  });
+
+  it("trim a crowded affiliate from the kind it has too many of, not its rotation", () => {
+    const league = generateLeague({ seed: "farm-kinds" });
+    const ctx = { league, day: 20, expanded: false };
+    const trimmed: string[] = [];
+    let checked = 0;
+    for (const team of league.teams) {
+      // Three relievers from Double-A crowd Triple-A to 29.
+      const extra = arms(league, team, "AA")
+        .filter((p) => !canStart(p))
+        .slice(0, 3);
+      if (extra.length < 3 || team.rosters.AAA.length !== 26) continue;
+      for (const p of extra) {
+        team.rosters.AA = team.rosters.AA.filter((id) => id !== p.id);
+        team.rosters.AAA.push(p.id);
+        p.level = "AAA";
+      }
+      const before = starters(league, team, "AAA");
+      const mlb = team.rosters.MLB.join();
+      manageOrganization(ctx, team, opts(league, team, false));
+      if (team.rosters.MLB.join() !== mlb) continue;
+      checked++;
+      expect(team.rosters.AAA.length).toBeLessThanOrEqual(28);
+      if (starters(league, team, "AAA") < before) trimmed.push(`${team.abbrev}: ${before} -> ${starters(league, team, "AAA")} starters`);
+    }
+    expect(checked).toBeGreaterThan(20);
+    expect(trimmed).toEqual([]);
   });
 });
 

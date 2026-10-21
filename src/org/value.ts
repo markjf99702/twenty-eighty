@@ -82,6 +82,14 @@ export function pitchingValue(p: Player, future = false): number {
 export const canStart = (p: Player): boolean => (p.pitching?.stamina.present ?? 0) >= 45;
 
 /**
+ * A player's kind as the farm sorts its players. The farm weighs each player only against his own kind: a value in
+ * runs a season (`playerValue`) weighs a starter's innings against a reliever's, so among minor leaguers, nearly all
+ * below an average big leaguer, it rates any reliever above an equally good starter.
+ */
+export type FarmKind = "hitter" | "starter" | "reliever";
+export const farmKind = (p: Player): FarmKind => (!p.pitching ? "hitter" : canStart(p) ? "starter" : "reliever");
+
+/**
  * A rough seasonal value in runs above an average regular, comparable across
  * hitters and pitchers. Starters face ~750 batters, relievers ~260.
  */
