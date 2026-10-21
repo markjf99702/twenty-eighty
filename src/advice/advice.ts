@@ -81,6 +81,13 @@ const money = (x: number) => (x >= 10 ? `$${x.toFixed(1)}M` : `$${x.toFixed(2)}M
 const gbText = (gb: number) => (gb === 0.5 ? "half a game" : gb === 1 ? "a game" : Number.isInteger(gb) ? `${gb} games` : `${Math.floor(gb)}½ games`);
 const names = (ps: Player[]) => (ps.length <= 2 ? ps.map(tag).join(" and ") : `${ps.slice(0, -1).map(tag).join(", ")} and ${tag(ps.at(-1)!)}`);
 
+/**
+ * Whether a pitcher whose ERA runs well over his FIP is worth keeping faith in: the gap says he's pitched better,
+ * but only a FIP about league average or better (no more than 0.25 over the league ERA, or an FIP- of 105 or less)
+ * says he's pitched well. The monthly note and the trade desk both go by it.
+ */
+export const goodFip = (fip: number, fipMinus: number, lgEra: number): boolean => fip <= lgEra + 0.25 || fipMinus <= 105;
+
 /** The user's read of what a player would give in the majors now, in wins (the 20-80 grade bunches up for big leaguers). */
 const ourWar = (season: Season, user: number, p: Player) => `about ${tenth(believedWar(season, user, p))} WAR a season`;
 /** The user's scouts' future value, in their 5-point steps as the boards show it. */
@@ -366,8 +373,7 @@ function analytics(season: Season, team: Team, day: number): void {
     if (!mine.has(p.id) || p.IP < 50) continue;
     const gap = p.ERA - p.FIP;
     if (Math.abs(gap) < 1.1 || (best && Math.abs(gap) <= best.gap)) continue;
-    // An ERA well over his FIP says he's pitched better, but only a FIP about league average or better is worth keeping faith in.
-    if (gap > 0 && p.FIP > lgEra + 0.25 && p.FIPminus > 105) continue;
+    if (gap > 0 && !goodFip(p.FIP, p.FIPminus, lgEra)) continue;
     const name = playerName(league.players[p.id]!);
     best =
       gap < 0

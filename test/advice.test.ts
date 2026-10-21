@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { seasonAdvice, winterAdvice } from "../src/advice/advice";
+import { tradeAdvice } from "../src/advice/trades";
 import { tenth } from "../src/core/text";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
@@ -62,6 +63,23 @@ describe("the analysts' word on a pitcher's ERA", () => {
   it("still says when an ERA is running ahead of a pitcher, however good it is", () => {
     const { note } = noteWith(line(2.1, 3.9));
     expect(note?.title).toBe(`${playerName(p)}'s ERA is running ahead of him`);
+  });
+
+  /** What the analytics director says at the trade desk about offering him, with his line this season set to `l`. */
+  const deskWith = (l: PitchingLine) => {
+    season.pitching.lines.set(p.id, l);
+    season.day = 55;
+    const fip = season.stats().pitchers.find((x) => x.id === p.id)!.FIP;
+    const take = tradeAdvice(season, [p.id], [], 1 - season.day / season.totalDays)!;
+    return { fip, note: take.notes.find((n) => n.from === "analytics")?.text };
+  };
+
+  it("goes by the same rule at the trade desk", () => {
+    expect(deskWith(line(7.3, 6.0)).note).toBeUndefined();
+    const good = deskWith(line(5.9, 3.1));
+    expect(good.note).toBe(`${playerName(p)}'s 5.85 ERA hides a ${good.fip.toFixed(2)} FIP: he's pitched better than it looks.`);
+    const lucky = deskWith(line(2.1, 3.9));
+    expect(lucky.note).toBe(`${playerName(p)}'s 2.10 ERA is well ahead of his ${lucky.fip.toFixed(2)} FIP: expect some of that to come back.`);
   });
 });
 

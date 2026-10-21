@@ -11,7 +11,7 @@ import { belief, believedWar, warShift } from "../scouting/analytics";
 import { ANALYTICS_TIERS, perceive, uncertainty } from "../scouting/scouting";
 import type { Season } from "../season/season";
 import { hitterAdvanced, pitcherAdvanced } from "../stats/advanced";
-import type { StaffRole } from "./advice";
+import { goodFip, type StaffRole } from "./advice";
 
 /**
  * What the user's staff makes of a trade: the assistant GM's verdict and why
@@ -357,9 +357,11 @@ function luck(season: Season, p: Player): string | null {
   if (p.pitching) {
     const line = season.levels[p.level].pitching.lines.get(p.id);
     if (!line || line.outs < 60) return null;
-    const a = pitcherAdvanced(line, 1, ctx);
+    // His club's park, as on the stats pages, for the FIP- (ERA and FIP don't depend on it).
+    const a = pitcherAdvanced(line, ctx.parkFactors.get(p.teamId ?? -1) ?? 1, ctx);
     if (a.ERA < a.FIP - 0.8) return `${playerName(p)}'s ${a.ERA.toFixed(2)} ERA is well ahead of his ${a.FIP.toFixed(2)} FIP: expect some of that to come back.`;
-    if (a.ERA > a.FIP + 0.8) return `${playerName(p)}'s ${a.ERA.toFixed(2)} ERA hides ${withArticle(a.FIP.toFixed(2))} FIP: he's pitched better than it looks.`;
+    // A bad FIP under a worse ERA is nothing to hold on to.
+    if (a.ERA > a.FIP + 0.8 && goodFip(a.FIP, a.FIPminus, ctx.lgEra)) return `${playerName(p)}'s ${a.ERA.toFixed(2)} ERA hides ${withArticle(a.FIP.toFixed(2))} FIP: he's pitched better than it looks.`;
     return null;
   }
   const line = season.levels[p.level].batting.lines.get(p.id);
