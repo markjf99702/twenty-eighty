@@ -215,6 +215,8 @@ interface Side {
   pitcher: Stint;
   stints: Stint[];
   bullpenLeft: number[];
+  /** How many of the bullpen's arms are relievers: the club's other starters come after them. */
+  relievers: number;
   line: number[];
   hits: number;
   errors: number;
@@ -300,6 +302,7 @@ export class GameSim {
       pitcher: starter,
       stints: [starter],
       bullpenLeft: setup.bullpen.filter((id) => id !== setup.starter),
+      relievers: setup.spare ? setup.bullpen.filter((id) => !setup.spare!.has(id)).length : setup.bullpen.length,
       line: [],
       hits: 0,
       errors: 0,
@@ -983,7 +986,7 @@ export class GameSim {
     } else if (s.starter) {
       pull = starterComesOut(s, this.inning, inningStart, runners, lead, this.battingSide.hits);
     } else {
-      pull = relieverComesOut(s, field.setup.bullpen.indexOf(s.id), field.setup.bullpen.length, this.inning, inningStart, lead);
+      pull = relieverComesOut(s, field.setup.bullpen.indexOf(s.id), field.relievers, this.inning, inningStart, lead);
     }
     if (!pull) return;
     const next = this.chooseReliever(field, lead, runners);
@@ -1340,16 +1343,16 @@ export interface RelieverOuting {
 
 /**
  * Whether a manager takes a reliever out before the next batter (an injury and an exhibition aside), with `slot` his
- * place in a bullpen of `penSize` (the closer first, the last two the long men) and `lead` his club's: at his limit,
- * after three runs, or at the top of an inning once he's pitched one. A long man stays on in a blowout while he has
- * pitches left, and a middle reliever who got through an inning on few pitches without a run works another before
- * the late innings.
+ * place in the game's bullpen (the closer first), `relievers` how many of its arms are relievers (the last two of them
+ * the long men; the club's other starters come after them) and `lead` his club's: at his limit, after three runs, or
+ * at the top of an inning once he's pitched one. A long man stays on in a blowout while he has pitches left, and a
+ * middle reliever who got through an inning on few pitches without a run works another before the late innings.
  */
-export function relieverComesOut(r: RelieverOuting, slot: number, penSize: number, inning: number, inningStart: boolean, lead: number): boolean {
+export function relieverComesOut(r: RelieverOuting, slot: number, relievers: number, inning: number, inningStart: boolean, lead: number): boolean {
   if (r.pitches >= r.limit) return true;
   if (!inningStart) return r.runs >= 3 && r.pitches >= 15;
   if (r.outs < 3) return false;
-  const longMan = slot >= penSize - 2;
+  const longMan = slot >= 2 && slot >= relievers - 2 && slot < relievers;
   const blowout = lead >= 5 || lead <= -4;
   if (longMan && blowout && r.pitches < r.limit - 10) return false;
   const B = ENGINE.bullpen;

@@ -161,6 +161,44 @@ describe("a manager's bullpen", () => {
     expect(relieverComesOut({ ...easy, outs: 1, runs: 3, pitches: 20 }, 3, 9, 6, false, 2)).toBe(true);
   });
 
+  it("counts the long men from the end of the relievers, not of the club's other starters after them", () => {
+    // Two innings in with pitches to spare, in a nine-man pen with the club's four other starters after it.
+    const two = { pitches: 24, limit: 35, runs: 0, outs: 6 };
+    expect(relieverComesOut(two, 7, 9, 8, true, 6)).toBe(false);
+    expect(relieverComesOut(two, 8, 9, 8, true, -5)).toBe(false);
+    // Not in a close game, and not the seventh reliever or a starter pressed into relief.
+    expect(relieverComesOut(two, 8, 9, 8, true, 2)).toBe(true);
+    expect(relieverComesOut(two, 6, 9, 8, true, 6)).toBe(true);
+    expect(relieverComesOut(two, 9, 9, 8, true, 6)).toBe(true);
+    expect(relieverComesOut(two, 12, 9, 8, true, 6)).toBe(true);
+    // Never the closer or the top setup man, however small the pen.
+    expect(relieverComesOut(two, 1, 3, 8, true, 6)).toBe(true);
+  });
+
+  it("keeps a long reliever on through a blowout", () => {
+    const l = generateLeague({ seed: "long-men" });
+    const s = new Season(l, { minors: false });
+    const rng = new Rng("long men");
+    let long = 0;
+    for (let i = 0; i < 400; i++) {
+      const sides = [s.gameSetup(l.teams[(2 * i) % 30]!, rng, i), s.gameSetup(l.teams[(2 * i + 1) % 30]!, rng, i)] as const;
+      const r = simulateGame(s.env, sides[0], sides[1], rng, i);
+      s.staff.record(r.pitchCounts, i);
+      for (const k of [0, 1] as const) {
+        const setup = sides[k];
+        const relievers = setup.bullpen.filter((id) => !setup.spare!.has(id));
+        for (const id of r.pitchersUsed[k].slice(1)) {
+          // Three innings in relief: anyone but a long man in a blowout comes out within two (eight outs at most).
+          if (r.pitching.lines.get(id)!.outs < 9) continue;
+          expect(relievers.slice(-2)).toContain(id);
+          long++;
+        }
+      }
+    }
+    // Every game bullpen ends with the club's other starters, so the rule used to reach only them, never a reliever.
+    expect(long).toBeGreaterThan(0);
+  });
+
   it("goes to the freshest middle reliever, nearest the middle of the pen", () => {
     const pool = [11, 12, 13, 14, 15];
     expect(freshestNearMiddle(pool)).toBe(13);
