@@ -4,8 +4,12 @@ import { generateLeague } from "../src/league/generate";
 import { acceptBar, FREE_AGENCY_WEEKS, freeAgencyWeek, openFreeAgency, signFreeAgent } from "../src/offseason/freeAgency";
 import { budgetRoom, MIN_SALARY, payroll, seasonWar } from "../src/org/contracts";
 import { releasePlayer } from "../src/org/roster";
+import { aiTradeMarket, FREE_AGENT_TRADE_DAY, freshSignings } from "../src/org/trades";
 import { canStart } from "../src/org/value";
+import { advanceOffseason, beginOffseason, winterContext } from "../src/offseason/offseason";
+import { warShift } from "../src/scouting/analytics";
 import { staffCost } from "../src/scouting/scouting";
+import { Season } from "../src/season/season";
 
 describe("free agency", () => {
   it("never pays anyone less than the league minimum, however late in the winter", () => {
@@ -78,5 +82,31 @@ describe("free agency", () => {
     releasePlayer(ctx, to, league.players[to.fortyMan.find((id) => league.players[id]!.level !== "MLB")!]!);
     expect(signFreeAgent(ctx, to, star, 8, 25).ok).toBe(true);
     expect(league.transactions.at(-1)!.text).toMatch(/ to an 8-year, \$200\.0M deal$/);
+  });
+});
+
+describe("a free agent who just signed", () => {
+  it("isn't traded that winter, or until June 15", () => {
+    const league = generateLeague({ seed: "flip-b" });
+    const season = new Season(league, { minors: false });
+    // Straight into the winter, through free agency, then many more trades between AI clubs on its last day.
+    beginOffseason(league, season);
+    while (league.offseason!.phase !== "international") advanceOffseason(league, season);
+    const ctx = winterContext(league, "freeAgency", 56);
+    aiTradeMarket(ctx, new Rng("more trades"), 60, 1, (viewer, p) => warShift(season, viewer, p));
+    const winter = league.transactions.filter((t) => t.year === league.year);
+    const signed = new Set(winter.filter((t) => t.type === "sign" && t.text.startsWith("Signed free agent ")).map((t) => t.playerId));
+    expect(signed.size).toBeGreaterThan(30);
+    const traded = winter.filter((t) => t.type === "trade");
+    expect(traded.length).toBeGreaterThan(10);
+    // Clubs used to flip them: here Vancouver signed Ángel Marte and traded him before spring.
+    expect(traded.filter((t) => signed.has(t.playerId)).map((t) => t.text)).toEqual([]);
+    expect(freshSignings(ctx)).toEqual(signed);
+    // In the season that follows they stay put until June 15.
+    let next: Season | null = null;
+    while (!next) next = advanceOffseason(league, season);
+    expect(freshSignings(next.rosterContext(FREE_AGENT_TRADE_DAY - 1))).toEqual(signed);
+    expect(freshSignings(next.rosterContext(FREE_AGENT_TRADE_DAY)).size).toBe(0);
+    expect(next.dateOf(FREE_AGENT_TRADE_DAY).toISOString().slice(5, 10)).toBe("06-15");
   });
 });

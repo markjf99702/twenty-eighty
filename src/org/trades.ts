@@ -40,6 +40,8 @@ import {
 export const DISCOUNT = 0.1;
 /** The last day of the season (from Opening Day) that trades are allowed: July 31. */
 export const TRADE_DEADLINE_DAY = 127;
+/** June 15 (from Opening Day): from here a free agent signed in the winter can be traded, as in MLB. */
+export const FREE_AGENT_TRADE_DAY = 81;
 
 
 export interface ControlYear {
@@ -346,10 +348,28 @@ export function marketSides(league: League): { buyers: Team[]; sellers: Team[] }
 }
 
 /**
+ * Free agents signed this winter (in season, the winter just past), whom the
+ * AI clubs don't trade until June 15. Signings are logged under the season
+ * just finished, and the log runs in order of the year.
+ */
+export function freshSignings(ctx: RosterContext): Set<number> {
+  const out = new Set<number>();
+  if (!ctx.offseason && ctx.day >= FREE_AGENT_TRADE_DAY) return out;
+  const tx = ctx.league.transactions;
+  const year = ctx.offseason ? ctx.league.year : ctx.league.year - 1;
+  for (let i = tx.length - 1; i >= 0 && tx[i]!.year >= year; i--) {
+    const t = tx[i]!;
+    if (t.year === year && t.type === "sign" && t.text.startsWith("Signed free agent ")) out.add(t.playerId);
+  }
+  return out;
+}
+
+/**
  * The AI trade market: contenders buy established players from rebuilding
  * clubs with prospects of similar surplus value. During the season the sides
  * come from the standings and a buyer pays only what's left of the salary.
- * Returns trades made.
+ * Nobody is traded in the winter he signed as a free agent (or before June
+ * 15). Returns trades made.
  */
 export function aiTradeMarket(
   ctx: RosterContext,
@@ -365,6 +385,7 @@ export function aiTradeMarket(
   // In the winter spring training trims 40-man rosters; in season they have to fit now.
   const slack = ctx.offseason ? 1 : 0;
   const minWar = ctx.offseason ? 2 : 1.2;
+  const fresh = freshSignings(ctx);
   let made = 0;
   for (let i = 0; i < attempts; i++) {
     const buyer = rng.pick(buyers);
@@ -372,7 +393,7 @@ export function aiTradeMarket(
     const room = budgetRoom(league, buyer) + (ctx.offseason ? 0 : 0.05 * buyer.budget);
     const target = orgPlayers(league, seller)
       // In season, relievers and role players are on the market too.
-      .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 27 && seasonWar(p) >= minWar && (p.contract?.salary ?? 0) * fraction <= room && !leavesAtDeadline(league, p))
+      .filter((p) => p.level === "MLB" && !p.il && !p.injury && p.age >= 27 && seasonWar(p) >= minWar && (p.contract?.salary ?? 0) * fraction <= room && !leavesAtDeadline(league, p) && !fresh.has(p.id))
       .sort((a, b) => seasonWar(b) - seasonWar(a))[0];
     if (!target) continue;
     const price = tradeValue(league, target, fraction, seen(seller.id, target));
@@ -386,7 +407,7 @@ export function aiTradeMarket(
     );
     // The seller prices the prospects it's offered with its own scouts.
     const chips = orgPlayers(league, buyer)
-      .filter((p) => !top.has(p.id) && !p.il && !p.injury && p.age <= 26 && !leavesAtDeadline(league, p))
+      .filter((p) => !top.has(p.id) && !p.il && !p.injury && p.age <= 26 && !leavesAtDeadline(league, p) && !fresh.has(p.id))
       .map((p) => ({ p, v: tradeValue(league, p, fraction, seen(seller.id, p)) }))
       .filter((x) => x.v > 1 && x.v < price * 1.3)
       .sort((a, b) => b.v - a.v);
