@@ -427,8 +427,9 @@ Every winter the whole universe moves forward a year:
   gains the club only a little (about 10% of the money); what makes a deal is being
   right about him, and the club carries the risk if he fades or gets hurt. Players
   within two years of a deal's end can talk; about a third of players a season from
-  free agency would rather test the market. In season the deal starts at once. AI
-  clubs sign 15-25 extensions each spring, with the players their own scouts like.
+  free agency would rather test the market. In season the deal starts at once; once the
+  regular season is over, talks wait for the offseason. AI clubs sign 15-25 extensions
+  each spring, with the players their own scouts like.
 - **The draft**: ten rounds in reverse order of the standings, high schoolers (18,
   raw, the most room to grow) and college players (21-22, closer to ready).
 - **Free agency**: every free agent asks for years and salary from his projected

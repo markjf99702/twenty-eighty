@@ -517,13 +517,19 @@ function Payroll({ d }: { d: TeamView }) {
 function Extensions() {
   const view = useApi("extensionCandidates", undefined);
   type Row = ExtensionCandidateView;
-  const columns: Column<Row>[] = [
+  const rows = view.data ?? [];
+  // When every player gives the same answer (between the last regular-season game and the winter, when extensions
+  // wait), it's said once above the table instead of on every row.
+  const shared = rows.length > 1 && rows.every((r) => !r.best && r.reason !== null && r.reason === rows[0]!.reason) ? rows[0]!.reason : null;
+  const base: Column<Row>[] = [
     { key: "name", label: "Name", cls: "name", sort: (r) => r.player.name, asc: true, render: (r) => <a href={playerHref(r.player.id)}>{r.player.name}</a> },
     { key: "pos", label: "Pos", render: (r) => r.player.pos },
     { key: "age", label: "Age", cls: "num", sort: (r) => r.player.age, asc: true, render: (r) => r.player.age },
     ...outlookColumns(view.data ?? [], (r) => r.player),
     { key: "deal", label: "Contract", render: (r) => <span class="dim">{r.player.contract?.label ?? "—"}</span> },
     { key: "free", label: "FA after", title: "The last season before he can become a free agent", cls: "num", sort: (r) => r.freeAfter ?? 0, asc: true, render: (r) => r.freeAfter ?? "—" },
+  ];
+  const terms: Column<Row>[] = [
     {
       key: "best",
       label: "Best deal by your read",
@@ -548,7 +554,8 @@ function Extensions() {
   ];
   return (
     <Section title="Extensions" aside="Open a player's page to talk terms">
-      {view.data ? <Table columns={columns} rows={view.data} rowKey={(r) => r.player.id} sortKey="gain" /> : <Loading />}
+      {shared && <p class="ext-reason">{shared}</p>}
+      {view.data ? <Table columns={shared ? base : [...base, ...terms]} rows={view.data} rowKey={(r) => r.player.id} sortKey="gain" /> : <Loading />}
     </Section>
   );
 }

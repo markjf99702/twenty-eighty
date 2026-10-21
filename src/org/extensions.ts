@@ -101,6 +101,9 @@ function standing(league: League, p: Player, fraction: number): Standing | strin
 export function extensionOptions(league: League, p: Player, fraction: number, shift = agentShift(league, p)): ExtensionOffer {
   const s = standing(league, p, fraction);
   if (typeof s === "string") return { ok: false, reason: s };
+  // Once the regular season is over, a deal would start with a season that's already been paid, and the winter's
+  // contract roll would take that year off it.
+  if (s.inSeason && fraction <= 0) return { ok: false, reason: "Extensions open again when the offseason starts, after the World Series." };
   if (s.owed > 2) return { ok: false, reason: `He's signed through ${s.first + s.owed - 1}. He'll talk about an extension in the last two years of his deal.` };
   const shortest = Math.max(MIN_EXTENSION_YEARS, s.owed + 1);
   const longest = Math.min(MAX_EXTENSION_YEARS, LAST_AGE - p.age + 1);

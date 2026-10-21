@@ -118,14 +118,29 @@ describe("signing an extension", () => {
     expect(serviceClock(league, extended, fraction)!.freeAfter).toBeGreaterThanOrEqual(terms.through);
   });
 
-  it("runs through the winter: years tick down and he's nobody's arbitration case", () => {
+  let october: Player;
+
+  it("waits for the offseason once the regular season is over", () => {
     season.simToEnd();
     runPostseason(season);
+    // The season is done (the worker's fraction is 0) and the winter hasn't begun. A deal priced now would count
+    // this season as its first, and the winter's contract roll would take it off: four years would be three.
+    october = best(mine().filter((p) => p.id !== extended.id && serviceYears(p) < 3 && p.level === "MLB"));
+    expect(extensionOptions(league, october, 0, 0)).toEqual({ ok: false, reason: "Extensions open again when the offseason starts, after the World Series." });
+    // His clock still reads.
+    expect(serviceClock(league, october, 0)).not.toBeNull();
+  });
+
+  it("runs through the winter: years tick down and he's nobody's arbitration case", () => {
     const years = extended.contract!.years;
     const w = beginOffseason(league, season);
     expect(extended.contract!.years).toBe(years - 1);
     expect(w.tenders.some((t) => t.playerId === extended.id)).toBe(false);
     expect(w.expiring).not.toContain(extended.id);
+    // In the winter a deal starts with the coming season.
+    const offer = extensionOptions(league, october, 1, 0);
+    if (!offer.ok) throw new Error(offer.reason);
+    expect(offer.options.every((t) => t.first === league.year + 1 && t.through === league.year + t.years)).toBe(true);
   });
 
   it("in the winter settles a pending arbitration case or keeps a free agent-to-be", () => {
