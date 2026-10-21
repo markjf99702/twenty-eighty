@@ -576,6 +576,11 @@ function roomReason(ctx: RosterContext, team: Team, p: Player, needsForty: boole
   const fortyFull = needsForty && team.fortyMan.length >= FORTY_MAN_LIMIT;
   const forty = `${team.fortyMan.length}/${FORTY_MAN_LIMIT}`;
   const someone = armsFull ? "a pitcher" : "someone";
+  // In the winter the club page shows no active limit until spring training sets the Opening Day 26, and with
+  // everyone back from the injured list one option or designation wouldn't make room anyway: the move just waits.
+  if (!activeLimitsApply(ctx) && (activeFull || armsFull)) {
+    return `That waits for spring training, which sets the Opening Day 26: the big-league roster has ${active} now${armsFull ? `, ${arms} of them pitchers` : ""}.`;
+  }
   if (fortyFull && (activeFull || armsFull)) {
     const full = activeFull ? `The active roster (${active}/${limit}) and the 40-man (${forty}) are both full` : `The staff already has ${arms} pitchers, the most allowed, and the 40-man is full (${forty})`;
     return `${full}: designate ${someone} on the big-league roster first, which opens a spot on both.`;

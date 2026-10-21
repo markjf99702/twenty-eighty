@@ -13,7 +13,9 @@ import { acceptJob } from "../src/finance/owner";
 import { boxScoreView, dashboardView, playerView, rosterActions, rosterMessage, StatsCache, status, teamView, transactions } from "../web/src/worker/views";
 import type { GameResult } from "../src/sim/game";
 import { budgetRoom } from "../src/org/contracts";
-import { callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
+import { activePitchers, callUp, designateForAssignment, optionPlayer } from "../src/org/roster";
+import { winterContext } from "../src/offseason/offseason";
+import type { OffseasonPhase } from "../src/offseason/types";
 import { playerValue } from "../src/org/value";
 import { MAX_OPTION_YEARS, type Player, playerName } from "../src/players/types";
 
@@ -286,6 +288,46 @@ describe("roster moves on Opening Day", () => {
         expect(msg.endsWith(").")).toBe(true);
       }
     }
+  });
+});
+
+describe("roster moves in the winter", () => {
+  // After the World Series everyone on the injured list is back on the active roster, past the 26 spring training sets.
+  const l = generateLeague({ seed: "winter-moves" });
+  hireGm(l, 4);
+  const team = l.teams[4]!;
+  const down = () => team.fortyMan.map((id) => l.players[id]!).filter((p) => p.level !== "MLB" && !p.il && !p.injury);
+  for (const p of [...down().filter((x) => !x.pitching).slice(0, 2), ...down().filter((x) => x.pitching).slice(0, 2)]) {
+    team.rosters[p.level] = team.rosters[p.level].filter((id) => id !== p.id);
+    p.level = "MLB";
+    team.rosters.MLB.push(p.id);
+  }
+  const winter = (phase: OffseasonPhase) => {
+    l.offseason = {
+      year: l.year,
+      phase,
+      development: { risers: [], fallers: [], retirements: [] },
+      shift: {},
+      tenders: [],
+      expiring: [],
+      draft: null,
+      freeAgency: null,
+      international: null,
+    };
+    return winterContext(l, phase);
+  };
+  const reason = (p: Player, phase: OffseasonPhase) => rosterActions(p, team, winter(phase)).find((a) => a.kind === "callUp")?.reason;
+
+  it("wait for spring training, with no limit to option or designate players down to", () => {
+    const active = team.rosters.MLB.length;
+    const arms = activePitchers(l, team);
+    expect(active).toBe(30);
+    const hitter = down().find((p) => !p.pitching)!;
+    const arm = down().find((p) => p.pitching)!;
+    expect(reason(hitter, "review")).toBe(`That waits for spring training, which sets the Opening Day 26: the big-league roster has ${active} now.`);
+    expect(reason(arm, "draft")).toBe(`That waits for spring training, which sets the Opening Day 26: the big-league roster has ${active} now, ${arms} of them pitchers.`);
+    // Once spring training has set the 26, room is made the usual way.
+    expect(reason(hitter, "spring")).toBe(`The active roster is full (${active}/26): option or designate someone on the big-league roster first.`);
   });
 });
 
