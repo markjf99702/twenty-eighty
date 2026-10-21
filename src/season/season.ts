@@ -476,6 +476,9 @@ export class Season {
     const spare = depth.rotation.filter((id) => id !== starter && !this.isOut(id));
     const bullpen = [...relievers, ...spare];
     const unavailable = new Set(bullpen.filter((id) => !relievers.includes(id) || !this.staff.isRested(id, day)));
+    // Four-in-seven sits the closer for everything but closing out a save; the other rest rules sit him for that too.
+    const closer = relievers[0];
+    const closerForSaves = closer !== undefined && unavailable.has(closer) && this.staff.restedForSave(closer, day) ? closer : undefined;
     return {
       team,
       lineup,
@@ -483,6 +486,7 @@ export class Season {
       starter,
       bullpen,
       unavailable,
+      closerForSaves,
       spare: new Set(spare),
       fatigue: this.staff.fatigueMap(bullpen, day),
       park: level === "MLB" ? team.park : team.affiliates[level].park,

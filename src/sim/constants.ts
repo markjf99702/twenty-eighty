@@ -187,6 +187,11 @@ export const ENGINE = {
     secondInningPitches: 15,
     /** ...if it's this inning or earlier. */
     secondInningLast: 7,
+    /**
+     * The closer's inning: from here on he closes out a save, and a closer whom only four-in-seven sits today still
+     * comes in for that (TeamGameSetup.closerForSaves).
+     */
+    closerInning: 9,
   },
 
   /**

@@ -70,7 +70,18 @@ export class StaffTracker {
     return last ? day - last.day : Infinity;
   }
 
+  /** Whether a pitcher can go today. */
   isRested(id: number, day: number): boolean {
+    // Four times in a week is enough, however light the work (the tracker keeps his last eight outings).
+    const week = (this.outings.get(id) ?? []).filter((o) => o.day < day && day - o.day <= 7).length;
+    return week < WEEK_OUTINGS && this.restedForSave(id, day);
+  }
+
+  /**
+   * Whether a closer can close out a save today: every rest rule but four-in-seven, which sits him for everything
+   * else (`isRested`).
+   */
+  restedForSave(id: number, day: number): boolean {
     const recent = this.recent(id, day);
     const yesterday = recent.find((o) => o.day === day - 1);
     const twoAgo = recent.find((o) => o.day === day - 2);
@@ -79,9 +90,6 @@ export class StaffTracker {
     // Starters (and long men) who threw a lot recently need their days.
     const last = this.lastOuting(id);
     if (last && last.pitches >= 50 && day - last.day < 4) return false;
-    // Four times in a week is enough, however light the work (the tracker keeps his last eight outings).
-    const week = (this.outings.get(id) ?? []).filter((o) => o.day < day && day - o.day <= 7).length;
-    if (week >= WEEK_OUTINGS) return false;
     const lastThree = recent.filter((o) => day - o.day <= 3).reduce((s, o) => s + o.pitches, 0);
     return lastThree < 60;
   }

@@ -54,6 +54,11 @@ export interface TeamGameSetup {
   bullpen: number[];
   /** Relievers who shouldn't pitch today (used only in an emergency). */
   unavailable?: ReadonlySet<number>;
+  /**
+   * The closer, when four-in-seven is the only rest rule sitting him today: he's in `unavailable`, but he still
+   * closes out a save from the 9th inning on (ENGINE.bullpen.closerInning).
+   */
+  closerForSaves?: number;
   /** The club's other starters, in the bullpen for an emergency only: they come after every reliever, rested or not. */
   spare?: ReadonlySet<number>;
   /** Pre-game fatigue (z) from recent workload, by pitcher id. */
@@ -189,7 +194,7 @@ interface Stint {
   runs: number;
   battersFaced: number;
   entryLead: number;
-  /** Entered in a save situation (lead of 1-3, or the tying run at least on deck). */
+  /** Entered in a save situation (`isSaveSituation`). */
   entrySave: boolean;
   /** Entered with the tying run on base, at bat, or on deck. */
   entryTying: boolean;
@@ -330,7 +335,7 @@ export class GameSim {
       runs: 0,
       battersFaced: 0,
       entryLead: lead,
-      entrySave: !starter && lead >= 1 && (lead <= 3 || lead <= runners + 2),
+      entrySave: !starter && isSaveSituation(lead, runners),
       entryTying: !starter && lead >= 1 && lead <= runners + 2,
       exitLead: lead,
       blew: false,
@@ -989,7 +994,7 @@ export class GameSim {
       pull = relieverComesOut(s, field.setup.bullpen.indexOf(s.id), field.relievers, this.inning, inningStart, lead);
     }
     if (!pull) return;
-    const next = this.chooseReliever(field, lead, runners);
+    const next = chooseReliever(field.setup, field.bullpenLeft, this.inning, lead, runners);
     if (next === null) return;
 
     s.exitLead = lead;
@@ -999,31 +1004,6 @@ export class GameSim {
     field.defense.P = next;
     field.bullpenLeft = field.bullpenLeft.filter((id) => id !== next);
     // Runners already on base stay charged to the previous pitcher.
-  }
-
-  private chooseReliever(field: Side, lead: number, runners: number): number | null {
-    const left = field.bullpenLeft;
-    if (left.length === 0) return null;
-    const rested = left.filter((id) => !field.setup.unavailable?.has(id));
-    // Out of rested arms: the least-worked reliever has to go, and another starter only when no reliever is left.
-    if (rested.length === 0) {
-      const fatigue = field.setup.fatigue;
-      const spare = field.setup.spare;
-      const pen = spare ? left.filter((id) => !spare.has(id)) : left;
-      return [...(pen.length > 0 ? pen : left)].sort((a, b) => (fatigue?.get(a) ?? 0) - (fatigue?.get(b) ?? 0))[0]!;
-    }
-    const ranked = field.setup.bullpen.filter((id) => rested.includes(id));
-    const closer = field.setup.bullpen[0];
-    const saveSituation = lead >= 1 && (lead <= 3 || lead <= runners + 2);
-    const late = this.inning >= 9;
-    if (late && (saveSituation || (lead === 0 && this.inning >= 10))) return ranked[0]!;
-    if (this.inning >= 7 && (saveSituation || Math.abs(lead) <= 1)) {
-      const setup = ranked.filter((id) => id !== closer || late);
-      return (setup[0] ?? ranked[0])!;
-    }
-    if (lead >= 5 || lead <= -4) return ranked[ranked.length - 1]!;
-    const middle = ranked.filter((id) => id !== closer);
-    return freshestNearMiddle(middle.length > 0 ? middle : ranked, field.setup.fatigue);
   }
 
   // -------------------------------------------------------------------------
@@ -1308,6 +1288,54 @@ export function starterComesOut(s: StarterOuting, inning: number, inningStart: b
   if (s.runs >= 5 && inning <= 5 && s.pitches >= 60) return true;
   if (inningStart) return s.pitches >= s.limit - 7 || (inning >= 7 && s.battersFaced >= 27 && Math.abs(lead) <= 2);
   return runners >= 2 && inning >= 5 && s.pitches >= s.limit - 12;
+}
+
+/**
+ * Whether a reliever coming in now enters a save situation: a lead of one to three runs, or the tying run on base, at
+ * bat or on deck.
+ */
+export function isSaveSituation(lead: number, runners: number): boolean {
+  return lead >= 1 && (lead <= 3 || lead <= runners + 2);
+}
+
+/**
+ * The arm a manager brings in from `left` (who's still in his game's bullpen), with `lead` his club's and `runners` on
+ * base: his best rested reliever, the closer, for a save or a close game from the 9th inning on
+ * (ENGINE.bullpen.closerInning), the top setup man for a close game in the 7th or 8th, the last rested reliever in a
+ * blowout, and otherwise the freshest middle reliever. Those not rested go only when nobody else is, except that a
+ * closer whom only four-in-seven sits today (`closerForSaves`) still closes out a save.
+ */
+export function chooseReliever(
+  setup: Pick<TeamGameSetup, "bullpen" | "unavailable" | "spare" | "fatigue" | "closerForSaves">,
+  left: readonly number[],
+  inning: number,
+  lead: number,
+  runners: number,
+): number | null {
+  if (left.length === 0) return null;
+  const saveSituation = isSaveSituation(lead, runners);
+  const late = inning >= ENGINE.bullpen.closerInning;
+  // Four-in-seven doesn't keep the closer from closing out a save.
+  const kept = setup.closerForSaves;
+  if (late && saveSituation && kept !== undefined && left.includes(kept)) return kept;
+  const rested = left.filter((id) => !setup.unavailable?.has(id));
+  // Out of rested arms: the least-worked reliever has to go, and another starter only when no reliever is left.
+  if (rested.length === 0) {
+    const fatigue = setup.fatigue;
+    const spare = setup.spare;
+    const pen = spare ? left.filter((id) => !spare.has(id)) : left;
+    return [...(pen.length > 0 ? pen : left)].sort((a, b) => (fatigue?.get(a) ?? 0) - (fatigue?.get(b) ?? 0))[0]!;
+  }
+  const ranked = setup.bullpen.filter((id) => rested.includes(id));
+  const closer = setup.bullpen[0];
+  if (late && (saveSituation || (lead === 0 && inning >= 10))) return ranked[0]!;
+  if (inning >= 7 && (saveSituation || Math.abs(lead) <= 1)) {
+    const setupMen = ranked.filter((id) => id !== closer || late);
+    return (setupMen[0] ?? ranked[0])!;
+  }
+  if (lead >= 5 || lead <= -4) return ranked[ranked.length - 1]!;
+  const middle = ranked.filter((id) => id !== closer);
+  return freshestNearMiddle(middle.length > 0 ? middle : ranked, setup.fatigue);
 }
 
 /**

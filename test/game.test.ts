@@ -3,7 +3,7 @@ import { Rng } from "../src/core/rng";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
 import { StaffTracker } from "../src/season/staff";
-import { freshestNearMiddle, relieverComesOut, simulateGame, starterComesOut, type GameResult } from "../src/sim/game";
+import { chooseReliever, freshestNearMiddle, relieverComesOut, simulateGame, starterComesOut, type GameResult } from "../src/sim/game";
 
 const league = generateLeague({ seed: "test-games" });
 const season = new Season(league);
@@ -140,6 +140,85 @@ describe("a manager's bullpen", () => {
     const three = new StaffTracker();
     for (const day of [1, 3, 5]) three.record(new Map([[9, 12]]), day);
     expect(three.isRested(9, 7)).toBe(true);
+  });
+
+  it("lets four-in-seven sit a closer for everything but a save, and the other rules sit him for that too", () => {
+    const week = new StaffTracker();
+    for (const day of [1, 3, 5, 7]) week.record(new Map([[9, 12]]), day);
+    expect(week.isRested(9, 8)).toBe(false);
+    expect(week.restedForSave(9, 8)).toBe(true);
+    // A third day running, 30 pitches yesterday, 50 in one outing lately, or 60 in three days.
+    const outings: [number, number][][] = [[[6, 12], [7, 12]], [[7, 30]], [[5, 50]], [[5, 31], [7, 29]]];
+    for (const list of outings) {
+      const t = new StaffTracker();
+      for (const [day, pitches] of list) t.record(new Map([[9, pitches]]), day);
+      expect(t.restedForSave(9, 8)).toBe(false);
+    }
+  });
+
+  it("brings in a closer whom only four-in-seven sits to close out a save, and for nothing else", () => {
+    // A nine-man pen, the closer (1) and the top setup man (2) first, with the club's other four starters after it.
+    const bullpen = [1, 2, 3, 4, 5, 6, 7, 8, 9, 21, 22, 23, 24];
+    const spare = new Set([21, 22, 23, 24]);
+    const kept = { bullpen, spare, unavailable: new Set([1, ...spare]), closerForSaves: 1 };
+    // A save from the 9th inning on: a lead of one to three, or the tying run on deck.
+    expect(chooseReliever(kept, bullpen, 9, 1, 0)).toBe(1);
+    expect(chooseReliever(kept, bullpen, 9, 3, 2)).toBe(1);
+    expect(chooseReliever(kept, bullpen, 9, 5, 3)).toBe(1);
+    expect(chooseReliever(kept, bullpen, 11, 2, 1)).toBe(1);
+    // Not in the 8th, not with four runs to spare, a tie or a run down, and not twice.
+    expect(chooseReliever(kept, bullpen, 8, 2, 0)).toBe(2);
+    expect(chooseReliever(kept, bullpen, 9, 4, 0)).not.toBe(1);
+    expect(chooseReliever(kept, bullpen, 9, 0, 0)).toBe(2);
+    expect(chooseReliever(kept, bullpen, 10, 0, 0)).toBe(2);
+    expect(chooseReliever(kept, bullpen, 9, -1, 0)).toBe(2);
+    expect(chooseReliever(kept, bullpen.slice(1), 9, 2, 0)).toBe(2);
+    // A rested closer works the 9th of a close game too, as before; one sat by another rule isn't kept for saves.
+    const rested = { bullpen, spare, unavailable: spare };
+    expect(chooseReliever(rested, bullpen, 9, 2, 0)).toBe(1);
+    expect(chooseReliever(rested, bullpen, 10, 0, 0)).toBe(1);
+    expect(chooseReliever({ ...kept, closerForSaves: undefined }, bullpen, 9, 2, 0)).toBe(2);
+  });
+
+  it("keeps a closer whom only four-in-seven sits for the saves in his club's games", () => {
+    const l = generateLeague({ seed: "kept-closer" });
+    const s = new Season(l, { minors: false });
+    const team = l.teams[3]!;
+    const closer = team.depth.bullpen.find((id) => !s.isOut(id))!;
+    // Every other day on a dozen pitches: on the 8th only four-in-seven sits him, and on the 9th he's rested.
+    for (const day of [1, 3, 5, 7]) s.staff.record(new Map([[closer, 12]]), day);
+    const rng = new Rng("kept closer");
+    const today = s.gameSetup(team, rng, 8);
+    expect(today.unavailable!.has(closer)).toBe(true);
+    expect(today.closerForSaves).toBe(closer);
+    const rested = s.gameSetup(team, rng, 9);
+    expect(rested.unavailable!.has(closer)).toBe(false);
+    expect(rested.closerForSaves).toBeUndefined();
+    let saves = 0;
+    let checked = 0;
+    for (let i = 0; i < 150; i++) {
+      // The same day over and over (nothing recorded), against the other clubs in turn.
+      const away = s.gameSetup(l.teams[i % 30 === 3 ? 4 : i % 30]!, rng, 8);
+      const home = s.gameSetup(team, rng, 8);
+      const r = simulateGame(s.env, away, home, rng, 8);
+      if (!r.pitchersUsed[1].includes(closer)) continue;
+      if (r.savePitcher === closer) saves++;
+      // Once every other reliever has pitched, a tired one has to go, as always. Before that, at home, he can only
+      // close out a save in the top of the 9th, so his club led after eight.
+      const unused = home.bullpen.filter((id) => !home.unavailable!.has(id) && !r.pitchersUsed[1].includes(id));
+      if (unused.length === 0) continue;
+      const afterEight = (side: 0 | 1) => r.lineScore[side].slice(0, 8).reduce((a, b) => a + b, 0);
+      expect(afterEight(1)).toBeGreaterThan(afterEight(0));
+      checked++;
+    }
+    // He used to go only once every other reliever had pitched: four times in these games, one of them a save.
+    expect(checked).toBeGreaterThan(10);
+    expect(saves).toBeGreaterThan(10);
+    // A third day running sits him for saves too.
+    s.staff.record(new Map([[closer, 12]]), 8);
+    const third = s.gameSetup(team, rng, 9);
+    expect(third.unavailable!.has(closer)).toBe(true);
+    expect(third.closerForSaves).toBeUndefined();
   });
 
   it("lets a middle reliever who breezed through an inning work another before the late innings", () => {
