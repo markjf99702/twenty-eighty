@@ -451,7 +451,9 @@ Every winter the whole universe moves forward a year:
   put him on the block before then (your trade desk can still ask for him).
 - **Spring training** heals most injuries, trims every 40-man roster and adds each
   club's best prospects to it, sets an Opening Day 26 and sorts each farm system by
-  ability (with age floors).
+  ability (with age floors), hitters, starters and relievers each against their own
+  kind, so every affiliate opens with a rotation and a bullpen (Triple-A, where
+  call-ups come from, with the farm's extra starters).
 
 A universe has to look the same in year 10 as in year 1, so each winter re-centers the
 grades (50 stays major-league average) and `npm run sim:years` plays many seasons to

@@ -7,6 +7,7 @@ import { manageOrganization } from "../src/org/ai";
 import { seasonWar } from "../src/org/contracts";
 import { canOption, refreshDepth } from "../src/org/roster";
 import { canStart, playerValue } from "../src/org/value";
+import { generateHitter, generatePitcher } from "../src/players/generate";
 import { MINOR_LEVELS, type MinorLevel, type Player } from "../src/players/types";
 
 const healthy = (p: Player) => !p.injury || p.injury.daysLeft <= 0;
@@ -155,21 +156,52 @@ describe("AI farm system", () => {
 });
 
 describe("spring training", () => {
-  it("places farm pitchers by their wins in their role, so useful starters aren't buried under relievers", () => {
+  it("places farm pitchers by their wins in their role, so useful starters aren't buried under worse ones", () => {
     const league = generateLeague({ seed: "spring-farm" });
     springTraining({ league, day: 0, expanded: false }, league.teams);
     const buried: string[] = [];
     for (const team of league.teams) {
-      const arms = (level: "AAA" | "AA" | "A+" | "A") => team.rosters[level].map((id) => league.players[id]!).filter((p) => p.pitching);
-      const aaa = arms("AAA");
-      const weakest = aaa.reduce((a, b) => (seasonWar(b) < seasonWar(a) ? b : a));
-      for (const p of [...arms("AA"), ...arms("A+"), ...arms("A")]) {
-        if (p.age >= 21 && seasonWar(p) > seasonWar(weakest) + 0.5) {
-          buried.push(`${team.abbrev}: ${p.role} ${p.lastName} (${seasonWar(p).toFixed(1)} WAR) in ${p.level}, ${weakest.role} ${weakest.lastName} (${seasonWar(weakest).toFixed(1)}) in AAA`);
+      const arms = (level: MinorLevel) => team.rosters[level].map((id) => league.players[id]!).filter((p) => p.pitching);
+      // Each kind against its own: Triple-A holds its share of the starters and a bullpen of relievers.
+      for (const starters of [true, false]) {
+        const aaa = arms("AAA").filter((p) => canStart(p) === starters);
+        if (aaa.length === 0) continue;
+        const weakest = aaa.reduce((a, b) => (seasonWar(b) < seasonWar(a) ? b : a));
+        for (const p of [...arms("AA"), ...arms("A+"), ...arms("A")].filter((x) => canStart(x) === starters)) {
+          if (p.age >= 21 && seasonWar(p) > seasonWar(weakest) + 0.5) {
+            buried.push(`${team.abbrev}: ${p.role} ${p.lastName} (${seasonWar(p).toFixed(1)} WAR) in ${p.level}, ${weakest.role} ${weakest.lastName} (${seasonWar(weakest).toFixed(1)}) in AAA`);
+          }
         }
       }
     }
     expect(buried).toEqual([]);
+  });
+
+  it("opens every affiliate with a rotation and a bullpen after a winter's intake, Triple-A with the extra starters", () => {
+    const league = generateLeague({ seed: "spring-farm" });
+    // The draft and the international class, mostly starters, land at Single-A and crowd the farm past its room.
+    const rng = new Rng("spring-intake");
+    for (const team of league.teams) {
+      for (let i = 0; i < 22; i++) {
+        const opts = { id: league.players.length, value: -45 + rng.normal(0, 7), age: rng.int(18, 22) };
+        const p = i < 8 ? generatePitcher(rng, { ...opts, role: "SP" }) : i < 12 ? generatePitcher(rng, { ...opts, role: "RP" }) : generateHitter(rng, { ...opts, position: "SS" });
+        p.teamId = team.id;
+        p.level = "A";
+        league.players.push(p);
+        team.rosters.A.push(p.id);
+      }
+    }
+    springTraining({ league, day: 0, expanded: false }, league.teams);
+    const short: string[] = [];
+    for (const team of league.teams) {
+      const starters = MINOR_LEVELS.map((level) => team.rosters[level].map((id) => league.players[id]!).filter((p) => p.pitching && canStart(p)).length);
+      MINOR_LEVELS.forEach((level, i) => {
+        const relievers = team.rosters[level].map((id) => league.players[id]!).filter((p) => p.pitching && !canStart(p)).length;
+        if (starters[i]! < 5 || relievers < 4) short.push(`${team.abbrev} ${level}: ${starters[i]} starters, ${relievers} relievers`);
+      });
+      if (starters.some((n) => n > starters[0]!)) short.push(`${team.abbrev}: starters AAA/AA/A+/A ${starters.join("/")}`);
+    }
+    expect(short).toEqual([]);
   });
 });
 

@@ -1,16 +1,17 @@
 import type { League, Team } from "../league/types";
 import { ensureMajorContract, seasonWar } from "../org/contracts";
 import { designateForAssignment, FORTY_MAN_LIMIT, refreshDepth, releasePlayer, type RosterContext } from "../org/roster";
-import { canStart, peakValue, playerValue } from "../org/value";
+import { canStart, type FarmKind, farmKind, peakValue, playerValue } from "../org/value";
 import { defenseGrade } from "../players/defense";
 import { LEVELS, type MinorLevel, MINOR_LEVELS, type Player } from "../players/types";
 
 /**
  * Spring training: the winter heals most injuries, every club trims its 40-man
  * roster and protects its best prospects on it, picks an Opening Day 26 and
- * sorts the rest of the organization into
- * its four affiliates by ability (with age floors, so teenagers start low).
- * Players who don't fit anywhere are released.
+ * sorts the rest of the organization into its four affiliates, hitters,
+ * starters and relievers each by ability against their own kind (with age
+ * floors, so teenagers start low), so that every affiliate opens with a
+ * lineup, a rotation and a bullpen. Players who don't fit anywhere are released.
  */
 
 const WINTER_HEALING_DAYS = 150;
@@ -18,6 +19,10 @@ const ACTIVE_PITCHERS = 13;
 const ACTIVE_HITTERS = 13;
 /** Players per affiliate: 13 pitchers and 13 position players. */
 const PER_LEVEL = 13;
+/** An affiliate's rotation. */
+const ROTATION = 5;
+/** The most starters an affiliate opens with: its rotation and four more, with a bullpen of at least four relievers. */
+const MOST_STARTERS = 9;
 const MIN_AGE: Record<MinorLevel, number> = { AAA: 21, AA: 20, "A+": 19, A: 0 };
 
 const hurt = (p: Player) => p.injury !== null && p.injury.daysLeft > 0;
@@ -189,26 +194,53 @@ function reorganize(ctx: RosterContext, team: Team): void {
     }
   }
 
-  // Everyone else to the farm, best first, with age floors. Released if there's no room.
+  // Everyone else to the farm, each kind to its own places, best first, with age floors: every affiliate holds 13
+  // position players and 13 pitchers, a rotation of starters (Triple-A, where call-ups come from, the farm's extra
+  // starters too) and relievers for the rest. Each kind is weighed only against its own (farmKind): on one scale a
+  // below-average starter rates under a replacement-level reliever (keepScore) or above a useful one (seasonWar), and
+  // either way the levels below Triple-A ran out of starters. Released if there's no room for his kind.
   const farm = sortedBy(rest.filter((p) => !active.has(p.id)), keepScore, true);
-  const capacity = PER_LEVEL * 2 * MINOR_LEVELS.length;
-  const keep = farm.filter((p, i) => p.onFortyMan || i < capacity);
+  const levels = MINOR_LEVELS.length;
+  const count = (k: FarmKind) => farm.filter((p) => farmKind(p) === k).length;
+  const starterSlots = ROTATION * levels + MOST_STARTERS - ROTATION;
+  const starterRoom = starterSlots + Math.max(0, PER_LEVEL * levels - starterSlots - count("reliever"));
+  const room: Record<FarmKind, number> = {
+    hitter: PER_LEVEL * levels,
+    starter: starterRoom,
+    reliever: PER_LEVEL * levels - Math.min(count("starter"), starterRoom),
+  };
+  const kept: Record<FarmKind, number> = { hitter: 0, starter: 0, reliever: 0 };
+  const keep = farm.filter((p) => {
+    const k = farmKind(p);
+    if (!p.onFortyMan && kept[k] >= room[k]) return false;
+    kept[k]++;
+    return true;
+  });
   const cut = farm.filter((p) => !keep.includes(p));
-  for (const kind of [true, false]) {
-    // Pitchers by wins in their role: a below-average starter still outranks a replacement-level reliever.
-    const rank = (p: Player) => (p.pitching ? seasonWar(p) : playerValue(p));
-    let pool = keep.filter((p) => Boolean(p.pitching) === kind).sort((a, b) => rank(b) - rank(a));
-    for (const level of MINOR_LEVELS) {
-      const last = level === "A";
-      const eligible = pool.filter((p) => p.age >= MIN_AGE[level]);
-      const chosen = last ? pool : [...eligible.slice(0, PER_LEVEL), ...pool.filter((p) => !eligible.includes(p))].slice(0, PER_LEVEL);
-      for (const p of chosen) {
-        p.level = level;
-        team.rosters[level].push(p.id);
-      }
-      pool = pool.filter((p) => !chosen.includes(p));
+  // Pitchers by wins in their role, hitters by value.
+  const rank = (p: Player) => (p.pitching ? seasonWar(p) : playerValue(p));
+  const pools: Record<FarmKind, Player[]> = { hitter: [], starter: [], reliever: [] };
+  for (const p of keep) pools[farmKind(p)].push(p);
+  for (const pool of Object.values(pools)) pool.sort((a, b) => rank(b) - rank(a));
+  MINOR_LEVELS.forEach((level, i) => {
+    // The best n left of a kind, those old enough for the level first; Single-A takes everyone left.
+    const take = (k: FarmKind, n: number) => {
+      const old = pools[k].filter((p) => p.age >= MIN_AGE[level]);
+      const chosen = level === "A" ? pools[k] : [...old, ...pools[k].filter((p) => !old.includes(p))].slice(0, n);
+      pools[k] = pools[k].filter((p) => !chosen.includes(p));
+      return chosen;
+    };
+    // The best starters left, as many as still leaves a rotation for every level below.
+    const left = pools.starter.length;
+    const sp = take("starter", Math.min(MOST_STARTERS, Math.max(Math.min(ROTATION, left), left - ROTATION * (levels - 1 - i))));
+    const rp = take("reliever", PER_LEVEL - sp.length);
+    // Short of relievers: more starters fill the staff.
+    const more = take("starter", PER_LEVEL - sp.length - rp.length);
+    for (const p of [...sp, ...rp, ...more, ...take("hitter", PER_LEVEL)]) {
+      p.level = level;
+      team.rosters[level].push(p.id);
     }
-  }
+  });
   for (const p of cut) {
     p.level = "A";
     team.rosters.A.push(p.id);
