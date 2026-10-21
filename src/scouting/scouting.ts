@@ -277,25 +277,25 @@ function lookWindow(league: League, day: number): string {
   return w ? `${league.year}:${w.phase}` : `${league.year}:w${Math.floor(day / 7)}`;
 }
 
-/** Looks left for the user right now (the allowance refills each week, and each winter phase). */
+/**
+ * Looks left for the user right now (the allowance refills each week, and each winter phase). Asking changes
+ * nothing: a new week's allowance is only stored once a look is taken, since the pages ask between days.
+ */
 export function looksLeft(league: League, day: number): number {
   const s = league.scouting;
   const user = league.userTeamId;
   if (user === null) return 0;
-  const window = lookWindow(league, day);
-  if (s.looksWindow !== window) {
-    s.looksWindow = window;
-    s.looksLeft = looksAllowance(s.scouting[user]!, league.offseason !== null);
-  }
-  return s.looksLeft;
+  return s.looksWindow === lookWindow(league, day) ? s.looksLeft : looksAllowance(s.scouting[user]!, league.offseason !== null);
 }
 
 export function takeLook(league: League, day: number, p: Player): { ok: boolean; reason?: string } {
   const user = league.userTeamId;
   if (user === null) return { ok: false, reason: "You don't run a club." };
   if (p.teamId === user) return { ok: false, reason: "Your own scouts see him every day." };
-  if (looksLeft(league, day) <= 0) return { ok: false, reason: "Your scouts are all out. More looks open up next week." };
-  league.scouting.looksLeft--;
+  const left = looksLeft(league, day);
+  if (left <= 0) return { ok: false, reason: "Your scouts are all out. More looks open up next week." };
+  league.scouting.looksWindow = lookWindow(league, day);
+  league.scouting.looksLeft = left - 1;
   league.scouting.looks[p.id] = (league.scouting.looks[p.id] ?? 0) + 1;
   return { ok: true };
 }

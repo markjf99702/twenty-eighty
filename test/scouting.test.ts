@@ -4,7 +4,7 @@ import { overallGrade, playerValue } from "../src/org/value";
 import { draftClass, signAmateur } from "../src/offseason/draft";
 import { Rng } from "../src/core/rng";
 import { analyticsRead, belief } from "../src/scouting/analytics";
-import { perceive, takeLook, uncertainty, valueShift } from "../src/scouting/scouting";
+import { looksAllowance, looksLeft, perceive, takeLook, uncertainty, valueShift } from "../src/scouting/scouting";
 import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
 import { Season } from "../src/season/season";
 
@@ -130,6 +130,35 @@ describe("analytics", () => {
     expect(b.weight).toBeGreaterThan(0);
     expect(b.weight).toBeLessThan(1);
     expect(b.value).toBeCloseTo((1 - b.weight) * b.scouts + b.weight * b.analytics!.value, 6);
+  });
+});
+
+describe("the user's looks", () => {
+  it("are counted, not stored, when a page asks how many are left", () => {
+    const l = generateLeague({ seed: "looks-read" });
+    l.userTeamId = 4;
+    l.scouting.scouting[4] = 2;
+    // The scouting page and every player page ask between days; asking leaves the save as it was.
+    const before = JSON.stringify(l.scouting);
+    expect(looksLeft(l, 0)).toBe(looksAllowance(2, false));
+    expect(JSON.stringify(l.scouting)).toBe(before);
+    // So a bigger scouting budget set on Opening Day, with the page open, gives the week's looks at the new level.
+    l.scouting.scouting[4] = 5;
+    expect(looksLeft(l, 0)).toBe(looksAllowance(5, false));
+  });
+
+  it("come out of the week's allowance, which refills the next week", () => {
+    const l = generateLeague({ seed: "looks-week" });
+    l.userTeamId = 4;
+    const allowance = looksAllowance(l.scouting.scouting[4]!, false);
+    const target = l.players.find((p) => p.teamId === 7)!;
+    for (let i = 0; i < allowance; i++) expect(takeLook(l, 3, target).ok).toBe(true);
+    expect(looksLeft(l, 6)).toBe(0);
+    expect(takeLook(l, 6, target)).toEqual({ ok: false, reason: "Your scouts are all out. More looks open up next week." });
+    expect(looksLeft(l, 7)).toBe(allowance);
+    expect(takeLook(l, 7, target).ok).toBe(true);
+    expect(looksLeft(l, 8)).toBe(allowance - 1);
+    expect(l.scouting.looks[target.id]).toBe(allowance + 1);
   });
 });
 
