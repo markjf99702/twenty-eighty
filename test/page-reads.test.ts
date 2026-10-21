@@ -2,7 +2,7 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { openingDayAdvice } from "../src/advice/advice";
 import { hireGm } from "../src/finance/owner";
 import { generateLeague } from "../src/league/generate";
-import { saveGame, serialize } from "../src/save/save";
+import { deserialize, loadGame, saveGame, serialize } from "../src/save/save";
 import { warShift } from "../src/scouting/analytics";
 import { Season } from "../src/season/season";
 import type { BoxScoreView } from "../web/src/api/protocol";
@@ -82,5 +82,30 @@ describe("the pages asked for between days", () => {
 
   it("leave the season to play and save the same way", () => {
     expect(firstDifference(busy.save, quiet.save)).toBeNull();
+  });
+});
+
+describe("a page asked for on the All-Star break", () => {
+  it("leaves what the clubs believe after the All-Star Game as it would be", () => {
+    // The game adds to the big leagues' run values without being one of their games, and no game follows it until
+    // the break is over. Played to the morning of the All-Star day once, then that day twice from the save.
+    const league = generateLeague({ seed: "between-days" });
+    hireGm(league, USER);
+    const season = new Season(league, { minors: false });
+    openingDayAdvice(season);
+    season.simDays(season.schedule.allStarDay!);
+    const text = serialize(saveGame(league, season));
+    const believed = (asked: boolean) => {
+      const { league: l, season: s } = loadGame(deserialize(text));
+      const watched = [USER, OTHER].flatMap((id) => l.teams[id]!.rosters.MLB).map((id) => l.players[id]!);
+      const read = () => [USER, OTHER].flatMap((viewer) => watched.map((p) => warShift(s!, viewer, p)));
+      if (asked) read();
+      s!.simDay();
+      expect(s!.allStar).toBeTruthy();
+      return read();
+    };
+    const quiet = believed(false);
+    const busy = believed(true);
+    expect(busy.filter((x, i) => x !== quiet[i]).length).toBe(0);
   });
 });

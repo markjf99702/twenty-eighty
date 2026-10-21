@@ -43,15 +43,18 @@ const IP_PER_600_BF = 142;
  * Each level's league context, kept until a game is played there. Not by the day: the pages ask between days,
  * before the next day's games, and the clubs read their beliefs after those games on the same day (the trade
  * market, the offers to the user, the staff's notes), so a context kept for the day was a day old for them
- * whenever a page had asked first.
+ * whenever a page had asked first. The run tracker's events count too: the All-Star Game adds to the big
+ * leagues' run values without being one of their games.
  */
-const ctxCache = new WeakMap<Season, Map<Level, { games: number; ctx: LeagueContext }>>();
+const ctxCache = new WeakMap<Season, Map<Level, { games: number; events: number; ctx: LeagueContext }>>();
 function levelContext(season: Season, level: Level): LeagueContext {
   let levels = ctxCache.get(season);
   if (!levels) ctxCache.set(season, (levels = new Map()));
   const ls = season.levels[level];
+  const games = ls.games.length;
+  const events = ls.tracker.eventCount();
   let c = levels.get(level);
-  if (!c || c.games !== ls.games.length) levels.set(level, (c = { games: ls.games.length, ctx: ls.context() }));
+  if (!c || c.games !== games || c.events !== events) levels.set(level, (c = { games, events, ctx: ls.context() }));
   return c.ctx;
 }
 
