@@ -39,19 +39,20 @@ const HALF = { wOBA: 450, xwOBA: 280, RA9: 700, ERA: 650, FIP: 400, SIERA: 280 }
 /** Batters faced in 600 is about 142 innings. */
 const IP_PER_600_BF = 142;
 
-const ctxCache = new WeakMap<Season, { day: number; ctx: Map<Level, LeagueContext> }>();
+/**
+ * Each level's league context, kept until a game is played there. Not by the day: the pages ask between days,
+ * before the next day's games, and the clubs read their beliefs after those games on the same day (the trade
+ * market, the offers to the user, the staff's notes), so a context kept for the day was a day old for them
+ * whenever a page had asked first.
+ */
+const ctxCache = new WeakMap<Season, Map<Level, { games: number; ctx: LeagueContext }>>();
 function levelContext(season: Season, level: Level): LeagueContext {
-  let c = ctxCache.get(season);
-  if (!c || c.day !== season.day) {
-    c = { day: season.day, ctx: new Map() };
-    ctxCache.set(season, c);
-  }
-  let ctx = c.ctx.get(level);
-  if (!ctx) {
-    ctx = season.levels[level].context();
-    c.ctx.set(level, ctx);
-  }
-  return ctx;
+  let levels = ctxCache.get(season);
+  if (!levels) ctxCache.set(season, (levels = new Map()));
+  const ls = season.levels[level];
+  let c = levels.get(level);
+  if (!c || c.games !== ls.games.length) levels.set(level, (c = { games: ls.games.length, ctx: ls.context() }));
+  return c.ctx;
 }
 
 const tierOf = (league: League, viewer: Viewer) => (viewer === null ? 3 : league.scouting.analytics[viewer]!);

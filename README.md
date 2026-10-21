@@ -307,7 +307,8 @@ the GM:
 
 The game autosaves to the browser (IndexedDB) after every sim and roster move, and a save
 can be exported to a file and imported again from the League office page. Saves resume
-exactly: the same seed and the same moves play out the same way.
+exactly: the same seed and the same moves play out the same way, whichever pages are open
+while the days play.
 
 ## The 20-80 scale
 
