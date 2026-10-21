@@ -84,7 +84,8 @@ const names = (ps: Player[]) => (ps.length <= 2 ? ps.map(tag).join(" and ") : `$
 /**
  * Whether a pitcher whose ERA runs well over his FIP is worth keeping faith in: the gap says he's pitched better,
  * but only a FIP about league average or better (no more than 0.25 over the league ERA, or an FIP- of 105 or less)
- * says he's pitched well. The monthly note and the trade desk both go by it.
+ * says he's pitched well. The monthly note and the trade desk both go by it, and the monthly note asks it too before
+ * calling the trade value of a pitcher whose ERA runs well under his FIP high.
  */
 export const goodFip = (fip: number, fipMinus: number, lgEra: number): boolean => fip <= lgEra + 0.25 || fipMinus <= 105;
 
@@ -365,10 +366,12 @@ function analytics(season: Season, team: Team, day: number): void {
   // Luck: a regular whose results are well off his underlying numbers (the better departments know to look).
   if (tier < 3) return;
   const mine = new Set(orgPlayers(league, team).map((p) => p.id));
-  // Once the deadline passes, nobody can cash in on a hot start until the winter.
-  const selling = day < TRADE_DEADLINE_DAY ? "his trade value may never be higher" : "don't pay for that ERA this winter";
-  let best: { id: number; gap: number; text: string; title: string } | null = null;
   const lgEra = stats.context.lgEra;
+  // Once the deadline passes, nobody can cash in on a hot start until the winter. Before it, only a pitcher whose FIP
+  // says he's pitched well too has trade value to cash in.
+  const selling = (fip: number, fipMinus: number) =>
+    day >= TRADE_DEADLINE_DAY ? "; don't pay for that ERA this winter" : goodFip(fip, fipMinus, lgEra) ? "; his trade value may never be higher" : "";
+  let best: { id: number; gap: number; text: string; title: string } | null = null;
   for (const p of stats.pitchers) {
     if (!mine.has(p.id) || p.IP < 50) continue;
     const gap = p.ERA - p.FIP;
@@ -377,7 +380,7 @@ function analytics(season: Season, team: Team, day: number): void {
     const name = playerName(league.players[p.id]!);
     best =
       gap < 0
-        ? { id: p.id, gap: Math.abs(gap), title: `${name}'s ERA is running ahead of him`, text: `${name} has ${withArticle(p.ERA.toFixed(2))} ERA, but he's pitched more like ${p.FIP.toFixed(2)} (FIP). Expect it to rise; ${selling}.` }
+        ? { id: p.id, gap: Math.abs(gap), title: `${name}'s ERA is running ahead of him`, text: `${name} has ${withArticle(p.ERA.toFixed(2))} ERA, but he's pitched more like ${p.FIP.toFixed(2)} (FIP). Expect it to rise${selling(p.FIP, p.FIPminus)}.` }
         : { id: p.id, gap: Math.abs(gap), title: `${name} has pitched better than his ERA`, text: `${name}'s ${p.ERA.toFixed(2)} ERA hides how well he's pitched: ${withArticle(p.FIP.toFixed(2))} FIP. He should turn it around, so it's no time to give up on him.` };
   }
   for (const h of stats.hitters) {

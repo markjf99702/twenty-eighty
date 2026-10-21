@@ -65,6 +65,15 @@ describe("the analysts' word on a pitcher's ERA", () => {
     expect(note?.title).toBe(`${playerName(p)}'s ERA is running ahead of him`);
   });
 
+  it("calls his trade value high only when his FIP is good too", () => {
+    const bad = noteWith(line(5.1, 6.6));
+    expect(bad.row.FIP).toBeGreaterThan(season.context().lgEra + 1);
+    expect(bad.note?.text).toBe(`${playerName(p)} has a 5.10 ERA, but he's pitched more like ${bad.row.FIP.toFixed(2)} (FIP). Expect it to rise.`);
+    const good = noteWith(line(2.1, 3.9));
+    expect(good.row.FIP).toBeLessThan(season.context().lgEra + 0.25);
+    expect(good.note?.text).toBe(`${playerName(p)} has a 2.10 ERA, but he's pitched more like ${good.row.FIP.toFixed(2)} (FIP). Expect it to rise; his trade value may never be higher.`);
+  });
+
   /** What the analytics director says at the trade desk about offering him, with his line this season set to `l`. */
   const deskWith = (l: PitchingLine) => {
     season.pitching.lines.set(p.id, l);
