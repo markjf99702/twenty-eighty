@@ -16,6 +16,8 @@ export interface StaffState {
 
 const STARTER_REST_DAYS = 5; // pitch on day d, available again on d + 5 (four days of rest)
 const HISTORY_DAYS = 4;
+/** A reliever who's pitched this many times in the last seven days sits today. */
+const WEEK_OUTINGS = 4;
 
 export class StaffTracker {
   private outings = new Map<number, Outing[]>();
@@ -77,6 +79,9 @@ export class StaffTracker {
     // Starters (and long men) who threw a lot recently need their days.
     const last = this.lastOuting(id);
     if (last && last.pitches >= 50 && day - last.day < 4) return false;
+    // Four times in a week is enough, however light the work (the tracker keeps his last eight outings).
+    const week = (this.outings.get(id) ?? []).filter((o) => o.day < day && day - o.day <= 7).length;
+    if (week >= WEEK_OUTINGS) return false;
     const lastThree = recent.filter((o) => day - o.day <= 3).reduce((s, o) => s + o.pitches, 0);
     return lastThree < 60;
   }

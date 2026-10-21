@@ -9,7 +9,23 @@ import { Season } from "../src/season/season";
 // A full 2,430-game season takes a few seconds; the realism checks below
 // use generous bands so they catch broken physics, not normal variance.
 const season = new Season(generateLeague({ seed: "test-season" }), { minors: false });
+// For the bullpen check: starts within four days of a pitcher's last, and relief outings by anyone who started in the last two weeks.
+const lastStart = new Map<number, number>();
+const usage = { shortRest: 0, startersInRelief: 0 };
+season.onGame = (level, r, day) => {
+  if (level !== "MLB") return;
+  for (const [starter, ...relievers] of r.pitchersUsed) {
+    const prev = lastStart.get(starter!);
+    if (prev !== undefined && day - prev < 5) usage.shortRest++;
+    lastStart.set(starter!, day);
+    for (const id of relievers) {
+      const started = lastStart.get(id);
+      if (started !== undefined && day - started <= 14) usage.startersInRelief++;
+    }
+  }
+};
 season.simToEnd();
+season.onGame = undefined;
 const stats = season.stats();
 const m = leagueMetrics([season]);
 
@@ -67,6 +83,17 @@ describe("a simulated season", () => {
     }
     // Streaks still going at the end of the season were closed out.
     expect(season.streaks.size).toBe(0);
+  });
+
+  it("spreads the bullpen's work", () => {
+    // Pitchers who never started, busiest first.
+    const relief = stats.pitchers.filter((p) => p.line.GS === 0).map((p) => p.line.G).sort((a, b) => b - a);
+    // Clubs used to ride the same arms into the 90s (ten of them here, the busiest at 100 games), and to press
+    // starters into relief (470 times) and start them on short rest (583 times).
+    expect(relief[0]).toBeLessThan(95);
+    expect(relief.filter((g) => g >= 90).length).toBeLessThanOrEqual(2);
+    expect(usage.startersInRelief).toBeLessThan(250);
+    expect(usage.shortRest).toBeLessThan(150);
   });
 
   it("looks like modern MLB", () => {

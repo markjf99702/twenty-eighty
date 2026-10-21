@@ -473,7 +473,8 @@ export class Season {
     const starter = this.staff.nextStarter(playoff?.rotationKey ?? `${team.id}:${level}`, depth.rotation, day, (id) => !this.isOut(id));
     // Relievers first; the other starters are emergency arms only.
     const relievers = depth.bullpen.filter((id) => !this.isOut(id));
-    const bullpen = [...relievers, ...depth.rotation.filter((id) => id !== starter && !this.isOut(id))];
+    const spare = depth.rotation.filter((id) => id !== starter && !this.isOut(id));
+    const bullpen = [...relievers, ...spare];
     const unavailable = new Set(bullpen.filter((id) => !relievers.includes(id) || !this.staff.isRested(id, day)));
     return {
       team,
@@ -482,6 +483,7 @@ export class Season {
       starter,
       bullpen,
       unavailable,
+      spare: new Set(spare),
       fatigue: this.staff.fatigueMap(bullpen, day),
       park: level === "MLB" ? team.park : team.affiliates[level].park,
     };

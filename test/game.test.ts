@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 import { Rng } from "../src/core/rng";
 import { generateLeague } from "../src/league/generate";
 import { Season } from "../src/season/season";
-import { simulateGame, starterComesOut, type GameResult } from "../src/sim/game";
+import { StaffTracker } from "../src/season/staff";
+import { freshestNearMiddle, relieverComesOut, simulateGame, starterComesOut, type GameResult } from "../src/sim/game";
 
 const league = generateLeague({ seed: "test-games" });
 const season = new Season(league);
@@ -124,5 +125,64 @@ describe("a starter with a no-hitter going", () => {
     // Managers used to go to the bullpen at the usual pitch counts, and 23 of these 31 no-hitters were combined.
     expect(solo + combined).toBeGreaterThanOrEqual(10);
     expect(solo).toBeGreaterThan(2 * combined);
+  });
+});
+
+describe("a manager's bullpen", () => {
+  it("sits a reliever who's pitched four times in a week, however lightly", () => {
+    const week = new StaffTracker();
+    // Every other day on a dozen pitches: never back to back, never many pitches.
+    for (const day of [1, 3, 5, 7]) week.record(new Map([[9, 12]]), day);
+    expect(week.isRested(9, 8)).toBe(false);
+    // Once the first of them is more than a week back, he can go again.
+    expect(week.isRested(9, 9)).toBe(true);
+    const three = new StaffTracker();
+    for (const day of [1, 3, 5]) three.record(new Map([[9, 12]]), day);
+    expect(three.isRested(9, 7)).toBe(true);
+  });
+
+  it("lets a middle reliever who breezed through an inning work another before the late innings", () => {
+    const easy = { pitches: 12, limit: 35, runs: 0, outs: 3 };
+    // The fourth man in a nine-man pen, at the top of the 6th or the 7th with a two-run lead.
+    expect(relieverComesOut(easy, 3, 9, 6, true, 2)).toBe(false);
+    expect(relieverComesOut(easy, 3, 9, 7, true, 2)).toBe(false);
+    // Not into the 8th, after a long inning or a run, or for a third inning, and never the closer or the top setup man.
+    expect(relieverComesOut(easy, 3, 9, 8, true, 2)).toBe(true);
+    expect(relieverComesOut({ ...easy, pitches: 19 }, 3, 9, 6, true, 2)).toBe(true);
+    expect(relieverComesOut({ ...easy, runs: 1 }, 3, 9, 6, true, 2)).toBe(true);
+    expect(relieverComesOut({ ...easy, outs: 6, pitches: 24 }, 3, 9, 7, true, 2)).toBe(true);
+    expect(relieverComesOut(easy, 0, 9, 6, true, 2)).toBe(true);
+    expect(relieverComesOut(easy, 1, 9, 6, true, 2)).toBe(true);
+    // A long man in a blowout stays on while he has pitches to spare, as before.
+    expect(relieverComesOut({ ...easy, outs: 6, pitches: 24 }, 8, 9, 7, true, 6)).toBe(false);
+    // In the middle of an inning he stays unless he's been hit hard.
+    expect(relieverComesOut({ ...easy, outs: 1 }, 3, 9, 6, false, 2)).toBe(false);
+    expect(relieverComesOut({ ...easy, outs: 1, runs: 3, pitches: 20 }, 3, 9, 6, false, 2)).toBe(true);
+  });
+
+  it("goes to the freshest middle reliever, nearest the middle of the pen", () => {
+    const pool = [11, 12, 13, 14, 15];
+    expect(freshestNearMiddle(pool)).toBe(13);
+    expect(freshestNearMiddle(pool, new Map([[13, 0.3]]))).toBe(14);
+    expect(freshestNearMiddle(pool, new Map([[13, 0.3], [14, 0.2]]))).toBe(12);
+    expect(freshestNearMiddle(pool, new Map([[13, 0.3], [14, 0.2], [12, 0.1]]))).toBe(15);
+  });
+
+  it("goes to a tired reliever before another starter", () => {
+    const l = generateLeague({ seed: "tired-pen" });
+    const s = new Season(l, { minors: false });
+    const rng = new Rng("tired pen");
+    let relieved = 0;
+    for (let i = 0; i < 20; i++) {
+      const home = s.gameSetup(l.teams[1]!, rng, i);
+      const relievers = home.bullpen.filter((id) => !home.spare!.has(id));
+      // Nobody is rested, and the relievers have worked more lately than the club's other starters.
+      const worn = { ...home, unavailable: new Set(home.bullpen), fatigue: new Map(relievers.map((id) => [id, 0.3])) };
+      const first = simulateGame(s.env, s.gameSetup(l.teams[2]!, rng, i), worn, rng).pitchersUsed[1][1];
+      if (first === undefined) continue;
+      relieved++;
+      expect(relievers).toContain(first);
+    }
+    expect(relieved).toBeGreaterThan(10);
   });
 });

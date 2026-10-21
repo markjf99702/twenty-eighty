@@ -54,6 +54,8 @@ export interface TeamGameSetup {
   bullpen: number[];
   /** Relievers who shouldn't pitch today (used only in an emergency). */
   unavailable?: ReadonlySet<number>;
+  /** The club's other starters, in the bullpen for an emergency only: they come after every reliever, rested or not. */
+  spare?: ReadonlySet<number>;
   /** Pre-game fatigue (z) from recent workload, by pitcher id. */
   fatigue?: ReadonlyMap<number, number>;
   /** Ballpark when this club is home (defaults to the MLB park). */
@@ -980,12 +982,8 @@ export class GameSim {
       if (s.pitches >= s.limit || (inningStart && s.outs >= (s.starter ? 6 : 3))) pull = true;
     } else if (s.starter) {
       pull = starterComesOut(s, this.inning, inningStart, runners, lead, this.battingSide.hits);
-    } else if (s.pitches >= s.limit) pull = true;
-    else {
-      const longMan = field.setup.bullpen.indexOf(s.id) >= field.setup.bullpen.length - 2;
-      const blowout = lead >= 5 || lead <= -4;
-      if (inningStart && s.outs >= 3 && !(longMan && blowout && s.pitches < s.limit - 10)) pull = true;
-      else if (!inningStart && s.runs >= 3 && s.pitches >= 15) pull = true;
+    } else {
+      pull = relieverComesOut(s, field.setup.bullpen.indexOf(s.id), field.setup.bullpen.length, this.inning, inningStart, lead);
     }
     if (!pull) return;
     const next = this.chooseReliever(field, lead, runners);
@@ -1004,10 +1002,12 @@ export class GameSim {
     const left = field.bullpenLeft;
     if (left.length === 0) return null;
     const rested = left.filter((id) => !field.setup.unavailable?.has(id));
-    // Out of rested arms: the least-worked of the rest has to go.
+    // Out of rested arms: the least-worked reliever has to go, and another starter only when no reliever is left.
     if (rested.length === 0) {
       const fatigue = field.setup.fatigue;
-      return [...left].sort((a, b) => (fatigue?.get(a) ?? 0) - (fatigue?.get(b) ?? 0))[0]!;
+      const spare = field.setup.spare;
+      const pen = spare ? left.filter((id) => !spare.has(id)) : left;
+      return [...(pen.length > 0 ? pen : left)].sort((a, b) => (fatigue?.get(a) ?? 0) - (fatigue?.get(b) ?? 0))[0]!;
     }
     const ranked = field.setup.bullpen.filter((id) => rested.includes(id));
     const closer = field.setup.bullpen[0];
@@ -1020,8 +1020,7 @@ export class GameSim {
     }
     if (lead >= 5 || lead <= -4) return ranked[ranked.length - 1]!;
     const middle = ranked.filter((id) => id !== closer);
-    const pool = middle.length > 0 ? middle : ranked;
-    return pool[Math.floor(pool.length / 2)]!;
+    return freshestNearMiddle(middle.length > 0 ? middle : ranked, field.setup.fatigue);
   }
 
   // -------------------------------------------------------------------------
@@ -1306,6 +1305,56 @@ export function starterComesOut(s: StarterOuting, inning: number, inningStart: b
   if (s.runs >= 5 && inning <= 5 && s.pitches >= 60) return true;
   if (inningStart) return s.pitches >= s.limit - 7 || (inning >= 7 && s.battersFaced >= 27 && Math.abs(lead) <= 2);
   return runners >= 2 && inning >= 5 && s.pitches >= s.limit - 12;
+}
+
+/**
+ * A middle-innings arm from `pool` (rested relievers, best first): the freshest, nearest the middle of the pen when
+ * several are as fresh, the one further down first.
+ */
+export function freshestNearMiddle(pool: readonly number[], fatigue?: ReadonlyMap<number, number>): number {
+  const mid = Math.floor(pool.length / 2);
+  let best = pool[mid]!;
+  let low = fatigue?.get(best) ?? 0;
+  for (let d = 1; d < pool.length && low > 0; d++) {
+    for (const k of [mid + d, mid - d]) {
+      const id = pool[k];
+      if (id === undefined) continue;
+      const f = fatigue?.get(id) ?? 0;
+      if (f < low) {
+        best = id;
+        low = f;
+      }
+    }
+  }
+  return best;
+}
+
+/** A reliever's outing so far, as his manager sees it. */
+export interface RelieverOuting {
+  pitches: number;
+  /** His pitch limit today. */
+  limit: number;
+  runs: number;
+  outs: number;
+}
+
+/**
+ * Whether a manager takes a reliever out before the next batter (an injury and an exhibition aside), with `slot` his
+ * place in a bullpen of `penSize` (the closer first, the last two the long men) and `lead` his club's: at his limit,
+ * after three runs, or at the top of an inning once he's pitched one. A long man stays on in a blowout while he has
+ * pitches left, and a middle reliever who got through an inning on few pitches without a run works another before
+ * the late innings.
+ */
+export function relieverComesOut(r: RelieverOuting, slot: number, penSize: number, inning: number, inningStart: boolean, lead: number): boolean {
+  if (r.pitches >= r.limit) return true;
+  if (!inningStart) return r.runs >= 3 && r.pitches >= 15;
+  if (r.outs < 3) return false;
+  const longMan = slot >= penSize - 2;
+  const blowout = lead >= 5 || lead <= -4;
+  if (longMan && blowout && r.pitches < r.limit - 10) return false;
+  const B = ENGINE.bullpen;
+  const cruising = slot >= 2 && r.outs < 6 && r.pitches <= B.secondInningPitches && r.runs === 0 && inning <= B.secondInningLast;
+  return !cruising;
 }
 
 export function simulateGame(env: SimEnv, away: TeamGameSetup, home: TeamGameSetup, rng: Rng, day = 0): GameResult {

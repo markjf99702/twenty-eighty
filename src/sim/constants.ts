@@ -178,6 +178,17 @@ export const ENGINE = {
     noHitCap: 135,
   },
 
+  /** How a manager works his bullpen. */
+  bullpen: {
+    /**
+     * A middle reliever (not the closer or the top setup man) who gets through an inning on this few pitches,
+     * without allowing a run, stays in for another...
+     */
+    secondInningPitches: 15,
+    /** ...if it's this inning or earlier. */
+    secondInningLast: 7,
+  },
+
   /**
    * Baserunning decisions. Each optional advance computes a success
    * probability (log-odds below); the runner goes only if it clears the
