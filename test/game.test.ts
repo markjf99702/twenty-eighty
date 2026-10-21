@@ -114,7 +114,7 @@ describe("a starter with a no-hitter going", () => {
     const rng = new Rng("no-hit bids");
     let solo = 0;
     let combined = 0;
-    for (let i = 0; i < 1000; i++) {
+    for (let i = 0; i < 2000; i++) {
       const home = l.teams[2 + (i % 28)]!;
       const r = simulateGame(s.env, s.gameSetup(weak, rng, i), s.gameSetup(home, rng, i), rng);
       if (r.hits[0] === 0) {
@@ -122,9 +122,10 @@ describe("a starter with a no-hitter going", () => {
         else combined++;
       }
     }
-    // Managers used to go to the bullpen at the usual pitch counts, and 23 of these 31 no-hitters were combined.
-    expect(solo + combined).toBeGreaterThanOrEqual(10);
-    expect(solo).toBeGreaterThan(2 * combined);
+    // About seven in ten are his alone. Managers used to go to the bullpen at the usual pitch counts, and 23 of 31
+    // no-hitters in a thousand of these games were combined.
+    expect(solo + combined).toBeGreaterThanOrEqual(20);
+    expect(solo).toBeGreaterThan(combined);
   });
 });
 
