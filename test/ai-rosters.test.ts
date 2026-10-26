@@ -126,6 +126,27 @@ describe("AI farm system", () => {
     expect(short).toEqual([]);
   });
 
+  it("keep every affiliate at 13 healthy arms, as a big-league staff, when injuries thin it", () => {
+    const league = generateLeague({ seed: "farm-kinds" });
+    const ctx = { league, day: 20, expanded: false };
+    const thin: string[] = [];
+    let checked = 0;
+    for (const team of league.teams) {
+      const pens = MINOR_LEVELS.map((level) => arms(league, team, level).filter((p) => !canStart(p)));
+      if (MINOR_LEVELS.some((level, i) => arms(league, team, level).length !== 13 || pens[i]!.length < 2)) continue;
+      // Two relievers hurt at every affiliate: eleven healthy arms each.
+      for (const pen of pens) for (const p of pen.slice(0, 2)) hurt(p, ctx.day);
+      manageOrganization(ctx, team, opts(league, team, false));
+      checked++;
+      for (const level of MINOR_LEVELS) {
+        const n = arms(league, team, level).length;
+        if (n < 13) thin.push(`${team.abbrev} ${level}: ${n} healthy arms`);
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+    expect(thin).toEqual([]);
+  });
+
   it("trim a crowded affiliate from the kind it has too many of, not its rotation", () => {
     const league = generateLeague({ seed: "farm-kinds" });
     const ctx = { league, day: 20, expanded: false };

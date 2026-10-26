@@ -53,7 +53,8 @@ export interface AiOptions {
 }
 
 const MIN_HITTERS = 12;
-const MIN_PITCHERS = 11;
+/** Healthy arms an affiliate keeps, as a big-league staff does: a rotation of five and a bullpen of eight. */
+const MIN_PITCHERS = 13;
 const MAX_MINOR_ROSTER = 28;
 
 const isPitcher = (p: Player) => Boolean(p.pitching);
