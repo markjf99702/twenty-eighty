@@ -943,6 +943,9 @@ function familiarityLabel(league: League, p: Player): string {
 
 /** Moves between affiliates: hidden unless the wire asks for minor league shuffles. */
 const SHUFFLES = new Set(["promote", "demote"]);
+/** A minor leaguer's release ends with his level, as a farm signing does (releasePlayer): a shuffle too. */
+const FARM_RELEASE = / \((?:AAA|AA|A\+|A)\)$/;
+const isShuffle = (t: Transaction) => SHUFFLES.has(t.type) || (t.type === "release" && FARM_RELEASE.test(t.text));
 
 /** International bonuses this big ($M) make the news. */
 const HEADLINE_BONUS = 2;
@@ -994,7 +997,7 @@ export function transactions(season: Season, opts: { teamId?: number; majorOnly?
   for (let i = league.transactions.length - 1; i >= 0 && out.length < (opts.limit ?? 200); i--) {
     const t = league.transactions[i]!;
     if (opts.teamId !== undefined && t.teamId !== opts.teamId) continue;
-    if (opts.majorOnly && SHUFFLES.has(t.type)) continue;
+    if (opts.majorOnly && isShuffle(t)) continue;
     if (opts.headlines && !isHeadline(season, t, i, debut)) continue;
     out.push({ date: dateLabel(season, t.day, t.year), year: t.year, teamId: t.teamId, abbrev: league.teams[t.teamId]!.abbrev, playerId: t.playerId, type: t.type, text: t.text });
   }

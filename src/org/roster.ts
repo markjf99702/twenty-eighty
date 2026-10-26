@@ -504,9 +504,14 @@ export function designateForAssignment(
   return ok;
 }
 
-/** Release a player outright (he becomes a free agent). */
+/**
+ * Release a player outright (he becomes a free agent). A minor leaguer's release (off the 40-man, not a big leaguer
+ * on the injured list) carries his level, as a farm signing does ("Released SS Nate Quinn (A)"), and the wire files
+ * it with the farm's moves.
+ */
 export function releasePlayer(ctx: RosterContext, team: Team, p: Player): RosterResult {
   if (p.teamId !== team.id) return fail(`${playerName(p)} isn't in the organization.`);
+  const farm = !p.onFortyMan && p.level !== "MLB" ? ` (${p.level})` : "";
   for (const level of Object.keys(team.rosters) as Level[]) removeFrom(team.rosters[level], p.id);
   removeFrom(team.fortyMan, p.id);
   removeFrom(team.injured, p.id);
@@ -523,7 +528,7 @@ export function releasePlayer(ctx: RosterContext, team: Team, p: Player): Roster
   p.il = null;
   p.ilDay = null;
   p.contract = null;
-  logTransaction(ctx.league, ctx.day, team, p, "release", `Released ${label(p)}`);
+  logTransaction(ctx.league, ctx.day, team, p, "release", `Released ${label(p)}${farm}`);
   // Big leaguers and real prospects hit the open market; the rest leave the game.
   if (p.service > 0 || playerValue(p) > -20 || peakValue(p) > 0) ctx.league.freeAgents.push(p.id);
   else p.retired = ctx.league.year;
