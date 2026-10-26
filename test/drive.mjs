@@ -4,6 +4,7 @@ import { createRequire } from 'node:module';
 import { execSync } from 'node:child_process';
 import { createServer } from 'node:http';
 import { readFile } from 'node:fs/promises';
+import { gunzipSync } from 'node:zlib';
 import { join, dirname, extname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import assert from 'node:assert/strict';
@@ -38,14 +39,17 @@ const until = async (what, fn, ms = 20000) => {
   }
 };
 
-/** A device: its own browser storage, the shared fake Google, and the origin check opened up for localhost. */
-async function device(name, init) {
+/**
+ * A device: its own browser storage, the shared fake Google, and the origin check opened up for localhost. `expected`
+ * matches console errors it should see (the connections the fake breaks off).
+ */
+async function device(name, init, expected) {
   const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
   await g.install(ctx, { rewrite: { '**/assets/index.js': (s) => s.replace('`https://junkdrawer.works`]', `\`https://junkdrawer.works\`,\`${origin}\`]`) } });
   if (init) await ctx.addInitScript(init);
   const page = await ctx.newPage();
   page.on('pageerror', (e) => problems.push(`${name}: ${e.message}`));
-  page.on('console', (m) => { if (m.type() === 'error' && !/401/.test(m.text())) problems.push(`${name}: ${m.text()}`); });
+  page.on('console', (m) => { if (m.type() === 'error' && !/401/.test(m.text()) && !expected?.test(m.text())) problems.push(`${name}: ${m.text()}`); });
   return page;
 }
 const SHOTS = process.env.SHOTS; // a folder, to look at the Drive screens
@@ -90,6 +94,11 @@ assert.equal(leagueFiles().length, 1, 'one file per league per device');
 assert.ok(leagueFiles()[0].body.startsWith('twenty-eighty league 1\n'), 'the update holds a league code');
 const aWeek = leagueFiles()[0].appProperties.when;
 assert.ok(aWeek.startsWith(await cell(a)), `Drive has A's date (${aWeek})`);
+// A league this size (every league for its first few seasons) goes up in one multipart request, new file and update.
+const smallUploads = g.calls.filter((x) => x.includes('/upload/'));
+assert.ok(smallUploads.some((x) => x.startsWith('POST /upload/drive/v3/files?uploadType=multipart')), `a new file went up as ${smallUploads.join(', ')}`);
+assert.ok(smallUploads.some((x) => x.startsWith(`PATCH /upload/drive/v3/files/${first.id}?uploadType=multipart`)), `an update went up as ${smallUploads.join(', ')}`);
+assert.deepEqual(smallUploads.filter((x) => !x.includes('uploadType=multipart')), [], 'a small league went up some other way than one multipart request');
 
 // ---- Device B, on a fresh browser, continues A's league ---------------------------------
 const b = await device('B');
@@ -171,6 +180,129 @@ await a.waitForTimeout(5500);
 assert.equal(uploads(), sent, 'no uploads after stopping');
 assert.equal(await a.evaluate(() => window.__revoked), undefined, 'never revokes');
 assert.equal(leagueFiles().length, 2, 'the files stay in Drive');
+
+// ---- A long league: past 4 MB it goes up in a resumable upload, picks up where Google's copy ends after a dropped ---
+// ---- connection or a 308, says so when it can't, and opens on another device -------------------------------------
+// Five seasons make a code of about 5.3 MB, too long to play here, so this league carries 3 MB of noise that the game
+// keeps and never reads. Its own Google account keeps its files apart from the ones above.
+const long = () => g.files().filter((f) => f.owner === 'long' && f.appProperties?.twentyEighty === 'league');
+const decode = (code) => JSON.parse(gunzipSync(Buffer.from(code.slice(code.indexOf('\n') + 1), 'base64')).toString('utf8'));
+const NOISE = 4 * 1024 * 1024; // 3 MB of random bytes, in base64
+const putsSince = (n) => g.calls.slice(n).filter((x) => x.startsWith('PUT ')).map((x) => /\[(.*)\]$/.exec(x)[1]);
+// Asked where it stands, Google says how much it has; the page sends the rest from there.
+const resumedAt = (puts) => {
+  const total = Number(/\/(\d+)$/.exec(puts[0])[1]);
+  return [`bytes 0-${total - 1}/${total}`, `bytes */${total}`, `bytes ${Math.floor(total / 2)}-${total - 1}/${total}`];
+};
+const savedNoise = (page) => page.evaluate(async () => {
+  const db = await new Promise((res, rej) => { const r = indexedDB.open('twenty-eighty', 1); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const stored = await new Promise((res, rej) => { const r = db.transaction('saves').objectStore('saves').get('current'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  db.close();
+  const save = JSON.parse(typeof stored === 'string' ? stored : await new Response(stored.stream().pipeThrough(new DecompressionStream('gzip'))).text());
+  return save.league.padding?.length ?? 0;
+});
+const d = await device('D', () => localStorage.setItem('__who', 'long'), /ERR_CONNECTION_RESET/);
+await d.goto(base);
+await d.waitForSelector('.club-pick');
+const longClub = (await d.locator('.club-pick .nm').nth(5).textContent()).trim();
+await d.locator('.club-pick').nth(5).click();
+await d.locator('.setup .check input').first().uncheck();
+await d.click('.start-bar .btn.primary');
+await d.waitForSelector('.club-hero', { timeout: 60000 });
+await d.evaluate(async () => {
+  const db = await new Promise((res, rej) => { const r = indexedDB.open('twenty-eighty', 1); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const stored = await new Promise((res, rej) => { const r = db.transaction('saves').objectStore('saves').get('current'); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); });
+  const save = JSON.parse(typeof stored === 'string' ? stored : await new Response(stored.stream().pipeThrough(new DecompressionStream('gzip'))).text());
+  const noise = new Uint8Array(3 * 1024 * 1024);
+  for (let i = 0; i < noise.length; i += 65536) crypto.getRandomValues(noise.subarray(i, i + 65536));
+  let bin = '';
+  for (let i = 0; i < noise.length; i += 0x8000) bin += String.fromCharCode(...noise.subarray(i, i + 0x8000));
+  save.league.padding = btoa(bin);
+  await new Promise((res, rej) => { const t = db.transaction('saves', 'readwrite'); t.objectStore('saves').put(JSON.stringify(save), 'current'); t.oncomplete = res; t.onerror = () => rej(t.error); });
+  db.close();
+});
+await d.reload();
+await d.waitForSelector('.club-hero', { timeout: 60000 });
+assert.equal(await savedNoise(d), NOISE, 'the long league did not load with its noise');
+
+// Connecting sends it as a new file: a resumable session opens, and the whole code goes in one PUT.
+let mark = g.calls.length;
+await d.goto(base + '#office');
+await d.locator('button', { hasText: 'Connect Google Drive' }).waitFor();
+await gisReady(d);
+await d.locator('button', { hasText: 'Connect Google Drive' }).click();
+const big = await until('the long league in Drive', () => long()[0], 60000);
+assert.ok(big.body.length > 4 * 1024 * 1024, `the long league's code is only ${big.body.length} bytes`);
+const opened = g.calls.slice(mark).filter((x) => x.includes('/upload/'));
+assert.ok(opened.some((x) => x.startsWith('POST /upload/drive/v3/files?uploadType=resumable')), `the long league went up as ${opened.join(', ')}`);
+assert.deepEqual(opened.filter((x) => x.includes('uploadType=multipart')), [], 'the long league went up in a multipart request');
+assert.deepEqual(putsSince(mark), [`bytes 0-${big.body.length - 1}/${big.body.length}`], 'the whole code in one PUT');
+assert.equal(big.name, `${longClub} (Linux PC).txt`);
+assert.equal(big.mimeType, 'text/plain');
+assert.deepEqual(big.parents, [g.files().find((f) => f.owner === 'long' && f.appProperties?.twentyEighty === 'folder')?.id], 'in its Twenty-Eighty folder');
+assert.equal(decode(big.body).league.padding.length, NOISE, 'Drive has the whole league');
+assert.equal(decode(big.body).league.id, big.appProperties.league);
+await until('a green cloud for the long league', () => d.locator('.cloud.ok').count());
+
+// The connection drops halfway through the next update: the page asks how much Google has and sends the rest.
+await d.goto(base + '#home');
+await d.waitForSelector('.club-hero');
+g.cut('drop');
+mark = g.calls.length;
+let prior = long()[0];
+await board(d, 'Day').click();
+await idle(d);
+await until('the next day in Drive after a dropped connection', () => long()[0].version > prior.version, 60000);
+let puts = putsSince(mark);
+assert.deepEqual(puts.slice(0, 3), resumedAt(puts), 'the update after a dropped connection did not pick up where Google\'s copy ended');
+assert.ok(g.calls.slice(mark).some((x) => x.startsWith(`PATCH /upload/drive/v3/files/${big.id}?uploadType=resumable`)), 'the update did not open a resumable session on its own file');
+assert.equal(long().length, 1, 'one file per league per device');
+assert.notEqual(long()[0].appProperties.when, prior.appProperties.when, 'Drive has the new day');
+assert.equal(decode(long()[0].body).league.padding.length, NOISE, 'the resumed upload is whole');
+
+// Google keeps half and answers 308: the same.
+g.cut('308');
+mark = g.calls.length;
+prior = long()[0];
+await board(d, 'Day').click();
+await idle(d);
+await until('the next day in Drive after a 308', () => long()[0].version > prior.version, 60000);
+puts = putsSince(mark);
+assert.deepEqual(puts.slice(0, 3), resumedAt(puts), 'the update after a 308 did not pick up where Google\'s copy ended');
+assert.equal(decode(long()[0].body).league.padding.length, NOISE, 'the upload after a 308 is whole');
+
+// A connection that keeps dropping: after asking three times the cloud turns red and says why, and the league waits
+// for the next save. Once the connection is back, a tap on the cloud sends it.
+g.down(true);
+mark = g.calls.length;
+prior = long()[0];
+await board(d, 'Day').click();
+await idle(d);
+await until('a red cloud', () => d.locator('.cloud.act').count(), 60000);
+assert.match(await d.locator('.cloud').getAttribute('title'), /The upload to Google Drive kept breaking off/, 'the cloud does not say the upload failed');
+const tries = putsSince(mark);
+const size = Number(/\/(\d+)$/.exec(tries[0])[1]);
+assert.deepEqual(tries.slice(0, 4), [`bytes 0-${size - 1}/${size}`, ...Array(3).fill(`bytes */${size}`)], `the upload gave up after ${tries.join(', ')}`);
+assert.equal(long()[0].version, prior.version, 'Drive changed though every upload broke off');
+await shot(d, 'long-failed');
+g.down(false);
+await d.locator('.cloud').click();
+await until('the upload once the connection is back', () => long()[0].version > prior.version, 60000);
+await until('a green cloud again', () => d.locator('.cloud.ok').count());
+const dDate = await cell(d);
+
+// ---- Device E, a fresh browser on the same account, carries on from the long league ------------------------------
+const e = await device('E', () => localStorage.setItem('__who', 'long'));
+await e.goto(base);
+await e.locator('text=Played on another device?').click();
+await e.locator('button', { hasText: 'Connect Google Drive' }).waitFor();
+await gisReady(e);
+await e.locator('button', { hasText: 'Connect Google Drive' }).click();
+await e.locator('.copy', { hasText: longClub }).waitFor();
+await e.locator('.copy button', { hasText: 'Continue from this' }).click();
+await e.waitForSelector('.club-hero', { timeout: 60000 });
+assert.equal(await cell(e), dDate, 'E picks up the long league at D\'s date');
+assert.equal(await savedNoise(e), NOISE, 'E has the whole long league');
 
 assert.deepEqual(problems, [], 'problems while using it');
 await browser.close();

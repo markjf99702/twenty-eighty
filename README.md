@@ -54,6 +54,9 @@ another device's.
 - **What's in a file**: the whole league, compressed (every club, player and season played, your moves
   and your club's books). Sim speed and the stops stay on each device. A file is a league code that
   **Import save** also takes, so you can download one from Drive and load it by hand.
+- A long league's file (past 4 MB, in its fourth season or so) goes up in Google's resumable upload: if the
+  connection drops partway, it asks Google how much arrived and sends the rest. If it still can't finish,
+  the cloud turns red and the next save tries again.
 - Twenty-Eighty asks Google only for `drive.file`, so it can reach the files it made and nothing else in
   your Drive.
 - Google signs the page out after an hour. The league keeps saving on the device meanwhile; the cloud in
@@ -118,7 +121,8 @@ then pick `main` and `/ (root)`.
 - `sw.js`: keeps a copy for playing offline.
 - `icon.svg`, `icon-*.png`, `manifest.webmanifest`, `og.png`: the icon, home-screen install and link preview.
 - `tools/`: the screenshot and icon scripts. `test/`: the engine tests, `e2e.mjs` for the site, and
-  `drive.mjs`, which plays three devices sharing a fake Google Drive (`fake-google.mjs`).
+  `drive.mjs`, which plays five devices sharing a fake Google Drive (`fake-google.mjs`), one with a long
+  league.
 
 ## Under the hood
 

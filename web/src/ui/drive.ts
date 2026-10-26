@@ -24,6 +24,14 @@ const DEVICE_KEY = "twenty-eighty.device";
 const SHARED = "junkdrawer.google";
 /** Ids go into Drive queries, so only the plain ones Twenty-Eighty makes. */
 const SAFE_ID = /^[a-z0-9]{6,32}$/;
+/**
+ * A league whose code is bigger than this goes up in a resumable upload. Google documents a multipart upload (the
+ * metadata and the file in one request) for files of 5 MB or less, and a long league's code passes that in its fifth
+ * season or so.
+ */
+const RESUMABLE_OVER = 4 * 1024 * 1024;
+/** How many times a resumable upload asks Google how much it has and sends the rest, before it waits for the next save. */
+const RESUMES = 3;
 
 interface SharedSignIn {
   token: string;
@@ -393,18 +401,17 @@ export class Drive {
         saved: String(meta.saved),
       },
     };
-    let id = this.st.files[meta.league] ?? "";
-    if (!id) {
-      const mine = await this.find(
-        `appProperties has { key='league' and value='${meta.league}' } and appProperties has { key='device' and value='${dev.id}' } and trashed = false`,
-        "id",
-      );
-      id = (mine[0]?.id as string | undefined) ?? "";
-    }
+    // A long league goes up in a resumable upload; the rest in one multipart request.
+    const bytes = new TextEncoder().encode(code);
+    const big = bytes.length > RESUMABLE_OVER;
+    let id = this.st.files[meta.league] || (await this.mine(meta.league));
     if (id) {
       try {
-        const m = multipart(head, code);
-        await this.api("PATCH", `${UP}/${id}?uploadType=multipart&fields=id`, m.body, m.type);
+        if (big) await this.resumable("PATCH", `${UP}/${id}?uploadType=resumable&fields=id`, head, bytes);
+        else {
+          const m = multipart(head, code);
+          await this.api("PATCH", `${UP}/${id}?uploadType=multipart&fields=id`, m.body, m.type);
+        }
       } catch (e) {
         if ((e as DriveError).kind !== "gone") throw e;
         id = "";
@@ -412,7 +419,10 @@ export class Drive {
     }
     if (!id) {
       const make = async () => {
-        const m = multipart({ ...head, mimeType: "text/plain", parents: [await this.folder()] }, code);
+        const file = { ...head, mimeType: "text/plain", parents: [await this.folder()] };
+        // Google's last answer to a resumable upload can leave out the file (it had the bytes already): find it.
+        if (big) return (await this.resumable("POST", `${UP}?uploadType=resumable&fields=id`, file, bytes)) || (await this.mine(meta.league));
+        const m = multipart(file, code);
         return (await (await this.api("POST", `${UP}?uploadType=multipart&fields=id`, m.body, m.type)).json()).id as string;
       };
       try {
@@ -431,6 +441,51 @@ export class Drive {
     if (this.copies) {
       const copy: DriveCopy = { fileId: id, league: meta.league, club: meta.club, when: meta.when, saved: meta.saved, device: dev.id, label: dev.label, mine: true };
       this.copies = [copy, ...this.copies.filter((c) => c.fileId !== id)].sort((a, b) => b.saved - a.saved);
+    }
+  }
+
+  /** This device's file for a league, if Drive has one ("" if not). */
+  private async mine(league: string): Promise<string> {
+    const found = await this.find(
+      `appProperties has { key='league' and value='${league}' } and appProperties has { key='device' and value='${this.deps.device.id}' } and trashed = false`,
+      "id",
+    );
+    return (found[0]?.id as string | undefined) ?? "";
+  }
+
+  /**
+   * A resumable upload, as Google documents it for files over 5 MB
+   * (https://developers.google.com/workspace/drive/api/guides/manage-uploads#resumable): a POST (a new file) or PATCH
+   * with the metadata opens a session, whose address comes back in the Location header; a PUT there sends the bytes,
+   * and 200 or 201 means Google has them all. If the connection drops, or Google answers 308 (it has only part) or
+   * with a 5xx, ask it how much it has (an empty PUT) and send the rest from there, a few times at most. The
+   * session's address is its key, so these PUTs carry no token, as in Google's browser examples. Returns the file's
+   * id, or "" if Google's last answer didn't say.
+   */
+  private async resumable(method: "POST" | "PATCH", url: string, meta: object, bytes: Uint8Array<ArrayBuffer>): Promise<string> {
+    const total = bytes.length;
+    const opened = await this.api(method, url, JSON.stringify(meta), "application/json; charset=UTF-8", {
+      "X-Upload-Content-Type": "text/plain",
+      "X-Upload-Content-Length": String(total),
+    });
+    const session = opened.headers.get("Location");
+    if (!session) throw new DriveError("other", "Google Drive didn't start the upload.");
+    const put = (headers: Record<string, string>, body?: Uint8Array<ArrayBuffer>) =>
+      this.deps.fetch(session, { method: "PUT", headers, body }).catch(() => null);
+    const send = (from: number) => put({ "Content-Type": "text/plain", "Content-Range": `bytes ${from}-${total - 1}/${total}` }, bytes.subarray(from));
+    let r = await send(0);
+    for (let asked = 0; ; asked++) {
+      // Google has it all: the file comes back (its id, as fields=id asks).
+      if (r?.status === 200 || r?.status === 201) return ((await r.json().catch(() => null)) as { id?: string } | null)?.id ?? "";
+      // Any other 4xx: the session is over (Google says to start again), which the next save does.
+      if (r && r.status !== 308 && r.status < 500) throw await saidNo(r);
+      // A 308, a 5xx or a dropped connection: ask how much Google has, after a pause that doubles each time.
+      if (asked === RESUMES) throw new DriveError("other", "The upload to Google Drive kept breaking off. It will try again with the next save.");
+      await new Promise((done) => setTimeout(done, 1000 * 2 ** asked));
+      const where = await put({ "Content-Range": `bytes */${total}` });
+      const from = where?.status === 308 ? received(where.headers.get("Range")) : -1;
+      // Then the rest, from where Google's copy ends; any other answer is settled at the top.
+      r = from >= 0 && from < total ? await send(from) : where;
     }
   }
 
@@ -502,9 +557,9 @@ export class Drive {
 
   // ---- REST ----------------------------------------------------------------
 
-  private async api(method: string, url: string, body?: string, type?: string): Promise<Response> {
+  private async api(method: string, url: string, body?: string, type?: string, more: Record<string, string> = {}): Promise<Response> {
     if (!this.hasToken()) throw new DriveError("auth");
-    const headers: Record<string, string> = { Authorization: `Bearer ${this.st.token}` };
+    const headers: Record<string, string> = { Authorization: `Bearer ${this.st.token}`, ...more };
     if (type) headers["Content-Type"] = type;
     const r = await this.deps.fetch(url, { method, headers, body });
     if (r.status === 401) {
@@ -516,11 +571,7 @@ export class Drive {
       throw new DriveError("auth");
     }
     if (r.status === 404) throw new DriveError("gone");
-    if (!r.ok) {
-      const t = await r.text();
-      const m = /"message":\s*"([^"]+)"/.exec(t);
-      throw new DriveError("other", `Google Drive said: ${m ? m[1] : r.status}`);
-    }
+    if (!r.ok) throw await saidNo(r);
     return r;
   }
 
@@ -535,6 +586,18 @@ export class Drive {
     } while (page);
     return out;
   }
+}
+
+/** What Google said when it turned a request down, for the error a failed save shows. */
+async function saidNo(r: Response): Promise<DriveError> {
+  const m = /"message":\s*"([^"]+)"/.exec(await r.text().catch(() => ""));
+  return new DriveError("other", `Google Drive said: ${m ? m[1] : r.status}`);
+}
+
+/** How many bytes of an upload Google has, from its 308's Range header ("bytes=0-42" is 43); none without one. */
+function received(range: string | null): number {
+  const m = /-(\d+)\s*$/.exec(range ?? "");
+  return m ? Number(m[1]) + 1 : 0;
 }
 
 function multipart(meta: object, body: string): { body: string; type: string } {
