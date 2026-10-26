@@ -1,5 +1,5 @@
-import { useMemo, useState } from "preact/hooks";
-import { call, useApi } from "../../api/client";
+import { useEffect, useMemo, useRef, useState } from "preact/hooks";
+import { call } from "../../api/client";
 import type { GameSettings, NewGameTeam, Status } from "../../api/protocol";
 import { SettingsPicker } from "../components/SettingsPicker";
 import { DEFAULT_SETTINGS } from "../settings";
@@ -28,34 +28,72 @@ const randomSeed = () => {
 export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
   const [seed, setSeed] = useState(randomSeed);
   const [draft, setDraft] = useState(seed);
+  // The clubs on screen and the seed they come from. Until a new seed's clubs arrive, they're the last seed's.
+  const [shown, setShown] = useState<{ seed: string; teams: NewGameTeam[] } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const asked = useRef("");
+  const gone = useRef(false);
   const [teamId, setTeamId] = useState<number | null>(null);
   const [minors, setMinors] = useState(true);
   const [starting, setStarting] = useState(false);
   const [settings, setSettings] = useState<GameSettings>(DEFAULT_SETTINGS);
-  const teams = useApi("newGameTeams", { seed }, [seed]);
+
+  /** Ask the worker for a seed's clubs at once, so a game started straight after is built from that same league. */
+  const show = (s: string) => {
+    asked.current = s;
+    setSeed(s);
+    setError(null);
+    call("newGameTeams", { seed: s }).then(
+      (teams) => !gone.current && asked.current === s && setShown({ seed: s, teams }),
+      (err: Error) => {
+        if (gone.current || asked.current !== s) return;
+        setShown(null);
+        setError(err.message);
+      },
+    );
+  };
+  useEffect(() => {
+    show(seed);
+    return () => void (gone.current = true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /** Use the seed in the box (on Enter, Generate, leaving the box and Take the job). An empty box gets the last one back. */
+  const apply = (text: string) => {
+    // A box that still has the keyboard lets go as the page closes for the new league; there's nothing to show then.
+    if (gone.current) return;
+    const s = text.trim();
+    setDraft(s || asked.current);
+    if (s && s !== asked.current) show(s);
+  };
 
   const byDivision = useMemo(() => {
     const out: NewGameTeam[][][] = [[[], [], []], [[], [], []]];
-    for (const t of teams.data ?? []) out[t.league]![t.division]!.push(t);
+    for (const t of shown?.teams ?? []) out[t.league]![t.division]!.push(t);
     return out;
-  }, [teams.data]);
+  }, [shown]);
 
   const ranks = useMemo(() => {
-    const list = teams.data ?? [];
+    const list = shown?.teams ?? [];
     const rank = (key: "strength" | "farm") => {
       const sorted = [...list].sort((a, b) => b[key] - a[key]);
       return new Map(sorted.map((t, i) => [t.id, i + 1]));
     };
     return { mlb: rank("strength"), farm: rank("farm") };
-  }, [teams.data]);
+  }, [shown]);
 
-  const chosen = teams.data?.find((t) => t.id === teamId);
+  const chosen = shown?.teams.find((t) => t.id === teamId);
+  const updating = shown !== null && shown.seed !== seed;
 
   const start = async () => {
     if (teamId === null) return;
+    // The league starts from what's in the box, though the tap came before Enter or the box let go (the clubs keep
+    // their places in every seed, so the pick still stands).
+    const s = draft.trim() || asked.current;
+    apply(s);
     setStarting(true);
     try {
-      onStarted(await call("newGame", { seed, teamId, minors, settings }));
+      onStarted(await call("newGame", { seed: s, teamId, minors, settings }));
     } catch (err) {
       notify((err as Error).message, true);
       setStarting(false);
@@ -95,10 +133,11 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
               enterKeyHint="go"
               value={draft}
               onInput={(e) => setDraft((e.target as HTMLInputElement).value)}
-              onKeyDown={(e) => e.key === "Enter" && draft.trim() && setSeed(draft.trim())}
+              onKeyDown={(e) => e.key === "Enter" && apply(draft)}
+              onBlur={() => apply(draft)}
               style={{ flex: "1 1 160px" }}
             />
-            <button type="button" class="btn" disabled={!draft.trim() || draft.trim() === seed} onClick={() => setSeed(draft.trim())}>
+            <button type="button" class="btn" disabled={!draft.trim() || draft.trim() === seed} onClick={() => apply(draft)}>
               Generate
             </button>
             <button
@@ -107,7 +146,7 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
               onClick={() => {
                 const s = randomSeed();
                 setDraft(s);
-                setSeed(s);
+                show(s);
                 setTeamId(null);
               }}
             >
@@ -136,10 +175,10 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
           <h2>Pick your club</h2>
           <span class="aside">MLB and farm ranks are this seed's talent, 1 = best.</span>
         </header>
-        {teams.loading && !teams.data && <Loading what="thirty organizations" />}
-        {teams.error && <ErrorNote error={teams.error} />}
-        {teams.data && (
-          <div class="clubs">
+        {!shown && !error && <Loading what="thirty organizations" />}
+        {error && <ErrorNote error={error} />}
+        {shown && (
+          <div class="clubs" aria-busy={updating}>
             {byDivision.map((divs, lg) => (
               <div key={lg} class="section">
                 <div class="eyebrow">{LEAGUES[lg]}</div>
@@ -173,7 +212,7 @@ export function NewGame({ onStarted }: { onStarted: (st: Status) => void }) {
       </section>
 
       <div class="start-bar">
-        <span class="dim">
+        <span class="dim" aria-busy={updating}>
           {chosen
             ? `${chosen.city} ${chosen.nickname}: MLB talent ranks ${ranks.mlb.get(chosen.id)} of 30, farm ${ranks.farm.get(chosen.id)} of 30.`
             : "Choose a club to run."}

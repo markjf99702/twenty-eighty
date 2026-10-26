@@ -35,6 +35,25 @@ const fits = async (where) =>
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true, `${where} scrolls sideways on a phone`);
 const board = (label) => page.locator('.board .btn', { hasText: label });
 const idle = () => page.waitForSelector('.board .progress', { state: 'detached', timeout: 120000 });
+// The seed the League office says this league was built from.
+const officeSeed = async () => {
+  await page.goto(base + '#office');
+  const v = page.locator('.facts > div', { has: page.locator('.k', { hasText: /^Seed$/ }) }).locator('.v');
+  return (await v.textContent({ timeout: 10000 })).trim();
+};
+// What the days played so far leave behind: the scoreboard, and every club's line in the standings (runs too).
+const played = async () => {
+  const cells = (await page.textContent('.board-cells')).replace(/\s+/g, ' ');
+  await page.goto(base + '#standings');
+  await page.waitForSelector('main .tbl tbody tr');
+  const rows = await page.evaluate(() => [...document.querySelectorAll('main .tbl tbody tr')].map((r) => r.textContent.replace(/\s+/g, ' ').trim()));
+  await page.goto(base + '#home');
+  await page.waitForSelector('.board-cells');
+  return [cells, ...rows].join('\n');
+};
+// Seeds typed in this run (not the made-up ones the page offers): a new pair each run, so the season still varies.
+const run = Date.now().toString(36);
+const typedSeed = `typed-${run}`;
 
 await page.goto(base);
 await page.evaluate(() => document.fonts.ready);
@@ -47,15 +66,32 @@ await fits('the title screen');
 // A phone's keyboard leaves a seed as typed: seeds are case-sensitive, so a capital or a correction builds another league.
 const seedBox = await page.evaluate(() => ['autocapitalize', 'autocorrect', 'spellcheck', 'autocomplete', 'enterkeyhint'].map((a) => `${a}=${document.querySelector('#seed').getAttribute(a)}`).join(' '));
 assert.equal(seedBox, 'autocapitalize=none autocorrect=off spellcheck=false autocomplete=off enterkeyhint=go', 'a phone can capitalize or correct the seed');
+// A seed typed in the box shows its own clubs once you leave the box, with no Enter and no Generate: the ranks change,
+// and Generate has nothing left to do.
+const ratings = () => page.evaluate(() => [...document.querySelectorAll('.club-pick .ratings')].map((r) => r.textContent).join(' '));
+const offered = await ratings();
+await page.fill('#seed', `left-${run}`);
+await page.locator('section h2', { hasText: 'Pick your club' }).tap();
+const leftBox = await page
+  .waitForFunction((was) => document.querySelector('.clubs')?.getAttribute('aria-busy') === 'false'
+    && [...document.querySelectorAll('.club-pick .ratings')].map((r) => r.textContent).join(' ') !== was, offered, { timeout: 60000 })
+  .then(() => true, () => false);
+assert.ok(leftBox, 'leaving the seed box left the last seed\'s clubs on screen');
+assert.equal(await page.locator('.setup .btn', { hasText: 'Generate' }).isDisabled(), true, 'the seed box was left without its seed being used');
+// The seed in the box is the one the league starts from, though it was typed after the club was picked and Take the
+// job came straight from the box. (The league used to come from the seed on screen, so two games typed with one seed
+// could be two different leagues.)
 const club = (await page.locator('.club-pick .nm').nth(3).textContent()).trim();
 await page.locator('.club-pick').nth(3).click();
 await page.locator('.setup .check input').first().uncheck();
-await page.click('.start-bar .btn.primary');
+await page.fill('#seed', typedSeed);
+await page.tap('.start-bar .btn.primary');
 await page.waitForSelector('.club-hero', { timeout: 60000 });
 // A new GM is welcomed, and told when free agents and draft picks come, and that the department budgets are set before the first pitch.
 const welcome = await page.locator('.note', { hasText: 'Welcome to the job' }).textContent({ timeout: 10000 });
 assert.match(welcome, /Free agency, the draft and international signings come in the winter/, 'no welcome for a new GM');
 assert.match(welcome, /Before the first pitch you can also set your scouting and analytics budgets/, 'the welcome does not mention the department budgets');
+assert.equal(await officeSeed(), typedSeed, 'the league was not built from the seed typed in the box');
 await page.goto(base + '#scouting');
 assert.match(await page.locator('.note.warn').textContent({ timeout: 10000 }), /^Before the first game: set this season's scouting and analytics budgets now/, 'the scouting page does not say the budgets lock at the first game');
 await page.goto(base + '#home');
@@ -70,6 +106,7 @@ await idle();
 const record = (await page.textContent('.board-cells')).replace(/\s+/g, ' ');
 assert.match(record, /\d+[–-]\d+/, 'no record after a week');
 await fits('the front office');
+const firstWeek = await played();
 // A day's sim leaves the scoreboard as tall as it was, so the page doesn't jump: the Sim buttons stay, with Day saying
 // it's playing (the progress line that replaced them was a row shorter on a phone).
 await page.evaluate(() => {
@@ -332,6 +369,30 @@ await page.locator('.winter-next .btn.primary', { hasText: 'Finish the draft' })
 await page.locator('.winter-next .winter-confirm', { hasText: 'Let your scouting director make' }).waitFor({ timeout: 10000 });
 await page.locator('.winter-next .winter-confirm button', { hasText: 'Not yet' }).click();
 await onTheClock.waitFor({ timeout: 10000 });
+
+// Two games from one seed play the same first week. Start over, type the first game's seed and take the same job with
+// the box still holding the keyboard, so the tap comes before the box lets go (as it can on a phone): the typed seed
+// still counts.
+await page.goto(base + '#office');
+await page.locator('.btn.danger', { hasText: 'New league' }).click();
+await page.locator('.confirm .btn.danger', { hasText: 'Yes, delete it' }).click();
+await page.waitForSelector('.club-pick', { timeout: 60000 });
+assert.equal((await page.locator('.club-pick .nm').nth(3).textContent()).trim(), club, 'the clubs are listed in another order for another seed');
+await page.locator('.club-pick').nth(3).click();
+await page.locator('.setup .check input').first().uncheck();
+await page.fill('#seed', typedSeed);
+await page.locator('.start-bar .btn.primary').dispatchEvent('click');
+await page.waitForSelector('.club-hero', { timeout: 60000 });
+assert.equal(await officeSeed(), typedSeed, 'Take the job, tapped while the seed box was in use, did not build the league from its seed');
+// The same pages as the first game before its week (a game plays the same whichever pages are open, but this is the seed's test).
+await page.goto(base + '#scouting');
+await page.locator('.note.warn').waitFor({ timeout: 10000 });
+await page.goto(base + '#home');
+await page.waitForSelector('.club-hero');
+await board('Week').click();
+await page.locator('.board .progress').waitFor({ timeout: 10000 }).catch(() => {});
+await idle();
+assert.equal(await played(), firstWeek, `two games from the seed ${typedSeed} played different first weeks`);
 
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();

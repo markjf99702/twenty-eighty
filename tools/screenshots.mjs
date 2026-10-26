@@ -34,7 +34,8 @@ async function league(viewport, deviceScaleFactor) {
   await page.waitForSelector('.club-pick');
   await page.fill('#seed', SEED);
   await page.locator('button', { hasText: 'Generate' }).click();
-  await page.waitForFunction(() => document.querySelector('.club-pick'));
+  // The list stops being busy once the clubs on screen are the fixed seed's.
+  await page.waitForSelector('.clubs[aria-busy="false"]', { timeout: 60000 });
   await page.waitForTimeout(800);
   await page.evaluate(() => document.fonts.ready);
   return page;
