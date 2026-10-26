@@ -418,16 +418,21 @@ await page.goto(base + (await page.evaluate(() => document.querySelector("a[href
 await page.waitForSelector('main .tbl tbody tr');
 const affiliates = page.locator('main .seg[aria-label="Affiliate"] button');
 const tooWide = [];
+let measured = 0;
 for (let i = 0; i < (await affiliates.count()); i++) {
   await affiliates.nth(i).click();
-  tooWide.push(...(await page.evaluate(() => [...document.querySelectorAll('main section.section')].flatMap((sec) => {
+  // One entry per table with a Moves column: empty when it fits, so a page that lost its tables can't pass by default.
+  const tables = await page.evaluate(() => [...document.querySelectorAll('main section.section')].flatMap((sec) => {
     const wrap = sec.querySelector('.tbl-wrap');
     const moves = sec.querySelector('tbody tr td:last-child button');
     if (!wrap || !moves) return [];
     const over = Math.max(wrap.scrollWidth - wrap.clientWidth, Math.ceil(moves.getBoundingClientRect().right - wrap.getBoundingClientRect().right));
-    return over > 0 ? [`${document.querySelector('main .seg[aria-label="Affiliate"] button.on').textContent} ${sec.querySelector('h2').textContent} (${over}px)`] : [];
-  }))));
+    return [over > 0 ? `${document.querySelector('main .seg[aria-label="Affiliate"] button.on').textContent} ${sec.querySelector('h2').textContent} (${over}px)` : ''];
+  }));
+  measured += tables.length;
+  tooWide.push(...tables.filter(Boolean));
 }
+assert.equal(measured, 8, `at 1280 the check found ${measured} of the farm's 8 tables with a Moves column (position players and pitchers at four affiliates)`);
 assert.deepEqual(tooWide, [], 'at 1280 a farm club\'s table runs past its box and cuts off the Moves column');
 await page.setViewportSize({ width: 390, height: 844 });
 
