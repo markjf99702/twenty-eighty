@@ -87,8 +87,9 @@ describe("the pages asked for between days", () => {
 
 describe("a page asked for on the All-Star break", () => {
   it("leaves what the clubs believe after the All-Star Game as it would be", () => {
-    // The game adds to the big leagues' run values without being one of their games, and no game follows it until
-    // the break is over. Played to the morning of the All-Star day once, then that day twice from the save.
+    // None of the big leagues' games follows it until the break is over, so a context a page asked for before it is
+    // still the one the clubs read after it: the game must leave their run values alone. Played to the morning of
+    // the All-Star day once, then that day twice from the save.
     const league = generateLeague({ seed: "between-days" });
     hireGm(league, USER);
     const season = new Season(league, { minors: false });
