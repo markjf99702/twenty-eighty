@@ -32,6 +32,8 @@ interface Props<T> {
    * name cell carries a long second line, which would cover the screen.
    */
   pinName?: boolean;
+  /** More classes for the table (a roster's closer columns on a wide screen). */
+  cls?: string;
 }
 
 /**
@@ -70,7 +72,7 @@ export function Table<T>(props: Props<T>) {
   return (
     <div>
       <div class="tbl-wrap">
-        <table class={props.pinName === false ? "tbl no-pin" : "tbl"}>
+        <table class={`tbl${props.pinName === false ? " no-pin" : ""}${props.cls ? ` ${props.cls}` : ""}`}>
           <thead>
             <tr>
               {ranked && <th class="rank num">#</th>}

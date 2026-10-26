@@ -394,6 +394,43 @@ await page.locator('.board .progress').waitFor({ timeout: 10000 }).catch(() => {
 await idle();
 assert.equal(await played(), firstWeek, `two games from the seed ${typedSeed} played different first weeks`);
 
+// At 1280 a farm club's tables fit beside the sidebar with the Moves column whole: a roster's columns sit closer on a
+// wide screen (six tools, a season line and an injured player's badge ran the position players' table up to 95px past
+// its box). A league whose farm plays, from a fixed seed, a month in.
+await page.goto(base + '#office');
+await page.locator('.btn.danger', { hasText: 'New league' }).click();
+await page.locator('.confirm .btn.danger', { hasText: 'Yes, delete it' }).click();
+await page.waitForSelector('.club-pick', { timeout: 60000 });
+const lastClubs = await ratings();
+await page.fill('#seed', 'farm-1280');
+await page.locator('section h2', { hasText: 'Pick your club' }).tap();
+await page.waitForFunction((was) => document.querySelector('.clubs')?.getAttribute('aria-busy') === 'false'
+  && [...document.querySelectorAll('.club-pick .ratings')].map((r) => r.textContent).join(' ') !== was, lastClubs, { timeout: 60000 });
+await page.locator('.club-pick').nth(7).click();
+assert.equal(await page.locator('.setup .check input').first().isChecked(), true, 'a new league leaves out the minor league games');
+await page.tap('.start-bar .btn.primary');
+await page.waitForSelector('.club-hero', { timeout: 60000 });
+await board('Month').click();
+await page.locator('.board .progress').waitFor({ timeout: 10000 }).catch(() => {});
+await idle();
+await page.setViewportSize({ width: 1280, height: 800 });
+await page.goto(base + (await page.evaluate(() => document.querySelector("a[href^='#team-']").getAttribute('href'))) + '-farm');
+await page.waitForSelector('main .tbl tbody tr');
+const affiliates = page.locator('main .seg[aria-label="Affiliate"] button');
+const tooWide = [];
+for (let i = 0; i < (await affiliates.count()); i++) {
+  await affiliates.nth(i).click();
+  tooWide.push(...(await page.evaluate(() => [...document.querySelectorAll('main section.section')].flatMap((sec) => {
+    const wrap = sec.querySelector('.tbl-wrap');
+    const moves = sec.querySelector('tbody tr td:last-child button');
+    if (!wrap || !moves) return [];
+    const over = Math.max(wrap.scrollWidth - wrap.clientWidth, Math.ceil(moves.getBoundingClientRect().right - wrap.getBoundingClientRect().right));
+    return over > 0 ? [`${document.querySelector('main .seg[aria-label="Affiliate"] button.on').textContent} ${sec.querySelector('h2').textContent} (${over}px)`] : [];
+  }))));
+}
+assert.deepEqual(tooWide, [], 'at 1280 a farm club\'s table runs past its box and cuts off the Moves column');
+await page.setViewportSize({ width: 390, height: 844 });
+
 assert.deepEqual(problems.filter(p => !p.startsWith('failed:')), [], 'problems while using it');
 await browser.close();
 server.close();

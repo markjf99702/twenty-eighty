@@ -305,7 +305,7 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
         key: `t-${t}`,
         label: t,
         title: TOOL_TITLES[t],
-        cls: "ctr",
+        cls: "ctr tool",
         sort: (p) => p.grades[toolIndex(t)]?.[1] ?? 0,
         render: (p) => {
           const g = p.grades[toolIndex(t)];
@@ -313,7 +313,7 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
         },
       }),
     ),
-    { key: "line", label: "This season", render: (p) => <span class="dim">{p.line || "—"}</span> },
+    { key: "line", label: "This season", cls: "line", render: (p) => <span class="dim">{p.line || "—"}</span> },
     ];
   }
   columns.push(
@@ -375,6 +375,7 @@ export function PlayerTable({ rows, pitchers, manage, showLevel, empty, sortKey,
       sortKey={initialSort}
       sortAsc={initialAsc}
       empty={empty}
+      cls="roster"
       expanded={manage ? (p) => (open === p.id ? <RosterMoves p={p} onDone={() => setOpen(null)} /> : null) : undefined}
     />
   );

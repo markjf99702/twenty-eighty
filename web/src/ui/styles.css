@@ -1655,6 +1655,14 @@ a.game-card:hover { border-color: var(--accent); text-decoration: none; }
   .tbl td.name .row-act.narrow-only { display: flex; }
   .tbl .wide-only { display: none; }
 }
+/* A roster's tables on a wide screen: closer columns, the tools closest, and a smaller season line (as a trade's
+   stats line), so a farm club's position players (six tools, a name with an injury badge) fit beside a sidebar at
+   1280 with that last column whole, as the pitchers do. A phone keeps its sideways scroller. */
+@media (min-width: 821px) {
+  .tbl.roster th, .tbl.roster td { padding-left: 5px; padding-right: 5px; }
+  .tbl.roster th.tool, .tbl.roster td.tool { padding-left: 3px; padding-right: 3px; }
+  .tbl.roster td.line { font-size: 12px; }
+}
 .offer-player .line { grid-column: 2 / -1; font-size: 12.5px; color: var(--ink-3); margin-top: -2px; }
 .staff-take {
   display: grid;
