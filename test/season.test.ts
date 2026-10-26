@@ -24,6 +24,19 @@ season.onGame = (level, r, day) => {
     }
   }
 };
+/** What the league's run values and the calibration's running and batted-ball numbers are built from. */
+const tallies = () => ({
+  played: season.allStar !== null,
+  events: season.tracker.eventCount(),
+  tracker: JSON.stringify(season.tracker.toJSON()),
+  running: { ...season.env.running! },
+  battedBalls: structuredClone(season.env.battedBalls!),
+});
+// To the morning of the All-Star day, then that day (its game and no other), then the rest.
+season.simDays(season.schedule.allStarDay!);
+const beforeAllStar = tallies();
+season.simDay();
+const afterAllStar = tallies();
 season.simToEnd();
 season.onGame = undefined;
 const stats = season.stats();
@@ -66,6 +79,16 @@ describe("a simulated season", () => {
     // His club that day, kept with the game (he may be traded before the season's out): one in the league he played for.
     const his = g.rosters.find((r) => allStarIds(r).includes(g.mvp!))!;
     expect(league.teams[g.mvpTeam!]!.league).toBe(his.league);
+  });
+
+  it("plays the All-Star Game outside the league's run values and its running and batted-ball counts", () => {
+    // As October is: the game used to add its seventy-odd plate appearances to all three.
+    expect(season.schedule.days[season.schedule.allStarDay!]).toHaveLength(0);
+    expect([beforeAllStar.played, afterAllStar.played]).toEqual([false, true]);
+    expect(afterAllStar.events).toBe(beforeAllStar.events);
+    expect(afterAllStar.tracker).toBe(beforeAllStar.tracker);
+    expect(afterAllStar.running).toEqual(beforeAllStar.running);
+    expect(afterAllStar.battedBalls).toEqual(beforeAllStar.battedBalls);
   });
 
   it("notices the season's moments", () => {
@@ -130,11 +153,14 @@ describe("a simulated season", () => {
   });
 
   it("crowns a champion from the twelve-team bracket", () => {
+    const regular = tallies();
     const post = runPostseason(season);
     expect(post.seeds.flat()).toHaveLength(12);
     expect(post.seeds.flat()).toContain(post.champion);
     const ws = post.series[post.series.length - 1]!;
     expect(ws.round).toBe("World Series");
     expect(Math.max(...ws.wins)).toBe(4);
+    // October, too, is played outside the league's run values and counts.
+    expect(tallies()).toEqual(regular);
   });
 });

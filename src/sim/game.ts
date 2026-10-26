@@ -139,6 +139,12 @@ export interface SimEnv {
   detailed?: boolean;
 }
 
+/**
+ * The environment for a game that counts toward none of the league's numbers (the All-Star Game, October): the run
+ * tracker behind the league's run values and the running and batted-ball tallies don't see it.
+ */
+export const uncounted = (env: SimEnv): SimEnv => ({ ...env, tracker: undefined, running: undefined, battedBalls: undefined });
+
 export interface GameResult {
   awayId: number;
   homeId: number;

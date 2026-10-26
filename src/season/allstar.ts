@@ -1,7 +1,7 @@
 import type { League } from "../league/types";
 import { defenseGrade } from "../players/defense";
 import { FIELD_POSITIONS, type FieldPosition, type LineupPosition, playerName, type Player } from "../players/types";
-import { type LineupSlot, simulateGame, type TeamGameSetup } from "../sim/game";
+import { type LineupSlot, simulateGame, type TeamGameSetup, uncounted } from "../sim/game";
 import type { BattingLine, FieldingLine, PitchingLine } from "../stats/lines";
 import type { HitterRow, PitcherRow, Season } from "./season";
 
@@ -9,7 +9,8 @@ import type { HitterRow, PitcherRow, Season } from "./season";
  * The All-Star Game, on the second day of the break in mid-July: each
  * league's best, picked on the first half (the fans vote in the starters, and
  * every club sends someone), in one exhibition at a host club's park. It
- * counts for nothing but the record books: no stats, no fatigue, no injuries.
+ * counts for nothing but the record books: no stats (the league's run values
+ * included), no fatigue, no injuries.
  */
 
 export interface AllStarRoster {
@@ -173,7 +174,7 @@ export const allStarHost = (league: League): number => league.teams[(league.year
 
 /**
  * Pick the rosters and play the game. It goes into the record (each All-Star's
- * awards, the MVP's too), not into anyone's stats.
+ * awards, the MVP's too), not into anyone's stats or the league's.
  */
 export function playAllStarGame(season: Season): AllStarGame {
   const league = season.league;
@@ -193,7 +194,8 @@ export function playAllStarGame(season: Season): AllStarGame {
   });
   const rng = season.rng.fork(`allstar:${league.year}`);
   const day = season.schedule.allStarDay ?? season.day;
-  const result = simulateGame(season.env, setup(rosters[0]), setup(rosters[1]), rng, day);
+  // Played as October is, outside the big leagues' run values and their running and batted-ball tallies.
+  const result = simulateGame(uncounted(season.env), setup(rosters[0]), setup(rosters[1]), rng, day);
 
   const sides = rosters.map((r) => new Set(allStarIds(r)));
   const batting: [AllStarBatting[], AllStarBatting[]] = [[], []];

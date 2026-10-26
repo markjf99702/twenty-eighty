@@ -6,7 +6,7 @@ import { autoDepthChart } from "../org/depth";
 import type { Player } from "../players/types";
 import { believedWar } from "../scouting/analytics";
 import type { GameResult } from "../sim/game";
-import { simulateGame } from "../sim/game";
+import { simulateGame, uncounted } from "../sim/game";
 import { inningsPitched } from "../stats/lines";
 import { noteMoments } from "./moments";
 import type { GameSummary, Season, TeamRecord } from "./season";
@@ -389,7 +389,7 @@ function playGame(season: Season, b: Bracket, s: LiveSeries): PostGame {
   const day = s.next!;
   const rng = new Rng(`${season.league.seed}:${season.league.year}:post:${s.round}:${s.higher}:${s.lower}:${g}`);
   // Postseason games don't feed regular-season stats or calibration tallies.
-  const env = { ...season.env, tracker: undefined, running: undefined, battedBalls: undefined };
+  const env = uncounted(season.env);
   // Each series starts its rotation from the top (whoever is rested).
   const key = b.series.indexOf(s);
   const setup = (t: Team) => season.gameSetup(t, rng, day, "MLB", { depth: playoffDepth(season, t, b.plan), rotationKey: `${t.id}:post:${key}` });
