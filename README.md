@@ -118,7 +118,7 @@ then pick `main` and `/ (root)`.
   served from here so nothing loads from elsewhere.
 - `web/src/ui/drive.ts`, `web/src/ui/sync.ts`: Google Drive saving (sign-in, uploads, listing, opening
   a copy), adapted from Terraville's.
-- `sw.js`: keeps a copy for playing offline.
+- `sw.js`: keeps a copy for playing offline. On a connection that isn't answering, a page opens from that copy after four seconds. `FILES` in it is a fingerprint of the files it keeps: change one and `npm run test:e2e` says what to set it to, so a release never leaves the copy half old.
 - `icon.svg`, `icon-*.png`, `manifest.webmanifest`, `og.png`: the icon, home-screen install and link preview.
 - `tools/`: the screenshot and icon scripts. `test/`: the engine tests, `e2e.mjs` for the site, and
   `drive.mjs`, which plays five devices sharing a fake Google Drive (`fake-google.mjs`), one with a long

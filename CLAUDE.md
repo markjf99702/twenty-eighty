@@ -10,9 +10,12 @@ dependencies; the browser UI in web/ uses Preact and Vite. See README.md for the
 - `npm run build:site`: the copy twenty-eighty.junkdrawer.works serves (GitHub Pages from `main`, repo
   root): writes `index.html` and `assets/` at the root, next to the hand-kept kit files
   (`sw.js`, `manifest.webmanifest`, icons, `og.png`). Rebuild and commit it with any UI or
-  engine change, then `npm run test:e2e` (plays the built site in Chromium; offline, no
-  outside requests, no sideways scrolling). If a built file is added or renamed, update
-  `sw.js`'s list and bump its cache name. `npm run screenshots` redraws `docs/` and `og.png`.
+  engine change, then `npm run test:e2e` (plays the built site in Chromium; offline, on a
+  stalled connection, no outside requests, no sideways scrolling). If a built file is added
+  or renamed, update `sw.js`'s list and bump its cache name. A rebuild changes files `sw.js`
+  keeps, so `test:e2e` then fails until `FILES` in `sw.js` is set to the value it gives (that
+  change is what makes installed copies download the new release whole).
+  `npm run screenshots` redraws `docs/` and `og.png`.
 - `npm run build:artifact`: one page for the Artifact viewer (fonts inlined, no downloads).
 
 Google Drive saving (the junkdrawer.works rules, Terraville's approach): `web/src/ui/drive.ts`
